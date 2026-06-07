@@ -18,7 +18,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A1  transformer from scratch    [Core]   deps: A0   (LLaMA-style core)
 
 ## Phase 1 — Visual representations
-- [ ] A2  vision transformers         [Core]   deps: A0,A1   (+register tokens, ConvNeXt)
+- [x] A2  vision transformers         [Core]   deps: A0,A1   (+register tokens, ConvNeXt)
 - [ ] A3  self-supervised (MAE+DINO)  [Core]   deps: A1,A2   (+iBOT)
 - [ ] A3.5 video / temporal modeling  [Core]   deps: A2,A3
 - [ ] A4  CLIP & open-vocab           [Core]   deps: A1,A2   (SigLIP primary)
