@@ -21,10 +21,16 @@ fits_12gb: <true | false>                   # true if a real train run fits; if 
 external_data: <none | "nuScenes v1.0-mini (~4GB, license)" | ...>
 ```
 
+> ASSIGNMENT.md is the concise builder contract. The comprehensive, lecture-note
+> version of motivation and background lives in the generated README.md (see
+> ARCHITECTURE.md §5 for its depth requirements: historical landscape, why the
+> paper mattered at the time, the technical core, inline paper links, and the
+> forward connections). Keep the fields below brief here and do not duplicate the
+> README's prose.
+
 ## motivation
-2–4 sentences: why this technique matters and where it sits historically
-(connect to what came before and what it enabled). Written for an experienced
-engineer returning to the field.
+2-4 sentences: the one-line historical placement and why the mechanism matters.
+The full treatment (with paper links and significance) goes in the README.
 
 ## background
 The concise math. Key equations only (use LaTeX-in-Markdown). No textbook

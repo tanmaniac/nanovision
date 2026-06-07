@@ -234,13 +234,36 @@ imports do not break.
 
 ## 5. House style for assignments (applies to every aXX)
 
-- **README.md (the handout)** has a fixed section order: Motivation (why this
-  matters / where it sits historically) → Background (the math, concise, with the
-  key equations) → What you'll implement → Tasks (numbered, each mapping to a TODO
-  in starter) → How to verify (the test commands, in order: shapes → gradcheck →
-  overfit-one-batch → optional real run) → Compute notes (what fits in 12GB,
-  expected runtime, what a healthy loss curve looks like) → Stretch goals →
-  Further reading (papers).
+- **README.md is comprehensive lecture notes, not a terse handout.** It is the
+  primary thing the learner reads to understand the topic, written for an
+  experienced engineer returning to the field. Fixed section order: Motivation →
+  Background → What you'll implement → Tasks → How to verify → Compute notes →
+  Stretch goals → Further reading. Depth requirements:
+  - **Motivation** must teach, not gesture. Explain the pre-existing landscape and
+    its limitation, what the originating paper(s) changed and *why that was
+    significant at the time* (the specific problem it solved, the result that made
+    people notice), the core technical idea in plain terms, and concretely how this
+    mechanism feeds later assignments (name them and say what they reuse). Cite the
+    key papers inline with links (arXiv abs URLs) at the point they are relevant -
+    do not save all citations for Further reading. Several substantial paragraphs,
+    not three sentences. Do not write filler like "this is the foundation" or "X
+    builds on it" without saying what specifically and why it matters.
+  - **Background** is the concise math: the key equations the learner implements,
+    every shape stated, derivations only where they aid implementation.
+  - **How to verify** lists the test commands in run order (shapes → gradcheck →
+    reference-value → overfit-one-batch → optional real run).
+  - **Compute notes** state what fits in 12GB, default sizes, expected runtime, and
+    what a healthy loss curve looks like (so a flat/slow curve is not misread).
+  - **Further reading** is 3-6 papers with one-line annotations and links.
+- **README.md vs ASSIGNMENT.md are different documents with different jobs.** The
+  README is the learner-facing lecture notes above. ASSIGNMENT.md is the concise,
+  machine-readable builder contract: the YAML frontmatter, `what_you_implement`
+  bullets, the per-task contracts (file, symbol, exact in/out shapes, the
+  formula/algorithm, the 1:1 test), `provided_boilerplate`, terse `compute_notes`,
+  and builder-only `solution_notes` (seeds, reference values and how they were
+  obtained, numerical gotchas). ASSIGNMENT.md must NOT re-narrate the README's
+  prose motivation/background; keep its `motivation`/`background` to a few lines or
+  a pointer to the README. The README explains; ASSIGNMENT.md specifies.
 - **Difficulty calibration:** each TODO is sized so the learner writes the
   *interesting* lines (the actual mechanism) and is given the boilerplate
   (data loading, arg parsing, the training-loop skeleton via `nanovision.Trainer`).
