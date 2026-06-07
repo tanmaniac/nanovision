@@ -18,9 +18,10 @@ assignments/**/out/
 *.ckpt
 *.pt
 
-# datasets (nuScenes etc. — never commit)
-data/
-datasets/
+# datasets (nuScenes etc. — never commit). Anchored to repo root so the
+# nanovision/data/ package is NOT ignored.
+/data/
+/datasets/
 *.zip
 
 # os
