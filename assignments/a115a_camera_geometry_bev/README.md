@@ -1,4 +1,4 @@
-# A11.5a — Camera geometry and the BEV transform
+# A11.5a - Camera geometry and the BEV transform
 
 ## Motivation
 
@@ -100,6 +100,26 @@ global frame is a fixed ENU map frame. SE(3) transforms are 4x4 homogeneous
 matrices applied on the left, `p' = T @ p_homogeneous`. A transform named
 `T_b_a` reads "a-to-b": it takes a point in frame a and returns it in frame b.
 
+The two body frames differ in handedness convention, which is the source of most
+sign bugs. The ego frame has +x forward, +y left, +z up. The OpenCV camera frame
+has +x right, +y down, +z forward into the scene:
+
+```
+        ego frame                       OpenCV camera frame
+        (vehicle body)                  (per camera)
+
+            z up                              z forward
+            |                                /
+            |                               /
+            |______ x forward              o --------- x right
+           /                               |
+          /                                |
+         y left                            y down
+```
+
+The transform stored per camera (`T_cam_world`) carries both the translation from
+the rear axle to the lens and this axis relabeling.
+
 ### Pinhole projection (one-paragraph review)
 
 A camera-frame point (X, Y, Z) with Z > 0 projects to a pixel by
@@ -112,6 +132,18 @@ Shapes: `project_points(pts_cam (N,3), K (3,3)) -> px (N,2)`;
 `unproject(px (N,2), depth (N,) or scalar, K (3,3)) -> pts_cam (N,3)`.
 Back-projection is what every BEV lift depends on; the only place to get it wrong
 is the sign/order when you chain it with the extrinsics.
+
+The forward pass is a divide by depth followed by the intrinsic scale and offset:
+
+```mermaid
+flowchart LR
+    A["pts_cam (N,3)<br/>X, Y, Z in camera frame"] -->|"divide by Z"| B["(X/Z, Y/Z)<br/>normalized image plane"]
+    B -->|"u = fx·X/Z + cx<br/>v = fy·Y/Z + cy"| C["px (N,2)<br/>pixels u, v"]
+    C -. "unproject at depth d<br/>X=(u-cx)·d/fx, Y=(v-cy)·d/fy, Z=d" .-> A
+```
+
+The dashed edge is `unproject`: it recovers the camera-frame point only because
+the depth d is supplied separately. A single pixel alone fixes a ray, not a point.
 
 ### The four SE(3) primitives
 
@@ -134,6 +166,22 @@ ego_pose_lidar, lidar_to_ego)`. The naive shortcut reuses the lidar-time ego pos
 for the camera step; the error is the ego motion between the two timestamps. At
 30 m/s and a ~50 ms offset that is about 1.5 m. The temporal-offset test makes
 this exact on synthetic poses (identity sensor extrinsics, a pure +x ego shift).
+
+Each arrow below is one 4x4 SE(3) matrix; the global frame is the only frame both
+timestamps share, so the chain has to pass through it to switch ego poses:
+
+```mermaid
+flowchart LR
+    L["lidar sensor<br/>(N,3) points"] -->|"lidar_to_ego<br/>(calibrated_sensor)"| EL["ego @ lidar_time"]
+    EL -->|"ego_pose_lidar<br/>(ego_pose @ t_lidar)"| G["global (ENU)"]
+    G -->|"invert(ego_pose_cam)<br/>(ego_pose @ t_cam)⁻¹"| EC["ego @ cam_time"]
+    EC -->|"T_cam_ego<br/>(calibrated_sensor⁻¹)"| C["camera frame"]
+    C -->|"K, divide by z"| P["pixels (z>0, in bounds)"]
+```
+
+The naive chain collapses `ego @ lidar_time` and `ego @ cam_time` into one node,
+dropping the global round-trip. On a moving vehicle that drops the ego translation
+between the two timestamps, which is the 1.5 m the test measures.
 
 ### The pyquaternion convention
 
@@ -163,6 +211,37 @@ correct ground mapping and this breakage. `ipm_to_bev` projects each cell's grou
 point into each camera and bilinearly samples the image (via `grid_sample`);
 overlapping cells are last-camera-wins.
 
+The data flow per cell is a ground point, a projection, and a sample:
+
+```mermaid
+flowchart LR
+    G["BEV cell center (x, y)<br/>ego frame, z = ground_z"] --> R["world_to_pixel<br/>(extrinsics, K)"]
+    R --> S["grid_sample image<br/>at (u, v), bilinear"]
+    S --> B["BEV cell color<br/>(C, nx, ny)"]
+```
+
+The failure is geometric. The camera ray through a pixel hits the assumed ground
+plane at one point, but the real scene point on that ray may sit at height h. An
+elevated feature is therefore written into the ground cell where its ray crosses
+z = 0, which is farther from the camera than the object's actual footprint:
+
+```
+   camera
+     o
+     |\
+     | \  ray through one pixel
+     |  \
+     |   \  * real point at height h (e.g. pedestrian's head)
+     |    \
+     |     \
+  ---+------X-------------------  z = 0 ground plane
+     |   true        IPM writes the pixel here,
+   footprint         past the true footprint
+```
+
+The gap between `true footprint` and `X` grows with the object's height and its
+distance from the camera, which is why tall objects streak outward in the BEV.
+
 ## What you'll implement
 
 In `starter/geometry.py`: `project_points` / `unproject`, the four SE(3)
@@ -173,13 +252,13 @@ nuScenes loader is provided boilerplate; you do not implement the devkit plumbin
 
 ## Tasks
 
-1. `project_points` / `unproject` — pinhole projection and its inverse on the
+1. `project_points` / `unproject` - pinhole projection and its inverse on the
    OpenCV camera axes.
-2. The four SE(3) primitives — 4x4 assembly, point application, the structured
+2. The four SE(3) primitives - 4x4 assembly, point application, the structured
    inverse (R^T, -R^T t), and left-to-right composition.
-3. `CameraRig.world_to_cam` / `cam_to_world` / `world_to_pixel` — per-camera
+3. `CameraRig.world_to_cam` / `cam_to_world` / `world_to_pixel` - per-camera
    projection with an in-front (z > 0) and in-bounds visibility mask.
-4. `ipm_to_bev` — warp images onto the ego ground plane via `grid_sample`.
+4. `ipm_to_bev` - warp images onto the ego ground plane via `grid_sample`.
 
 Each maps to a `raise NotImplementedError("A11.5a Task N: ...")` in `starter/`
 and to one test file.
@@ -247,18 +326,18 @@ watch.
 ## Further reading
 
 - Caesar et al., "nuScenes: A Multimodal Dataset for Autonomous Driving" (CVPR
-  2020), [arXiv:1903.11027](https://arxiv.org/abs/1903.11027) — coordinate frames,
+  2020), [arXiv:1903.11027](https://arxiv.org/abs/1903.11027) - coordinate frames,
   sensor suite, and the four-step projection chain.
 - nuScenes devkit schema,
   [schema_nuscenes.md](https://github.com/nutonomy/nuscenes-devkit/blob/master/docs/schema_nuscenes.md)
-  — field-by-field `calibrated_sensor` / `ego_pose` / `sample_data` reference.
+  - field-by-field `calibrated_sensor` / `ego_pose` / `sample_data` reference.
 - Philion and Fidler, "Lift, Splat, Shoot" (ECCV 2020),
-  [arXiv:2008.05711](https://arxiv.org/abs/2008.05711) — the camera-rig and
+  [arXiv:2008.05711](https://arxiv.org/abs/2008.05711) - the camera-rig and
   ego-centric BEV grid abstraction every later method reuses (A11.5b).
 - Li et al., "BEVFormer" (ECCV 2022),
-  [arXiv:2203.17270](https://arxiv.org/abs/2203.17270) — 3-D BEV reference points
+  [arXiv:2203.17270](https://arxiv.org/abs/2203.17270) - 3-D BEV reference points
   projected to 2-D image coordinates, the back half of the projection chain
   (A11.5c).
 - Harley et al., "Simple-BEV" (ICRA 2023),
-  [arXiv:2206.07959](https://arxiv.org/abs/2206.07959) — a clean description of the
+  [arXiv:2206.07959](https://arxiv.org/abs/2206.07959) - a clean description of the
   200x200x8 ego-centric voxel grid and bilinear-sampling lift.

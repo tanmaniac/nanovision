@@ -104,6 +104,23 @@ softmax. M is an optional additive mask, 0 to keep a position and -inf to forbid
 it, used for causality and padding. Compute the softmax stably by subtracting the
 per-row max before exponentiating.
 
+The data flow, with shapes for one head (q is (B,H,Sq,Dh), k and v are
+(B,H,Sk,Dh)):
+
+```mermaid
+flowchart LR
+    Q["q<br/>(B,H,Sq,Dh)"] --> S["q @ kᵀ / sqrt(Dh)<br/>scores (B,H,Sq,Sk)"]
+    K["k<br/>(B,H,Sk,Dh)"] --> S
+    M["+ mask<br/>(0 / -inf)"] --> S
+    S --> SM["softmax over Sk<br/>attn (B,H,Sq,Sk)"]
+    SM --> O["attn @ v<br/>out (B,H,Sq,Dh)"]
+    V["v<br/>(B,H,Sk,Dh)"] --> O
+```
+
+Each output row is a convex combination of the value rows, with weights set by how
+well that query matches each key. The mask is added to the scores before the
+softmax, so a -inf entry sends its weight to zero.
+
 Multi-head attention splits the model dim into h heads of size d/h, runs attention
 per head, concatenates, and applies an output projection. Self-attention takes K
 and V from the same input as Q; cross-attention takes K and V from a separate
@@ -111,10 +128,50 @@ input (the encoder memory). Grouped-query attention projects K and V to fewer he
 than Q (one KV head per group) and repeats each KV head across its query group
 before attending; n_kv_heads == 1 is multi-query.
 
+GQA with n_heads=4 and n_kv_heads=2 groups the four query heads onto two shared
+key/value heads. Each KV head is repeated (repeat_interleave) to cover its two
+query heads before the dot product:
+
+```mermaid
+flowchart TB
+    subgraph Q["query heads (n_heads = 4)"]
+        Q0[q0] --- Q1[q1] --- Q2[q2] --- Q3[q3]
+    end
+    subgraph KV["kv heads (n_kv_heads = 2)"]
+        KV0[kv0] --- KV1[kv1]
+    end
+    KV0 --> Q0
+    KV0 --> Q1
+    KV1 --> Q2
+    KV1 --> Q3
+```
+
+n_kv_heads == n_heads is ordinary multi-head (one KV head per query head);
+n_kv_heads == 1 shares a single KV head across all query heads (multi-query). Fewer
+KV heads means a smaller KV-cache at inference, which is the memory that dominates
+long-context decoding.
+
 The block is pre-norm:
 
     h = x + Attn(Norm(x))
     y = h + FFN(Norm(h))
+
+Each sub-layer normalizes its input, runs the mechanism, and adds the result back
+to the un-normalized input, so an identity path runs straight down the residual
+stream and the norm only ever touches the branch:
+
+```mermaid
+flowchart TB
+    X["x (B,S,dim)"] --> N1["RMSNorm"]
+    N1 --> A["self-attention<br/>(RoPE, causal)"]
+    X --> ADD1((+))
+    A --> ADD1
+    ADD1 --> N2["RMSNorm"]
+    N2 --> F["SwiGLU MLP"]
+    ADD1 --> ADD2((+))
+    F --> ADD2
+    ADD2 --> Y["y (B,S,dim)"]
+```
 
 With cross-attention enabled, a cross-attention sub-layer (attending to kv) sits
 between the self-attention and FFN sub-layers, each with its own pre-norm and
@@ -125,6 +182,24 @@ no mean subtraction or bias:
 
     rms(x) = sqrt(mean(x^2, last) + eps);   y = x / rms(x) * weight
 
+The causal mask is the additive mask M for a decoder: query i may attend to key j
+only when j <= i. As an (S,S) matrix for S=5, with `.` a kept position (0) and `x`
+a forbidden one (-inf), it is lower-triangular including the diagonal:
+
+```text
+          key j
+        0  1  2  3  4
+query 0 .  x  x  x  x
+  i   1 .  .  x  x  x
+      2 .  .  .  x  x
+      3 .  .  .  .  x
+      4 .  .  .  .  .
+```
+
+`torch.triu(full(-inf), diagonal=1)` produces exactly the `x` entries (strictly
+above the diagonal); added to the scores, those positions get zero softmax weight,
+so position i never sees the future.
+
 RoPE rotates pairs of channels of Q and K by an angle proportional to position, so
 the dot product of a rotated query and key depends only on their relative offset:
 
@@ -133,6 +208,22 @@ the dot product of a rotated query and key depends only on their relative offset
 where rotate_half splits the last dim in two halves (x1, x2) and returns (-x2, x1),
 and the cos/sin angles come from inv_freq = base^(-arange(half)/half) outer-product
 position. head_dim must be even.
+
+RoPE turns each pair of channels into a 2D vector and rotates it by an angle
+mθ that grows with the position m. A query at position m and a key at position n,
+each rotated by their own position, have a dot product that depends only on m - n,
+which is how absolute-position rotation encodes relative position:
+
+```mermaid
+flowchart LR
+    Q["query channel pair<br/>at position m"] -->|"rotate by m·θ"| QR["q′"]
+    K["key channel pair<br/>at position n"] -->|"rotate by n·θ"| KR["k′"]
+    QR --> D["q′ · k′<br/>depends on (m - n)·θ"]
+    KR --> D
+```
+
+Different channel pairs use different θ (from inv_freq), so the head encodes a range
+of relative-offset frequencies at once.
 
 SwiGLU is a gated SiLU feed-forward:
 

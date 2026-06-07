@@ -96,6 +96,21 @@ model-plus-loop with `overfit_one_batch`, both built here. The `Trainer`, the
 determinism helpers, and the loss-curve viz are reused unchanged for the rest of
 the course. You are building the instruments before the experiments.
 
+The method is a fixed sequence of cheap-to-expensive checks. Each gate catches a
+different class of bug before the next one runs, so you never spend a real training
+run finding something a shape assertion would have caught:
+
+```mermaid
+flowchart LR
+    A["shape check<br/>(test_shapes.py)"] -->|"output shape and<br/>stats correct"| B["gradcheck<br/>(test_gradcheck.py)"]
+    B -->|"autograd grad matches<br/>finite difference at fp64"| C["overfit one batch<br/>(test_overfit.py)"]
+    C -->|"loss to ~0 on a<br/>fixed noiseless batch"| D["real run"]
+    A -.->|"wrong axis or<br/>broadcast"| X["fix forward"]
+    B -.->|"silent reshape or<br/>wrong-axis reduction"| X
+    C -.->|"flat curve = wiring;<br/>stall = model/loss"| X
+    X -.-> A
+```
+
 ## Background
 
 LayerNorm over the last dimension. Given `x` of shape `(..., dim)`, take the mean
@@ -125,7 +140,21 @@ The MLP, with `x` of shape `(..., dim)`:
     fc2: Linear(hidden, dim)      # (..., dim)
 
 so `forward(x) = fc2(drop(act(fc1(x))))`. Output shape equals input shape. With
-`dropout=0.0` (the A0 default) the dropout layer is the identity.
+`dropout=0.0` (the A0 default) the dropout layer is the identity. The width goes up
+to `hidden` in the middle and back down to `dim`, and every step is elementwise or
+position-wise, so the leading `...` dimensions pass through untouched:
+
+```mermaid
+flowchart LR
+    X["x<br/>(..., dim)"] --> F1["fc1<br/>Linear(dim, hidden)"]
+    F1 --> H1["(..., hidden)"]
+    H1 --> ACT["act = gelu<br/>elementwise"]
+    ACT --> H2["(..., hidden)"]
+    H2 --> DR["drop<br/>Dropout(p)"]
+    DR --> H3["(..., hidden)"]
+    H3 --> F2["fc2<br/>Linear(hidden, dim)"]
+    F2 --> Y["out<br/>(..., dim)"]
+```
 
 The optimization step is the standard rhythm. Given a batch `(inputs, targets)`:
 
@@ -138,7 +167,21 @@ The optimization step is the standard rhythm. Given a batch `(inputs, targets)`:
     return loss.item()                 # python float for logging
 
 `overfit_one_batch` calls `step` on the same batch for a fixed number of steps and
-records the loss each time; a correct setup drives it to ~0.
+records the loss each time; a correct setup drives it to ~0. The order inside `step`
+is what makes it correct: `zero_grad` clears the previous step's gradients before
+`backward` accumulates new ones, and `optimizer.step` reads those gradients before
+the next `zero_grad` wipes them. Drop or reorder any one of these and the loss stays
+flat.
+
+```mermaid
+flowchart LR
+    Z["optimizer.zero_grad()<br/>clear last step's .grad"] --> F["pred = model(inputs)<br/>forward"]
+    F --> L["loss = loss_fn(pred, targets)<br/>scalar"]
+    L --> B["loss.backward()<br/>autograd fills .grad"]
+    B --> S["optimizer.step()<br/>update parameters"]
+    S --> R["return loss.item()<br/>python float"]
+    S -.->|"next call on<br/>same batch"| Z
+```
 
 ## What you'll implement
 
