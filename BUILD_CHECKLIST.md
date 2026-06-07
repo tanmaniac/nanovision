@@ -5,17 +5,17 @@ pass AND its `README.md` + `ASSIGNMENT.md` + `viz.py` are complete. Build
 top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 
 ## Shared library lands incrementally — verify these contracts as you go
-- [ ] `nanovision.primitives` (A0; ConvNeXt block added in A2)
-- [ ] `nanovision.trainer` / `gradcheck` / `determinism` / `data` (A0)
-- [ ] `nanovision.attention` + `nanovision.transformer` (A1; RoPE/RMSNorm/SwiGLU/GQA)
+- [x] `nanovision.primitives` (A0; RMSNorm/SwiGLU added in A1; ConvNeXt block in A2)
+- [x] `nanovision.trainer` / `gradcheck` / `determinism` / `data` (A0)
+- [x] `nanovision.attention` + `nanovision.transformer` (A1; RoPE/RMSNorm/SwiGLU/GQA)
 - [ ] `nanovision.transformer.TubeletEmbedding` (A3.5)
 - [ ] `nanovision.quantize` (A6.5)
-- [ ] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
+- [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
 - [ ] `nanovision.geometry` pointmap/depth utils (A10.5)
 
 ## Phase 0 — Foundation
-- [ ] A0  harness & primitives        [Core]   deps: none
-- [ ] A1  transformer from scratch    [Core]   deps: A0   (LLaMA-style core)
+- [x] A0  harness & primitives        [Core]   deps: none
+- [x] A1  transformer from scratch    [Core]   deps: A0   (LLaMA-style core)
 
 ## Phase 1 — Visual representations
 - [ ] A2  vision transformers         [Core]   deps: A0,A1   (+register tokens, ConvNeXt)
@@ -37,7 +37,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [ ] A11 detection & segmentation    [Mixed]  deps: A1,A2
 
 ## Phase 3.5 — Autonomous-driving perception (nuScenes-mini)
-- [ ] A11.5a camera geometry & BEV    [Core]   deps: A0       (owns dataset "step zero")
+- [x] A11.5a camera geometry & BEV    [Core]   deps: A0       (owns dataset "step zero")
 - [ ] A11.5b lift-splat-shoot         [Core]   deps: A11.5a,A2
 - [ ] A11.5c BEVFormer attention      [Core]   deps: A11.5a,A1,A11.5b,A3.5
 - [ ] A11.5d 3D occupancy             [Core]   deps: A11.5a,A9,A11.5b/c  (render-supervised)
