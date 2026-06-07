@@ -1,0 +1,28 @@
+# Conda environment for nanovision.
+# Create with:  conda env create -f environment.yml
+# Then:         conda activate nanovision && pip install -e .
+#
+# Targets a single 12GB GPU (RTX 4080, CUDA 12.x). The tiny gradcheck/shape tests
+# also run on CPU. The pip torch wheel on Linux is a CUDA 12.x build by default.
+name: nanovision
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - torch>=2.2
+      - torchvision>=0.17
+      - numpy>=1.26
+      - einops>=0.7
+      - matplotlib>=3.8
+      - tqdm>=4.66
+      - pytest>=8.0
+      # probe-only (pretrained weights; notebooks only):
+      - timm>=1.0
+      - open_clip_torch>=2.24
+      - transformers>=4.40
+      # autonomous-driving (A11.5*):
+      - nuscenes-devkit>=1.1
+      - pyquaternion>=0.9
+      - shapely>=2.0

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanovision"
+version = "0.1.0"
+description = "Implement-the-mechanism computer-vision course: transformer era through 2026"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "numpy>=1.26",
+    "einops>=0.7",
+    "matplotlib>=3.8",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+# Pretrained-weight libraries — ALLOWED ONLY in clearly marked probe notebooks,
+# never in starter/ or solution/ mechanism code (see ARCHITECTURE.md §4).
+probe = ["timm>=1.0", "open_clip_torch>=2.24", "transformers>=4.40"]
+# Autonomous-driving substrate (A11.5*).
+av = ["nuscenes-devkit>=1.1", "pyquaternion>=0.9", "shapely>=2.0"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["nanovision*"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["assignments", "tests"]

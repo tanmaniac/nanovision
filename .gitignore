@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# venvs
+.venv/
+venv/
+
+# assignment outputs (viz renders, logs, checkpoints)
+assignments/**/out/
+**/runs/
+*.ckpt
+*.pt
+
+# datasets (nuScenes etc. — never commit)
+data/
+datasets/
+*.zip
+
+# os
+.DS_Store
