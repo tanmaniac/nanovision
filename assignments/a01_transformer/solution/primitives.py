@@ -1,0 +1,9 @@
+"""Reference solution: the canonical implementation lives in the shared library."""
+
+from nanovision.primitives import (  # noqa: F401
+    MLP,
+    LayerNorm,
+    RMSNorm,
+    SwiGLU,
+    gelu,
+)
