@@ -31,16 +31,10 @@ CLS-vs-mean-pool choice, PE interpolation, and the ConvNeXt counterpoint with pa
 links and the forward connections to CLIP, MAE/DINO, and BEV backbones.
 
 ## background
-See the README for the worked shapes. The holes implement: the ConvNeXt block
-(depthwise 7x7 conv -> channels-last LayerNorm -> Linear dim->4dim -> gelu ->
-Linear 4dim->dim -> layer-scale -> residual); patch embedding as a strided Conv2d
-(kernel = stride = patch) flattened to (B, N, dim) with N = (img/patch)^2; the token
-sequence (prepend [CLS], add the learned absolute PE over [CLS]+patches, append
-n_registers register tokens that get no PE); pooling (the [CLS] token at index 0, or
-the mean over the N patch tokens, excluding CLS and registers); and bicubic PE
-interpolation from an old_grid x old_grid layout to new_grid x new_grid with the CLS
-row kept. Shapes: images are (B, C, H, W); patch tokens are (B, N, dim); the encoder
-sees (B, 1 + N + n_registers, dim); logits are (B, num_classes).
+See the README for the worked shapes and figures. Shapes: images are (B, C, H, W);
+patch tokens are (B, N, dim) with N = (img/patch)^2; the encoder sees
+(B, 1 + N + n_registers, dim); logits are (B, num_classes). The PE table is
+(1, 1 + N, dim) and covers the CLS row plus the N patch rows; registers get no PE.
 
 ## what_you_implement
 - The ConvNeXt block (canonical in `nanovision/primitives.py`; the only new
