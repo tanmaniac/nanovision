@@ -30,12 +30,11 @@ camera_axis_convention: OpenCV (+x right, +y down, +z forward)
 ```
 
 ## motivation
-The geometry substrate for the autonomous-driving module. LSS (A11.5b),
-BEVFormer (A11.5c), and occupancy (A11.5d) all reuse the four SE(3) primitives,
-`CameraRig`, and the ego-centric `BEVGrid` defined here. The learner has the
-multi-view-geometry background; the new content is the nuScenes coordinate-frame
-plumbing, the lidar/camera temporal offset, and the flat-ground IPM baseline the
-learned methods exist to fix.
+The geometry the rest of the AV module imports: the four SE(3) primitives,
+`CameraRig`, the ego-centric `BEVGrid`, and `ipm_to_bev`, reused by LSS (A11.5b),
+BEVFormer (A11.5c), and occupancy (A11.5d). The new content is nuScenes
+coordinate-frame plumbing, the lidar/camera temporal offset, and the flat-ground
+IPM baseline. Full treatment with paper links is in the README.
 
 ## background
 Camera frame is OpenCV (+x right, +y down, +z forward); ego frame is x forward,
@@ -111,10 +110,11 @@ geometry with float64 gradchecks on `project_points` and `apply_transform`. The
 3. On real data, measure the naive-vs-correct pixel gap vs ego speed.
 
 ## further_reading
-- Caesar et al., "nuScenes" (CVPR 2020).
-- Philion & Fidler, "Lift, Splat, Shoot" (ECCV 2020).
-- Li et al., "BEVFormer" (ECCV 2022).
-- Harley et al., "Simple-BEV" (ICRA 2023).
+- Caesar et al., "nuScenes" (CVPR 2020), arXiv:1903.11027.
+- nuScenes devkit schema_nuscenes.md (calibrated_sensor / ego_pose fields).
+- Philion & Fidler, "Lift, Splat, Shoot" (ECCV 2020), arXiv:2008.05711.
+- Li et al., "BEVFormer" (ECCV 2022), arXiv:2203.17270.
+- Harley et al., "Simple-BEV" (ICRA 2023), arXiv:2206.07959.
 
 ## solution_notes
 Camera axis convention is OpenCV (+x right, +y down, +z forward), matching
