@@ -255,6 +255,15 @@ imports do not break.
   - **Compute notes** state what fits in 12GB, default sizes, expected runtime, and
     what a healthy loss curve looks like (so a flat/slow curve is not misread).
   - **Further reading** is 3-6 papers with one-line annotations and links.
+  - **Figures and diagrams** carry the structural explanation. Use inline Mermaid
+    blocks (```mermaid) for architecture, data flow, and tensor-shape diagrams
+    (GitHub renders them natively, no binary assets); link a specific figure in the
+    originating paper (ar5iv HTML `https://ar5iv.org/abs/<id>` or the arXiv page,
+    verified to resolve) when a published figure is the clearest reference; and
+    commit a generated PNG under the assignment's `assets/` only for quantitative
+    plots that need real numbers (noise schedules, attention maps), produced by a
+    small reproducible script. Prefer Mermaid for anything structural. Do not
+    hotlink or invent figures you have not confirmed exist.
 - **README.md vs ASSIGNMENT.md are different documents with different jobs.** The
   README is the learner-facing lecture notes above. ASSIGNMENT.md is the concise,
   machine-readable builder contract: the YAML frontmatter, `what_you_implement`

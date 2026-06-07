@@ -39,6 +39,17 @@ with a prompt that:
    what the originating paper(s) changed and why that mattered at the time, the
    technical core in plain terms, and the concrete forward connections (name the
    later assignments and what they reuse), with paper links inline.
+6. Requires figures/diagrams where they carry the explanation. Use, in order of
+   preference: (a) inline Mermaid fenced blocks (```mermaid) for architecture,
+   data flow, and tensor-shape diagrams - GitHub renders these natively, they
+   diff cleanly, and they need no binary assets; (b) a link to a specific figure
+   in the originating paper when a published figure is the clearest reference
+   (link the ar5iv HTML, e.g. `https://ar5iv.org/abs/<id>`, or the arXiv page,
+   and verify it resolves); (c) a generated PNG committed under the assignment's
+   `assets/` and referenced by relative path, only for quantitative plots that
+   need real numbers (noise schedules, attention maps, loss curves), and only if
+   a small reproducible script produces it. Prefer (a) for anything structural.
+   Do not invent or hotlink figures you have not confirmed exist.
 
 ## Verify after
 
