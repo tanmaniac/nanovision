@@ -28,5 +28,10 @@ dev = ["pytest>=8.0"]
 include = ["nanovision*"]
 
 [tool.pytest.ini_options]
+# Run one assignment at a time: `make test A=aXX` / `make verify A=aXX`, or the
+# aggregate `make test-all` / `make verify-all` which use one pytest process per
+# assignment. Assignments reuse test-file and module basenames (test_shapes.py,
+# primitives.py, ...) and the impl-switch imports them by bare name, so a single
+# shared process would collide; per-assignment processes (prepend import mode,
+# the default) keep each isolated and let tests import local helpers.
 addopts = "-q"
-testpaths = ["assignments", "tests"]
