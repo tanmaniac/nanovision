@@ -82,8 +82,8 @@ whether that is happening rather than collapsing.
 ## Background
 
 The shared setup is the ViT patch grid. An image is `(B, C, H, W)`; with patch size
-`p` it becomes `N = (H/p)*(W/p)` patch tokens of dimension `D`. For the tiny config
-here (32x32 images, `p = 4`) that is `N = 64`.
+`p` it becomes $N = (H/p)(W/p)$ patch tokens of dimension `D`. For the tiny config
+here (32x32 images, `p = 4`) that is $N = 64$.
 
 ### MAE
 
@@ -119,12 +119,11 @@ shuffled order, and gathers by `ids_restore` so every position holds either its 
 visible token or a mask token, back in grid order, ready for the decoder positional
 embedding.
 
-The target is the per-patch-normalized pixels, and the loss is MSE on masked patches
-only:
+The target is the per-patch-normalized pixels (each patch made zero-mean unit-variance
+before the MSE), and the loss is MSE on masked patches only:
 
-    target = per_patch_normalize(patchify(img))          # (B, N, p*p*C), zero-mean unit-var per patch
-    per_patch_mse = mean_over_pixels( (pred - target)^2 ) # (B, N)
-    L_mae = sum_i mask_i * per_patch_mse_i / sum_i mask_i
+$$\mathrm{mse}_i = \operatorname*{mean}_{\text{pixels}}\big[(\mathrm{pred}_i - \mathrm{target}_i)^2\big], \qquad
+L_{\text{mae}} = \frac{\sum_i \mathrm{mask}_i \cdot \mathrm{mse}_i}{\sum_i \mathrm{mask}_i}$$
 
 Two details that the tasks make you get right. The loss ignores visible patches
 entirely (the `mask` weight zeroes them), because predicting a patch you were shown is
@@ -139,11 +138,12 @@ Each crop is run through `DINOModel` = backbone ViT then a projection head, prod
 `(B, K)` logits over `K = 128` learned prototypes. The head is an MLP, then L2-
 normalize the hidden feature onto the unit sphere, then a weight-normalized linear
 whose rows are the prototype directions. The cross-view objective compares the
-teacher's distribution to the student's:
+teacher's distribution to the student's (the teacher branch is stop-gradient):
 
-    p_teacher = softmax( (g_teacher - center) / tau_teacher )   # stop-gradient
-    log p_student = log_softmax( g_student / tau_student )
-    H(p_teacher, p_student) = - sum_k p_teacher(k) * log p_student(k)
+$$p_{\text{teacher}} = \operatorname{softmax}\!\big((g_{\text{teacher}} - \text{center})/\tau_{\text{teacher}}\big), \qquad
+\log p_{\text{student}} = \operatorname{log\_softmax}(g_{\text{student}}/\tau_{\text{student}})$$
+
+$$H(p_{\text{teacher}}, p_{\text{student}}) = -\sum_k p_{\text{teacher}}(k)\,\log p_{\text{student}}(k)$$
 
 summed over every (teacher global crop, student crop) pair except the matched same-crop
 pair (a crop is not distilled against itself), averaged over the counted pairs. Because
@@ -168,9 +168,10 @@ flowchart TB
 ```
 
 The teacher moves two ways, neither by backprop. Its weights are an EMA of the
-student's, `theta_t <- m*theta_t + (1-m)*theta_s` over every parameter and float
-buffer. The `center` is an EMA of the batch-mean teacher logits, `center <- m_c*center
-+ (1-m_c)*mean(g_teacher)`, updated outside the autograd graph.
+student's, $\theta_t \leftarrow m\,\theta_t + (1-m)\,\theta_s$ over every parameter and
+float buffer. The `center` is an EMA of the batch-mean teacher logits,
+$\text{center} \leftarrow m_c\,\text{center} + (1-m_c)\operatorname{mean}(g_{\text{teacher}})$,
+updated outside the autograd graph.
 
 Centering and sharpening are the anti-collapse pair, and they push against opposite
 failure modes. Subtracting `center` (the running average teacher output) stops any one
@@ -185,7 +186,7 @@ healthy middle: confident per image, spread across prototypes over the batch.
 
 The collapse instrument is the mean teacher entropy:
 
-    H = mean_over_batch( - sum_k p_teacher(k) * log p_teacher(k) )
+$$H = \operatorname*{mean}_{\text{batch}}\Big[-\sum_k p_{\text{teacher}}(k)\,\log p_{\text{teacher}}(k)\Big]$$
 
 This one scalar reads out which way training has gone, and the collapse test asserts an
 ordering on it:
@@ -196,9 +197,9 @@ flowchart LR
     B --- C["no sharpening<br/>uniform output<br/>H -> log K"]
 ```
 
-With `K = 128`, `log K = ln(128) = 4.85`. Remove centering and the teacher collapses
+With $K = 128$, $\log K = \ln 128 = 4.85$. Remove centering and the teacher collapses
 onto a single prototype, entropy near 0. Remove sharpening (use a large teacher
-temperature) and the teacher goes uniform, entropy near `log K`. Keep both and entropy
+temperature) and the teacher goes uniform, entropy near $\log K$. Keep both and entropy
 sits in the middle. The two collapses are different degeneracies, which is why one
 anti-collapse trick is not enough and you need both.
 
@@ -245,7 +246,7 @@ only the six mechanism bodies.
    toward the batch-mean teacher logits by `center_momentum`. Teaches the stable EMA
    target and the centering buffer that prevents single-mode collapse.
 6. `teacher_entropy` (`dino.py`): form `p_t = softmax((g_t - center)/tau_t)` and return
-   the mean over the batch of `-sum_k p_t(k) log p_t(k)`. Teaches the instrument the
+   the mean over the batch of $-\sum_k p_t(k)\,\log p_t(k)$. Teaches the instrument the
    collapse test reads.
 
 ## How to verify
@@ -306,7 +307,7 @@ The overfit test freezes the teacher and captures its output once, then trains t
 student against that fixed target; the loss falls to about `0.74 * initial`. It does not
 reach zero because the head's unit-norm features give bounded cosine logits that cannot
 exactly match the sharp teacher target. The collapse test runs three short variants and
-reads `teacher_entropy`; with `log K = 4.85`, full DINO settles around 1.3, no-centering
+reads `teacher_entropy`; with $\log K = 4.85$, full DINO settles around 1.3, no-centering
 near 0, no-sharpening near 4.85. The collapse test deliberately uses a fast-tracking
 teacher momentum (0.9) so the degeneracy appears within ~150 steps; the overfit test
 uses no momentum at all (frozen teacher). These are opposite teacher regimes on purpose.

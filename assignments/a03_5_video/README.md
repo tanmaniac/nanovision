@@ -34,15 +34,15 @@ VideoMAE abstract). Tube masking plus a very high ratio makes masked
 autoencoding work for video, and you reproduce that contrast on a tiny clip here.
 
 The architectural simplification this assignment makes, and that you should know it is
-making, is joint space-time attention: the transformer encoder attends over all `N = T' * S'`
-tubelet tokens at once, which is `O(N^2)`. For a real clip `N` is large and that
+making, is joint space-time attention: the transformer encoder attends over all $N = T'S'$
+tubelet tokens at once, which is $O(N^2)$. For a real clip $N$ is large and that
 quadratic cost is exactly why video transformers were expensive and why the field moved
 to factorized attention. TimeSformer (Bertasius et al., 2021,
 [arxiv.org/abs/2102.05095](https://arxiv.org/abs/2102.05095)) attends within space and
 within time in separate sub-layers ("divided space-time attention"), turning
-`O((T'S')^2)` into `O(T' S'^2 + T'^2 S')`, and ViViT proposes factorized-encoder and
+$O((T'S')^2)$ into $O(T'S'^2 + T'^2 S')$, and ViViT proposes factorized-encoder and
 factorized-attention variants for the same reason. Joint attention is fine here because
-`N = 48`; at scale it is not, and the README for any real system would lead with the
+$N = 48$; at scale it is not, and the README for any real system would lead with the
 factorization. We build joint attention because it is the transformer encoder unchanged, and
 name the cost so the simplification is explicit.
 
@@ -59,9 +59,9 @@ on you.
 ## Background
 
 A clip is `(B, C, T, H, W)`. With spatial patch `p` and temporal tubelet `t`, the
-tubelet grid is `T' = T/t` temporal steps by `S' = (H/p)*(W/p)` spatial positions, for
-`N = T' * S'` tokens. The tiny config here is `T=6, t=2` (so `T'=3`), `16x16` frames
-with `p=4` (so `S'=16`), giving `N = 48`.
+tubelet grid is $T' = T/t$ temporal steps by $S' = (H/p)(W/p)$ spatial positions, for
+$N = T'S'$ tokens. The tiny config here is `T=6, t=2` (so $T'=3$), `16x16` frames
+with `p=4` (so $S'=16$), giving $N = 48$.
 
 ### Tubelet embedding
 
@@ -72,7 +72,7 @@ each non-overlapping space-time tubelet:
 
 The conv output is `(B, dim, T', H', W')`; flattening the three grid dims
 temporal-outermost and transposing gives `(B, N, dim)` with token index
-`idx = t' * S' + (h'*W' + w')`. This is the exact 3D analog of the ViT patch embedding, and the
+$idx = t'S' + (h'W' + w')$. This is the exact 3D analog of the ViT patch embedding, and the
 same identity holds: the embed equals unfolding each tubelet into a `(C*t*p*p)` vector
 and multiplying by the conv weight reshaped to `(C*t*p*p, dim)`.
 
@@ -85,7 +85,7 @@ flowchart LR
     Tr -. equal .-> M
 ```
 
-The flatten convention (temporal-outermost, `idx = t'*S' + s`) is pinned because the
+The flatten convention (temporal-outermost, $idx = t'S' + s$) is pinned because the
 positional embedding, the tube mask, and the reconstruction target all index tokens
 this way; transposing it silently breaks the tube test.
 
@@ -117,7 +117,7 @@ The defining property, and the centerpiece test, is that the mask reshaped to
 value), keep 2 of 16 spatial columns, so `n_keep = 3*2 = 6` visible tubelets and 42
 masked. VideoMAE itself uses 90 to 95 percent; the toy lowers it to 0.875 only so a
 depth-4 model can memorize one clip, and the tube structure quantizes the achievable
-ratio to `1 - k/16`.
+ratio to $1 - k/16$.
 
 ### Reconstruction and loss
 
@@ -127,8 +127,8 @@ sees the full 48-token grid, and a linear head predicts `(B, N, t*p*p*C)` per-tu
 pixels. The loss is MAE's masked-patch MSE with the patch enlarged from `p*p` to
 `t*p*p`, on per-tubelet-normalized targets, averaged over masked tubelets only:
 
-    target  = per_tubelet_normalize(tubeletify(clip))     # (B, N, t*p*p*C)
-    L_video = sum_i mask_i * mean_pix((pred_i - target_i)^2) / sum_i mask_i
+$$L_{\text{video}} = \frac{\sum_i \mathrm{mask}_i \cdot \operatorname*{mean}_{\text{pixels}}\big[(\mathrm{pred}_i - \mathrm{target}_i)^2\big]}{\sum_i \mathrm{mask}_i},
+\qquad \mathrm{target} = \operatorname{per\_tubelet\_normalize}(\operatorname{tubeletify}(\mathrm{clip}))$$
 
 ## What you'll implement
 
@@ -209,7 +209,7 @@ linear probe): the representation benefit of tube masking shows only at real vid
 Two simplifications the toy makes, stated so they are not mistaken for the recipe. The
 masking ratio is 0.875, below VideoMAE's 90-95 percent, lowered only so a tiny model
 overfits one clip. The encoder uses joint space-time attention (the transformer encoder over all
-48 tokens), which is `O(N^2)`; real systems factorize space and time (TimeSformer,
+48 tokens), which is $O(N^2)$; real systems factorize space and time (TimeSformer,
 ViViT) to avoid the quadratic cost.
 
 ## Stretch goals

@@ -74,10 +74,10 @@ the standard structure you will build in A1 and reuse everywhere after.
 GELU is the activation. Hendrycks and Gimpel proposed it in
 [Gaussian Error Linear Units (GELUs)](https://arxiv.org/abs/1606.08415) (2016) as a
 smooth gate: instead of ReLU's hard cutoff at zero, GELU multiplies each input by
-the probability that a standard Gaussian is below it, `x * Φ(x)`, which weights an
+the probability that a standard Gaussian is below it, $x\,\Phi(x)$, which weights an
 input by how large it is rather than thresholding it. The smoothness gives nonzero
 gradient on both sides of the origin, and the exact form uses the error function,
-`x * 0.5 * (1 + erf(x / sqrt(2)))`. The paper also gives a tanh approximation that
+$x \cdot \tfrac{1}{2}\big(1 + \operatorname{erf}(x/\sqrt{2})\big)$. The paper also gives a tanh approximation that
 predates fast vectorized `erf`; we implement the exact form because `torch.erf` is
 fast and exact, and because matching the exact definition keeps the primitive
 unambiguous. GELU is the activation inside the transformer's MLP.
@@ -128,9 +128,9 @@ shape equals input shape. Use `unbiased=False`; the biased variance (dividing by
 
 Exact GELU, elementwise, same shape in and out:
 
-    GELU(x) = x * 0.5 * (1 + erf(x / sqrt(2)))
+$$\mathrm{GELU}(x) = x \cdot \tfrac{1}{2}\big(1 + \operatorname{erf}(x/\sqrt{2})\big)$$
 
-`erf` is `torch.erf`, and `sqrt(2)` is `math.sqrt(2.0)`. Note `GELU(0) == 0`.
+`erf` is `torch.erf`, and `sqrt(2)` is `math.sqrt(2.0)`. Note $\mathrm{GELU}(0) = 0$.
 
 The MLP, with `x` of shape `(..., dim)`:
 
@@ -264,7 +264,7 @@ at the model or loss, not the optimizer.
   test; the norm in the pre-norm residual block.
 - Hendrycks and Gimpel,
   [Gaussian Error Linear Units (GELUs)](https://arxiv.org/abs/1606.08415) (2016) -
-  the smooth `x * Φ(x)` activation; introduces both the exact-erf form and the tanh
+  the smooth $x\,\Phi(x)$ activation; introduces both the exact-erf form and the tanh
   approximation.
 - Kingma and Ba,
   [Adam: A Method for Stochastic Optimization](https://arxiv.org/abs/1412.6980)

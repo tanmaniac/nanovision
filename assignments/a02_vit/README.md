@@ -110,7 +110,7 @@ uses a matter of importing and reshaping.
 ## Background
 
 An input image is `(B, C, H, W)`. Patch embedding with patch size `p` produces
-`N = (H/p) * (W/p)` patch tokens of dimension `d`:
+$N = (H/p)\,(W/p)$ patch tokens of dimension `d`:
 
     PatchEmbed(x) = flatten_spatial(Conv2d_{k=p, s=p}(x))      # (B, N, d)
 

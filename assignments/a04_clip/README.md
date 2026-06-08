@@ -14,17 +14,17 @@ model, with no per-class annotation. Because the text encoder accepts arbitrary
 language at inference, the resulting model is open-vocabulary: you classify into any set
 of classes by writing them as text prompts, with no fine-tuning and no new head.
 
-This assignment builds the training objective. A batch of N (image, caption)
-pairs gives an N by N grid of image-text combinations. The N diagonal entries are the
-matched pairs, the N(N-1) off-diagonal entries are mismatched pairs used as negatives.
+This assignment builds the training objective. A batch of $N$ (image, caption)
+pairs gives an $N \times N$ grid of image-text combinations. The $N$ diagonal entries are the
+matched pairs, the $N(N-1)$ off-diagonal entries are mismatched pairs used as negatives.
 CLIP scores every combination by cosine similarity in the shared space, scales the
 scores by a learned temperature, and applies a symmetric cross-entropy: each image
 should rank its own caption above all others, and each caption should rank its own image
 above all others. This is the InfoNCE loss. The negatives come from within the batch, so the number and
 diversity of negatives scale with the batch size. The InfoNCE objective is a lower bound
 on the mutual information between the image and text representations, and the bound
-tightens as N grows. CLIP used a batch size of 32,768 to make the negatives hard. With 7
-negatives at N=8 the task is trivially solved and the representation is weak; the loss
+tightens as $N$ grows. CLIP used a batch size of 32,768 to make the negatives hard. With 7
+negatives at $N=8$ the task is trivially solved and the representation is weak; the loss
 needs a very large batch to be informative.
 
 That batch-size requirement is a problem on any single GPU, and it motivates the
@@ -33,7 +33,7 @@ second loss in this assignment. SigLIP (Zhai et al., 2023,
 softmax of InfoNCE with an independent sigmoid on every pair: each of the N by N entries
 becomes its own binary classification, matched or not, with a log-sigmoid loss and a
 learnable bias. There is no softmax denominator that sums over the batch, so the loss is
-well-defined at any batch size, including N=1, and it does not need an all-gather over
+well-defined at any batch size, including $N=1$, and it does not need an all-gather over
 the full similarity matrix in distributed training. SigLIP outperforms softmax InfoNCE
 at small and moderate batch sizes and matches it once the batch is very large. For a 12GB
 budget the sigmoid loss is the practical default, and it is the production default in
@@ -91,34 +91,34 @@ is bidirectional with a different pool; this toy uses the CLIP causal-EOS conven
 
 ### Symmetric InfoNCE (CLIP)
 
-With both feature sets L2-normalized, build the scaled similarity matrix and average the
-two cross-entropies, one over rows (image to text) and one over columns (text to image),
-with the matched pair on the diagonal:
+With both feature sets L2-normalized (write $u_i$ for image embedding $i$, $v_j$ for text
+embedding $j$, and $s$ for the scale), build the scaled similarity matrix
+$\ell_{ij} = s\,\langle u_i, v_j\rangle$ and average a row cross-entropy (image to text) and
+a column cross-entropy (text to image), each with the matched pair on the diagonal:
 
-    logits = scale * image_features @ text_features.T          # (N, N)
-    L_clip = 0.5 * ( CE(logits, arange(N)) + CE(logits.T, arange(N)) )
+$$L_{\text{clip}} = \tfrac{1}{2}\left[\,-\frac{1}{N}\sum_i \log\frac{e^{\ell_{ii}}}{\sum_j e^{\ell_{ij}}}\;-\;\frac{1}{N}\sum_j \log\frac{e^{\ell_{jj}}}{\sum_i e^{\ell_{ij}}}\,\right]$$
 
 `scale` is `logit_scale.exp()`, where `logit_scale` is a learnable scalar in log space.
 The cross-entropy is built by hand here (log-softmax over each row, then the diagonal),
-because the softmax denominator summing over the N-1 in-batch negatives is the mechanism
+because the softmax denominator summing over the $N-1$ in-batch negatives is the mechanism
 the loss teaches; calling a prebuilt cross-entropy would hide it. CLIP initializes
-`logit_scale` to `log(1/0.07)` and clamps the parameter at `log(100)` each step, which
+`logit_scale` to $\log(1/0.07)$ and clamps the parameter at $\log(100)$ each step, which
 was needed for stability; the temperature converges near 0.01 (scale near 100).
 
 ### Sigmoid loss (SigLIP)
 
 SigLIP scores the same matrix but treats each pair independently. The label matrix is +1
 on the diagonal and -1 off it, and the loss is the negative log-sigmoid summed over the
-full matrix and divided by N (the batch size), following the paper's Algorithm 1:
+full matrix and divided by $N$ (the batch size), following the paper's Algorithm 1. With
+$\ell_{ij} = s\,\langle u_i, v_j\rangle + b$ and $\sigma$ the sigmoid:
 
-    logits = scale * image_features @ text_features.T + bias    # (N, N)
-    labels = 2 * eye(N) - 1                                     # +1 matched, -1 mismatched
-    L_sig  = - sum( logsigmoid(labels * logits) ) / N
+$$y_{ij} = \begin{cases}+1 & i = j \\ -1 & i \neq j\end{cases}, \qquad
+L_{\text{sig}} = -\frac{1}{N}\sum_{i=1}^{N}\sum_{j=1}^{N}\log\sigma\big(y_{ij}\,\ell_{ij}\big)$$
 
 `bias` is a learnable scalar initialized to -10. Most pairs in the matrix are negatives,
-and `sigmoid(score + bias)` with a large negative bias starts near 0, so the negatives
+and $\sigma(\text{score} + \text{bias})$ with a large negative bias starts near 0, so the negatives
 contribute almost no loss at initialization and the model is not swamped by them. The
-paper initializes the temperature to `log(10)`.
+paper initializes the temperature to $\log(10)$.
 
 ```mermaid
 flowchart TB

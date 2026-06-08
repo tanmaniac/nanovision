@@ -5,11 +5,11 @@
 Before 2017, sequence modeling meant recurrence. An RNN, and its gated successors
 the LSTM and GRU, read a sequence one token at a time and carried a hidden state
 forward. That design has two costs that came to dominate everything. First, the
-computation is inherently sequential: to compute the state at position t you must
-already have the state at t-1, so you cannot parallelize over the time axis, and a
-length-n sequence takes n sequential steps regardless of how many GPUs you have.
+computation is inherently sequential: to compute the state at position $t$ you must
+already have the state at $t-1$, so you cannot parallelize over the time axis, and a
+length-$n$ sequence takes $n$ sequential steps regardless of how many GPUs you have.
 Second, information from an early token reaches a late token only by passing
-through every intermediate state, an O(n) path. Each hop multiplies by a recurrent
+through every intermediate state, an $O(n)$ path. Each hop multiplies by a recurrent
 weight and squashes through a nonlinearity, so gradients along that path shrink (or
 blow up) exponentially with distance. Long-range dependencies decay. The LSTM gate
 machinery was built specifically to slow that decay, and it helped, but it did not
@@ -93,13 +93,13 @@ problem small enough to verify exactly, and the rest of the course imports it.
 
 ## Background
 
-Scaled dot-product attention for queries Q in R^{n x d}, keys K in R^{m x d},
-values V in R^{m x d}:
+Scaled dot-product attention for queries $Q \in \mathbb{R}^{n\times d}$, keys
+$K \in \mathbb{R}^{m\times d}$, values $V \in \mathbb{R}^{m\times d}$:
 
-    Attention(Q, K, V) = softmax(Q K^T / sqrt(d) + M) V
+$$\mathrm{Attention}(Q, K, V) = \operatorname{softmax}\!\left(\frac{Q K^\top}{\sqrt{d}} + M\right) V$$
 
-The 1/sqrt(d) scale keeps the logits from growing with d and saturating the
-softmax. M is an optional additive mask, 0 to keep a position and -inf to forbid
+The $1/\sqrt{d}$ scale keeps the logits from growing with $d$ and saturating the
+softmax. $M$ is an optional additive mask, 0 to keep a position and $-\infty$ to forbid
 it, used for causality and padding. Compute the softmax stably by subtracting the
 per-row max before exponentiating.
 
@@ -120,7 +120,7 @@ Each output row is a convex combination of the value rows, with weights set by h
 well that query matches each key. The mask is added to the scores before the
 softmax, so a -inf entry sends its weight to zero.
 
-Multi-head attention splits the model dim into h heads of size d/h, runs attention
+Multi-head attention splits the model dim into $h$ heads of size $d/h$, runs attention
 per head, concatenates, and applies an output projection. Self-attention takes K
 and V from the same input as Q; cross-attention takes K and V from a separate
 input (the encoder memory). Grouped-query attention projects K and V to fewer heads
@@ -152,8 +152,7 @@ long-context decoding.
 
 The block is pre-norm:
 
-    h = x + Attn(Norm(x))
-    y = h + FFN(Norm(h))
+$$h = x + \mathrm{Attn}(\mathrm{Norm}(x)), \qquad y = h + \mathrm{FFN}(\mathrm{Norm}(h))$$
 
 Each sub-layer normalizes its input, runs the mechanism, and adds the result back
 to the un-normalized input, so an identity path runs straight down the residual
@@ -179,7 +178,7 @@ residual.
 RMSNorm rescales by the root-mean-square over the last axis with a learned gain and
 no mean subtraction or bias:
 
-    rms(x) = sqrt(mean(x^2, last) + eps);   y = x / rms(x) * weight
+$$\mathrm{rms}(x) = \sqrt{\tfrac{1}{d}\textstyle\sum_i x_i^2 + \epsilon}, \qquad y = \frac{x}{\mathrm{rms}(x)}\,\gamma$$
 
 The causal mask is the additive mask M for a decoder: query i may attend to key j
 only when j <= i. As an (S,S) matrix for S=5, with `.` a kept position (0) and `x`
@@ -202,15 +201,15 @@ so position i never sees the future.
 RoPE rotates pairs of channels of Q and K by an angle proportional to position, so
 the dot product of a rotated query and key depends only on their relative offset:
 
-    q' = q * cos + rotate_half(q) * sin
+$$q' = q\odot\cos + \operatorname{rotate\_half}(q)\odot\sin$$
 
-where rotate_half splits the last dim in two halves (x1, x2) and returns (-x2, x1),
+where rotate_half splits the last dim in two halves $(x_1, x_2)$ and returns $(-x_2, x_1)$,
 and the cos/sin angles come from inv_freq = base^(-arange(half)/half) outer-product
 position. head_dim must be even.
 
 RoPE turns each pair of channels into a 2D vector and rotates it by an angle
-mθ that grows with the position m. A query at position m and a key at position n,
-each rotated by their own position, have a dot product that depends only on m - n,
+$m\theta$ that grows with the position $m$. A query at position $m$ and a key at position $n$,
+each rotated by their own position, have a dot product that depends only on $m - n$,
 which is how absolute-position rotation encodes relative position:
 
 ```mermaid
@@ -221,14 +220,14 @@ flowchart LR
     KR --> D
 ```
 
-Different channel pairs use different θ (from inv_freq), so the head encodes a range
+Different channel pairs use different $\theta$ (from inv_freq), so the head encodes a range
 of relative-offset frequencies at once.
 
 SwiGLU is a gated SiLU feed-forward:
 
-    SwiGLU(x) = (silu(W_gate x) * (W_up x)) W_down,   silu(z) = z * sigmoid(z)
+$$\mathrm{SwiGLU}(x) = \big(\operatorname{silu}(W_{\text{gate}}\,x)\odot(W_{\text{up}}\,x)\big)\,W_{\text{down}}, \qquad \operatorname{silu}(z) = z\,\sigma(z)$$
 
-The three linear layers are bias-free. The inner width is set to about 8/3 of dim
+The three linear layers are bias-free. The inner width is set to about $8/3$ of dim
 (then rounded to a multiple of 8) so the parameter count matches a 4x GELU MLP.
 
 Shapes: tensors are (batch, seq, dim) at module boundaries, (batch, heads, seq,
