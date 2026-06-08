@@ -36,7 +36,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A9  NeRF (prequel)              [Core]   deps: A0
 - [x] A10 Gaussian splatting          [Core]   deps: A9
 - [x] A10.5 geometry foundation models[Mixed]  deps: A1,A2,A9
-- [ ] A11 detection & segmentation    [Mixed]  deps: A1,A2
+- [x] A11 detection & segmentation    [Mixed]  deps: A1,A2
 
 ## Phase 3.5 - Autonomous-driving perception (nuScenes-mini)
 - [x] A11.5a camera geometry & BEV    [Core]   deps: A0       (owns dataset "step zero")

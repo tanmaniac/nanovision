@@ -350,3 +350,68 @@ def nerf_synthetic_scene(
     images = torch.stack(images, dim=0).to(device)
     poses = torch.stack(poses, dim=0).to(device)
     return images, poses, K.to(device), float(near), float(far)
+
+
+def detection_batch(
+    batch: int = 4,
+    size: int = 32,
+    num_classes: int = 3,
+    max_objects: int = 2,
+    seed: int = 0,
+    device: str = "cpu",
+) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+    """A tiny detection toy: solid colored squares on a black background (A11).
+
+    Each image holds 1 to max_objects axis-aligned squares. A square's color is one of
+    num_classes fixed RGB colors, and the color is its class id. The box is the square's
+    exact extent, returned in normalized cxcywh in [0, 1] (center x, center y, width,
+    height, each divided by the image size). The number of objects varies per image, so
+    boxes and labels are padded to max_objects and a boolean mask marks the valid rows.
+
+    Returns:
+        images (batch, 3, size, size) in [0, 1].
+        boxes  (batch, max_objects, 4) cxcywh in [0, 1]; padded rows are zero.
+        labels (batch, max_objects) long class ids in [0, num_classes); padded rows zero.
+        mask   (batch, max_objects) bool; True where the (box, label) row is a real object.
+
+    Deterministic per seed. Squares are placed without overlap so each pixel has one
+    unambiguous class, and side lengths are a few pixels so the box is several patches wide.
+    """
+    g = torch.Generator().manual_seed(seed)
+    # Fixed class colors: red, green, blue (extend by cycling if num_classes > 3).
+    palette = torch.tensor([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+    ])
+    colors = palette[torch.arange(num_classes) % palette.shape[0]]
+
+    images = torch.zeros(batch, 3, size, size)
+    boxes = torch.zeros(batch, max_objects, 4)
+    labels = torch.zeros(batch, max_objects, dtype=torch.long)
+    mask = torch.zeros(batch, max_objects, dtype=torch.bool)
+
+    side_min, side_max = max(4, size // 8), max(6, size // 4)
+    for b in range(batch):
+        n_obj = int(torch.randint(1, max_objects + 1, (1,), generator=g))
+        placed: list[tuple[int, int, int, int]] = []  # (x0, y0, x1, y1) in pixels
+        for j in range(n_obj):
+            for _ in range(50):  # rejection-sample a non-overlapping placement
+                side = int(torch.randint(side_min, side_max + 1, (1,), generator=g))
+                x0 = int(torch.randint(0, size - side + 1, (1,), generator=g))
+                y0 = int(torch.randint(0, size - side + 1, (1,), generator=g))
+                x1, y1 = x0 + side, y0 + side
+                if all(x1 <= px0 or x0 >= px1 or y1 <= py0 or y0 >= py1
+                       for (px0, py0, px1, py1) in placed):
+                    break
+            placed.append((x0, y0, x1, y1))
+            cls = int(torch.randint(0, num_classes, (1,), generator=g))
+            images[b, :, y0:y1, x0:x1] = colors[cls][:, None, None]
+            cx = (x0 + x1) / 2.0 / size
+            cy = (y0 + y1) / 2.0 / size
+            w = side / size
+            h = side / size
+            boxes[b, j] = torch.tensor([cx, cy, w, h])
+            labels[b, j] = cls
+            mask[b, j] = True
+
+    return images.to(device), boxes.to(device), labels.to(device), mask.to(device)
