@@ -35,7 +35,11 @@ with a prompt that:
 5. States the writing style: plain American English, sentence-case headings, no em
    dashes (single hyphen), straight quotes, no filler ("delve", "leverage",
    "robust", "crucial", "seamless", etc.), and never the phrase "this is the
-   substrate". Motivation must explain the pre-existing landscape and its limit,
+   substrate". Math is real LaTeX: inline `$...$`, display `$$...$$`, with proper
+   symbols ($\sqrt{\,}$, $\bar\alpha_t$, $\varepsilon$), never inline-code spans or
+   ASCII like `sqrt(1-abar)` for equations (GitHub renders LaTeX natively). Inline
+   code is for identifiers and file names only. Motivation must explain the
+   pre-existing landscape and its limit,
    what the originating paper(s) changed and why that mattered at the time, the
    technical core in plain terms, and the concrete forward connections (name the
    later assignments and what they reuse), with paper links inline.
@@ -78,6 +82,10 @@ rewrite it to be direct, editing ONLY the README. Specifically it must strip:
 - New jargon used before it is defined: if a term (tubelet, register token, EOS
   pooling, ...) is used before a clause explains what it is, add a short gloss at first
   use or flag it. The reader should never hit a word they cannot understand in place.
+- Math written as inline-code spans or ASCII instead of LaTeX: convert `` `x_t` ``,
+  `sqrt(1-abar)`, `alpha_bar_t`, and similar to real LaTeX ($x_t$, $\sqrt{1-\bar\alpha_t}$,
+  $\bar\alpha_t$), inline as `$...$` and display equations as `$$...$$`. Leave genuine
+  code identifiers and file names in inline code.
 It must NOT add claims, soften technical precision, or touch code/shapes/citations. It
 returns the list of edits it made so the change is auditable.
 

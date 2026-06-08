@@ -161,3 +161,41 @@ def image_text_batch(batch: int = 8, size: int = 16, channels: int = 3, n_classe
         tokens[i, 1] = 1 + n_classes + a      # attribute token
         tokens[i, 2] = eos                    # EOS (largest id); rest stay pad (0)
     return images.clamp(0.0, 1.0).to(device), tokens.to(device)
+
+
+def diffusion_image_batch(n: int = 16, num_classes: int = 3, size: int = 16,
+                          channels: int = 1, seed: int = 0,
+                          device: str = "cpu") -> tuple[Tensor, Tensor]:
+    """A batch of tiny shape images with class labels, for diffusion (A5).
+
+    Returns (images (B, C, H, W) in [-1, 1], labels (B,) in 0..num_classes-1). Each class
+    is a distinct shape - 0: filled disk, 1: axis-aligned square, 2: plus/cross - drawn at
+    a randomly jittered center and size. The class label does NOT pin down position or
+    size, so the wide intra-class spread gives classifier-free guidance a real
+    fidelity/diversity trade-off to show: high guidance sharpens the canonical shape and
+    collapses the position/size variation. Deterministic per seed, so overfitting one
+    batch to near-zero is exact. Data is scaled to [-1, 1] (background -1, shape +1), the
+    range diffusion models assume.
+    """
+    g = torch.Generator().manual_seed(seed)
+    imgs = torch.full((n, channels, size, size), -1.0)
+    labels = torch.randint(0, num_classes, (n,), generator=g)
+    ys = torch.arange(size).float().view(size, 1)
+    xs = torch.arange(size).float().view(1, size)
+    for i in range(n):
+        cls = int(labels[i])
+        # Half-size (radius) jittered wide; center jittered so the shape stays in frame.
+        r = 2.5 + torch.rand(1, generator=g).item() * 3.5     # 2.5 .. 6.0
+        cx = r + torch.rand(1, generator=g).item() * (size - 2 * r)
+        cy = r + torch.rand(1, generator=g).item() * (size - 2 * r)
+        dx = (xs - cx).abs()
+        dy = (ys - cy).abs()
+        if cls == 0:                                          # filled disk
+            mask = ((xs - cx) ** 2 + (ys - cy) ** 2) <= r ** 2
+        elif cls == 1:                                        # axis-aligned square
+            mask = (dx <= r) & (dy <= r)
+        else:                                                 # plus / cross
+            arm = r / 2.5
+            mask = ((dx <= arm) & (dy <= r)) | ((dy <= arm) & (dx <= r))
+        imgs[i, 0][mask] = 1.0
+    return imgs.to(device), labels.to(device)

@@ -247,7 +247,7 @@ The U-Net is no longer the default backbone. DiT replaced it for ImageNet class-
 
 ### Diffusion vs. flow matching unification is being formalized (2024-2025)
 
-Several papers in 2025 have derived unified measure-theoretic frameworks showing DDPM, score-based models, and flow matching as special cases of a single object (e.g., "A Unified Measure-Theoretic View of Diffusion, Score-Based, and Flow Matching Generative Models," arXiv:2605.06829, 2025). This is primarily of theoretical interest for A5, but it confirms that teaching the SDE/score connection in A5 is the right foundation for understanding that A6 is a simplification rather than a replacement.
+Several papers have derived unified frameworks showing DDPM, score-based models, and flow matching as special cases of a single object (the cleanest concrete reference is Lipman et al.'s flow matching, arXiv:2210.02747, which casts diffusion paths as one family of probability paths). This is primarily of theoretical interest for A5, but it confirms that teaching the SDE/score connection in A5 is the right foundation for understanding that A6 is a simplification rather than a replacement. (An earlier draft of this note cited arXiv:2605.06829 for a "measure-theoretic view"; that id is future-dated and unverified, so it was removed.)
 
 ---
 
