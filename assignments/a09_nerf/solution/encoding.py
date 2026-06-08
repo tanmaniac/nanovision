@@ -1,0 +1,51 @@
+"""Fourier positional encoding, the fix for the MLP's spectral bias.
+
+A plain coordinate MLP fits low frequencies first and renders the scene blurry (the
+spectral-bias result of Tancik et al. 2020). The encoding lifts each input coordinate to a
+bank of sinusoids at geometrically spaced frequencies, so the network can represent
+high-frequency detail (sharp object boundaries) early in training.
+
+Input-range contract: the frequency schedule 2^k is only well-behaved when inputs are
+normalized to roughly [-1, 1] first. The caller (NeRFMLP) divides sample positions by a
+scene-bound constant before encoding and feeds unit-length directions. An unnormalized
+position of magnitude ~4 with the top 2^(L-1) * pi band aliases badly, so this module
+assumes the caller has normalized.
+"""
+
+import torch
+from torch import Tensor, nn
+
+
+class PositionalEncoding(nn.Module):
+    """Map (..., D) coordinates to Fourier features with no learnable parameters.
+
+    The encoding of one scalar coordinate p is
+        gamma(p) = (sin(2^0 pi p), cos(2^0 pi p), ..., sin(2^(L-1) pi p), cos(2^(L-1) pi p)),
+    applied to each of the D input coordinates. With include_input the raw input is
+    concatenated first, so the output dim is D + D*2*L; without it, D*2*L.
+
+    Args:
+        L: number of frequency bands.
+        include_input: prepend the raw coordinates to the encoding.
+    """
+
+    def __init__(self, L: int, include_input: bool = True):
+        super().__init__()
+        self.L = L
+        self.include_input = include_input
+        # Frequency bands 2^k for k = 0..L-1, stored as a non-trainable buffer.
+        bands = 2.0 ** torch.arange(L, dtype=torch.float32)
+        self.register_buffer("bands", bands)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Encode x (..., D) -> (..., D + D*2*L) with include_input, else (..., D*2*L)."""
+        # x: (..., D). Multiply each coordinate by every band * pi -> (..., D, L).
+        scaled = x[..., None] * (self.bands * torch.pi)
+        sin = torch.sin(scaled)
+        cos = torch.cos(scaled)
+        # Interleave per band so channel order is (sin_0, cos_0, sin_1, cos_1, ...).
+        feats = torch.stack([sin, cos], dim=-1)               # (..., D, L, 2)
+        feats = feats.reshape(*x.shape[:-1], x.shape[-1] * self.L * 2)
+        if self.include_input:
+            return torch.cat([x, feats], dim=-1)
+        return feats

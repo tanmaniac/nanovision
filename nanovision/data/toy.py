@@ -235,3 +235,118 @@ def two_moons(n: int = 256, noise: float = 0.1,
     pts = torch.cat([upper, lower], dim=0)
     pts = pts + noise * torch.randn(n, 2, generator=g)
     return (pts * 2.0).to(device)        # scale up to a few units across
+
+
+def nerf_synthetic_scene(
+    n_views: int = 6,
+    H: int = 16,
+    W: int = 16,
+    radius: float = 1.0,
+    sphere_sigma: float = 8.0,
+    cam_dist: float = 4.0,
+    focal: float | None = None,
+    bg: float = 1.0,
+    seed: int = 0,
+    device: str = "cpu",
+) -> tuple[Tensor, Tensor, Tensor, float, float]:
+    """A tiny posed-image scene of one colored solid sphere, for NeRF (A9).
+
+    The object is a solid sphere of the given radius centered at the world origin,
+    constant interior density `sphere_sigma`, and a smooth position-dependent color.
+    Cameras sit on a horizontal ring at distance `cam_dist`, each looking at the
+    origin in the OpenCV convention (camera +z points into the scene, +x right,
+    +y down). This matches nanovision.geometry, not the original NeRF's OpenGL -z.
+
+    Ground truth is rendered by the closed-form ray-sphere chord, NOT by
+    volume_render, so a learner whose discretized renderer reproduces these pixels
+    has shown the quadrature converges to the analytic Beer-Lambert integral rather
+    than to its own renderer. For a ray that enters the sphere over an interior
+    chord of length l, the exact transmittance through constant density is
+    exp(-sphere_sigma * l), giving alpha = 1 - exp(-sphere_sigma * l) and a
+    composited pixel alpha * c_sphere + (1 - alpha) * bg. A ray that misses the
+    sphere keeps the background. The hard sphere silhouette is the sharp feature
+    the spectral-bias ablation needs (a raw-coordinate MLP blurs it).
+
+    Args:
+        n_views: number of cameras on the ring (the last one is the held-out view).
+        H, W: image height and width in pixels.
+        radius: sphere radius in world units.
+        sphere_sigma: constant interior volume density.
+        cam_dist: camera distance from the origin.
+        focal: pinhole focal length in pixels; defaults to W (a ~53 degree FOV).
+        bg: background gray level in [0, 1], applied to all three channels.
+        seed: unused placeholder for API symmetry (the scene is deterministic).
+        device: target device for the returned tensors.
+
+    Returns:
+        images: (n_views, H, W, 3) ground-truth pixels in [0, 1].
+        poses: (n_views, 4, 4) camera-to-world transforms (OpenCV +z forward).
+        K: (3, 3) shared pinhole intrinsic.
+        near: float, a conservative near distance along the ray.
+        far: float, a conservative far distance along the ray.
+    """
+    del seed  # deterministic per the fixed ring; kept for a uniform toy API
+    f = float(focal) if focal is not None else float(W)
+    cx, cy = (W - 1) / 2.0, (H - 1) / 2.0
+    K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
+
+    # near/far bracket the sphere along every ray: cam_dist +- radius with margin.
+    near = cam_dist - radius - 0.5
+    far = cam_dist + radius + 0.5
+
+    # A smooth color over the sphere surface, so the held-out view tests color too.
+    def _sphere_color(p: Tensor) -> Tensor:
+        # p: (..., 3) the entry point on the sphere; map normalized coords to RGB.
+        d = p / radius
+        r = 0.5 + 0.5 * d[..., 0]
+        gch = 0.5 + 0.5 * d[..., 1]
+        b = 0.5 + 0.5 * d[..., 2]
+        return torch.stack([r, gch, b], dim=-1).clamp(0.0, 1.0)
+
+    poses = []
+    images = []
+    for i in range(n_views):
+        ang = 2.0 * torch.pi * i / n_views
+        cam_pos = torch.tensor([cam_dist * torch.cos(torch.tensor(ang)),
+                                0.0,
+                                cam_dist * torch.sin(torch.tensor(ang))])
+        # Look-at in OpenCV: forward = (target - eye) normalized is camera +z.
+        forward = -cam_pos / cam_pos.norm()
+        world_up = torch.tensor([0.0, -1.0, 0.0])  # OpenCV +y is down
+        right = torch.cross(forward, world_up, dim=0)
+        right = right / right.norm()
+        down = torch.cross(forward, right, dim=0)
+        R = torch.stack([right, down, forward], dim=1)  # columns are cam axes in world
+        c2w = torch.eye(4)
+        c2w[:3, :3] = R
+        c2w[:3, 3] = cam_pos
+        poses.append(c2w)
+
+        # Camera-frame ray directions for every pixel, then rotate to world.
+        vs, us = torch.meshgrid(torch.arange(H, dtype=torch.float32),
+                                torch.arange(W, dtype=torch.float32), indexing="ij")
+        dirs_cam = torch.stack([(us - cx) / f, (vs - cy) / f, torch.ones_like(us)], dim=-1)
+        dirs_world = dirs_cam @ R.T
+        dirs_world = dirs_world / dirs_world.norm(dim=-1, keepdim=True)
+        o = cam_pos  # (3,)
+
+        # Closed-form ray-sphere chord: |o + t d|^2 = radius^2, d unit so a = 1.
+        b_coef = 2.0 * (dirs_world * o).sum(-1)
+        c_coef = (o * o).sum() - radius * radius
+        disc = b_coef * b_coef - 4.0 * c_coef
+        hit = disc > 0.0
+        sqrt_disc = torch.sqrt(disc.clamp(min=0.0))
+        t0 = (-b_coef - sqrt_disc) / 2.0
+        t1 = (-b_coef + sqrt_disc) / 2.0
+        chord = (t1 - t0).clamp(min=0.0) * hit.float()
+        alpha = 1.0 - torch.exp(-sphere_sigma * chord)
+
+        entry = o + t0[..., None] * dirs_world  # first intersection point
+        c_sphere = _sphere_color(entry)
+        img = alpha[..., None] * c_sphere + (1.0 - alpha[..., None]) * bg
+        img = torch.where(hit[..., None], img, torch.full_like(img, bg))
+        images.append(img.clamp(0.0, 1.0))
+
+    images = torch.stack(images, dim=0).to(device)
+    poses = torch.stack(poses, dim=0).to(device)
+    return images, poses, K.to(device), float(near), float(far)
