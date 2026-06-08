@@ -34,7 +34,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 ## Phase 3 - Multimodal & 3D
 - [x] A8  VLM (LLaVA-style)           [Core]   deps: A1,A2,A4
 - [x] A9  NeRF (prequel)              [Core]   deps: A0
-- [ ] A10 Gaussian splatting          [Core]   deps: A9
+- [x] A10 Gaussian splatting          [Core]   deps: A9
 - [ ] A10.5 geometry foundation models[Mixed]  deps: A1,A2,A9
 - [ ] A11 detection & segmentation    [Mixed]  deps: A1,A2
 
