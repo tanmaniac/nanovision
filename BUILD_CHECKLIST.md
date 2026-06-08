@@ -27,7 +27,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A5  diffusion (DDPM/DDIM)       [Core]   deps: A0,A1   (v-prediction)
 - [x] A6  flow matching / rect. flow  [Core]   deps: A5      (+OT coupling)
 - [x] A6.5 VQ tokenizer               [Core]   deps: A1,A2
-- [ ] A7  latent diffusion + DiT      [Core]   deps: A1,A5,A6,A6.5  (flow-matching DiT)
+- [x] A7  latent diffusion + DiT      [Core]   deps: A1,A5,A6,A6.5  (flow-matching DiT)
 
 ## Phase 3 - Multimodal & 3D
 - [ ] A8  VLM (LLaVA-style)           [Core]   deps: A1,A2,A4
