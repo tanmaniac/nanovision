@@ -9,7 +9,7 @@ import math
 
 import torch
 
-from geometry import BEVGrid, CameraRig, make_transform
+from nanovision.geometry import BEVGrid, CameraRig, make_transform
 
 
 def make_K(fx=400.0, fy=400.0, w=400, h=224) -> torch.Tensor:

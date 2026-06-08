@@ -55,41 +55,41 @@ The BEV grid is ego-centric, default [-50, 50] m at 0.5 m (200x200).
 `BEVGrid` is provided; the nuScenes loader is provided boilerplate.
 
 ## tasks
-- **Task 1 — projection** (file: `starter/geometry.py`, symbols:
+- **Task 1 - projection** (file: `geometry.py`, symbols:
   `project_points`, `unproject`): pinhole projection and its inverse. Teaches:
   the exact pinhole model on the OpenCV camera axes and that unproject undoes
   project at the known depth.
-- **Task 2 — SE(3) primitives** (file: `starter/geometry.py`, symbols:
+- **Task 2 - SE(3) primitives** (file: `geometry.py`, symbols:
   `make_transform`, `apply_transform`, `invert_transform`, `compose_transforms`):
   the 4x4 toolkit. Teaches: SE(3) as homogeneous matrices, the structured
   inverse (R^T, -R^T t), and left-to-right composition. Reused by every later
   AV assignment.
-- **Task 3 — CameraRig** (file: `starter/geometry.py`, symbol: `CameraRig`):
+- **Task 3 - CameraRig** (file: `geometry.py`, symbol: `CameraRig`):
   per-camera projection with an in-front-and-in-bounds visibility mask.
   Teaches: the multi-camera rig abstraction (K + ego-to-camera extrinsic per
   camera) and which cameras see a given 3-D point.
-- **Task 4 — ipm_to_bev** (file: `starter/geometry.py`, symbol: `ipm_to_bev`):
+- **Task 4 - ipm_to_bev** (file: `geometry.py`, symbol: `ipm_to_bev`):
   warp images onto the ego ground plane via `grid_sample`. Teaches: the
   flat-ground homography baseline and its failure on elevated points.
 
 ## tests
 Run in this order (see README "How to verify"):
-1. `tests/test_projection.py` — reference values, axis point, unproject/project
+1. `tests/test_projection.py` - reference values, axis point, unproject/project
    round-trip, float64 gradcheck. (shape + reference + gradcheck)
-2. `tests/test_se3.py` — block layout, applied-point reference, inverse is
+2. `tests/test_se3.py` - block layout, applied-point reference, inverse is
    identity, composition associativity and chaining, float64 gradcheck on
    `apply_transform`. (reference + gradcheck)
-3. `tests/test_rig.py` — a synthetic 4-camera rig: a front point is visible only
+3. `tests/test_rig.py` - a synthetic 4-camera rig: a front point is visible only
    in the front camera and lands on the optical axis; a cube projects into the
    expected cameras; `cam_to_world` inverts `world_to_cam`. (reference)
-4. `tests/test_ipm.py` — a ground marker warps back to its expected BEV cell;
+4. `tests/test_ipm.py` - a ground marker warps back to its expected BEV cell;
    an elevated point is mapped past its footprint (the documented breakage).
-5. `tests/test_temporal_offset.py` — the timestamp-correct chain differs from
+5. `tests/test_temporal_offset.py` - the timestamp-correct chain differs from
    the naive one by the ego motion (1.5 m on synthetic poses); with no ego
    motion they agree.
-6. `tests/test_nuscenes_loader.py` — the loader module imports without the
+6. `tests/test_nuscenes_loader.py` - the loader module imports without the
    devkit; the sample-shape check skips when NUSCENES_DATAROOT/devkit are absent.
-7. `tests/test_forbidden_imports.py` — greps the solution and shared geometry
+7. `tests/test_forbidden_imports.py` - greps the solution and shared geometry
    module for cv2/kornia shortcuts.
 
 ## provided_boilerplate

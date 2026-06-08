@@ -1,9 +1,10 @@
-# TEMPLATE.md — per-assignment spec format
+# TEMPLATE.md - per-assignment spec format
 
 Every assignment directory contains an `ASSIGNMENT.md` written in this format.
-It is the machine-readable contract the builder uses to generate `starter/`,
-`solution/`, `tests/`, and `README.md`. Copy this template, fill every field.
-Do not leave a field as "TODO" — if something is genuinely N/A, write "N/A" and
+It is the machine-readable contract the builder uses to generate the top-level
+module files (the holed code the student edits), `solution/`, `tests/`, and
+`README.md`. Copy this template, fill every field.
+Do not leave a field as "TODO" - if something is genuinely N/A, write "N/A" and
 why.
 
 ```yaml
@@ -15,7 +16,7 @@ estimated_learner_hours: <number>           # focused work, excluding training t
 depends_on: [a00_harness, ...]              # assignment ids whose code is imported
 builds_into_shared_lib:                     # public symbols this adds to nanovision/
   - nanovision.module.Symbol
-forbidden_imports:                          # enforced by a grep test on solution/
+forbidden_imports:                          # enforced by a grep test on the top-level files + solution/
   - nn.MultiheadAttention
 fits_12gb: <true | false>                   # true if a real train run fits; if false, explain
 external_data: <none | "nuScenes v1.0-mini (~4GB, license)" | ...>
@@ -42,14 +43,15 @@ Bullet list of the specific mechanisms (not boilerplate) the learner writes.
 
 ## tasks
 Numbered list. Each task:
-- **Task N — <name>** (file: `starter/<path>`, symbol: `<fn/class>`):
-  one-paragraph contract — inputs, outputs, shapes, the formula/algorithm,
-  and the single conceptual point it teaches. Each task maps 1:1 to a TODO hole
-  in starter and 1:1 to a test in tests/.
+- **Task N - <name>** (file: `<module>.py`, symbol: `<fn/class>`):
+  one-paragraph contract - inputs, outputs, shapes, the formula/algorithm,
+  and the single conceptual point it teaches. Each task maps 1:1 to a
+  `NotImplementedError` hole in the top-level `<module>.py` and 1:1 to a test in
+  tests/.
 
 ## tests
 For each task, the test that proves it:
-- `tests/test_*.py::test_name` — what it asserts and how (shape | gradcheck |
+- `tests/test_*.py::test_name` - what it asserts and how (shape | gradcheck |
   reference-value | overfit-one-batch | end-to-end). Specify the order they
   should be run in the README.
 

@@ -61,7 +61,7 @@ def main():
     out.mkdir(exist_ok=True)
     attention_heatmap(out / "causal_attention.png")
     final = overfit_curve(out / "charlm_loss.png")
-    print(f"final char-LM loss {final:.3e} — wrote {out}/causal_attention.png, {out}/charlm_loss.png")
+    print(f"final char-LM loss {final:.3e} - wrote {out}/causal_attention.png, {out}/charlm_loss.png")
 
 
 if __name__ == "__main__":

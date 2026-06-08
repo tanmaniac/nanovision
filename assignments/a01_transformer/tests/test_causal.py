@@ -6,8 +6,8 @@ mask to the logits before softmax should drive every upper-triangle weight to ~0
 
 import torch
 
-from attention import scaled_dot_product_attention
-from transformer import build_causal_mask
+from nanovision.attention import scaled_dot_product_attention
+from nanovision.transformer import build_causal_mask
 
 
 def test_causal_upper_triangle_is_zero():
@@ -25,7 +25,7 @@ def test_causal_upper_triangle_is_zero():
 
 def test_mha_causal_matches_explicit_mask():
     torch.manual_seed(0)
-    from attention import MultiHeadAttention
+    from nanovision.attention import MultiHeadAttention
 
     x = torch.randn(1, 5, 8)
     causal_mha = MultiHeadAttention(8, 2, causal=True)

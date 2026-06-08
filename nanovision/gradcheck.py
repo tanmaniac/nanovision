@@ -44,7 +44,7 @@ def check_gradients(
 
     try:
         torch.autograd.gradcheck(func, inputs, eps=eps, atol=atol, rtol=rtol)
-    except Exception as e:  # noqa: BLE001 — surface a readable message
+    except Exception as e:  # noqa: BLE001 - surface a readable message
         raise AssertionError(f"gradcheck failed for {type(module).__name__}: {e}")
     return True
 

@@ -22,7 +22,7 @@ def main():
     tr = Trainer(model, opt, torch.nn.functional.mse_loss, device="cpu")
     losses = tr.overfit_one_batch((X, y), steps=500)
     path = plot_loss_curve(losses, out / "loss_curve.png", title="A0 overfit linreg (MSE)")
-    print(f"final loss {losses[-1]:.3e} — wrote {path}")
+    print(f"final loss {losses[-1]:.3e} - wrote {path}")
 
 
 if __name__ == "__main__":

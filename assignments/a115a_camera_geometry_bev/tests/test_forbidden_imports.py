@@ -21,8 +21,9 @@ FORBIDDEN = [
 ]
 
 FILES = [
-    _REPO / "assignments" / "a115a_camera_geometry_bev" / "solution" / "geometry.py",
-    _REPO / "nanovision" / "geometry.py",
+    _REPO / "assignments" / "a115a_camera_geometry_bev" / "geometry.py",  # student top-level
+    _REPO / "assignments" / "a115a_camera_geometry_bev" / "solution" / "geometry.py",  # reference
+    _REPO / "nanovision" / "geometry.py",  # shim
 ]
 
 

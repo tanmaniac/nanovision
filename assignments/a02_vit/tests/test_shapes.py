@@ -2,7 +2,7 @@
 
 import torch
 
-from primitives import ConvNeXtBlock
+from nanovision.primitives import ConvNeXtBlock
 from vit import ViT, PatchEmbed
 
 

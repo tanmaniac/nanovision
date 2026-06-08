@@ -1,14 +1,13 @@
-"""A1 starter - the two new primitives (RMSNorm, SwiGLU). Fill the holes.
+"""A1 - the two new primitives (RMSNorm, SwiGLU). Fill the holes.
 
-LayerNorm, gelu, and MLP were built in A0 and are re-exported from the shared
-library so the A1 transformer block can use them; you only implement the two new
-LLaMA-style primitives below. The reference lives in `nanovision/primitives.py`.
+LayerNorm, gelu, and MLP were built in A0; code that needs them imports them from
+`nanovision.primitives` directly, so here you only implement the two new LLaMA-style
+primitives. RMSNorm and SwiGLU are self-contained. The reference is in this
+assignment's solution/primitives.py.
 """
 
 import torch
 from torch import Tensor, nn
-
-from nanovision.primitives import MLP, LayerNorm, gelu  # noqa: F401  (A0, not A1 tasks)
 
 
 class RMSNorm(nn.Module):

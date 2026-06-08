@@ -3,7 +3,7 @@
 import torch
 
 from nanovision.gradcheck import check_gradients
-from geometry import project_points, unproject
+from nanovision.geometry import project_points, unproject
 
 
 def _K():

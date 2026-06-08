@@ -1,5 +1,5 @@
 """Synthetic datasets: linear regression (A0), copy/sort and a tiny char corpus
-(used by A1). These are provided boilerplate — never the taught mechanism.
+(used by A1). These are provided boilerplate, never the taught mechanism.
 """
 
 import torch

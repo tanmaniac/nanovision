@@ -10,7 +10,7 @@ offset is ~1.5 m, large enough to misalign projected points.
 
 import torch
 
-from geometry import (
+from nanovision.geometry import (
     apply_transform,
     compose_transforms,
     invert_transform,

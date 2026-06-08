@@ -37,8 +37,8 @@ patch tokens are (B, N, dim) with N = (img/patch)^2; the encoder sees
 (1, 1 + N, dim) and covers the CLS row plus the N patch rows; registers get no PE.
 
 ## what_you_implement
-- The ConvNeXt block (canonical in `nanovision/primitives.py`; the only new
-  shared-library symbol).
+- The ConvNeXt block (written in `convnext.py`, exposed as
+  `nanovision.primitives.ConvNeXtBlock`; the only new shared-library symbol).
 - Patch embedding as a non-overlapping strided convolution.
 - The ViT token sequence: CLS + learned PE + register tokens.
 - The pooling head: CLS token vs mean over patch tokens.
@@ -47,25 +47,25 @@ patch tokens are (B, N, dim) with N = (img/patch)^2; the encoder sees
   the integration check; the encoder stack itself is imported from A1.
 
 ## tasks
-- **Task 1 - ConvNeXtBlock.forward** (`nanovision/primitives.py`, holed in
-  `starter/primitives.py`): depthwise 7x7 conv, channels-last LayerNorm, inverted
+- **Task 1 - ConvNeXtBlock.forward** (`convnext.py`, exposed as
+  `nanovision.primitives.ConvNeXtBlock`): depthwise 7x7 conv, channels-last LayerNorm, inverted
   bottleneck (Linear dim->4dim, gelu, Linear 4dim->dim), optional layer-scale gamma,
   residual add. Input/output (B, dim, H, W). Teaches the modernized-ResNet design
   and that spatial mixing (depthwise conv) and channel mixing (the MLP) separate the
   same way attention and the FFN do.
-- **Task 2 - PatchEmbed.forward** (`starter/vit.py`): Conv2d(in_chans, dim,
+- **Task 2 - PatchEmbed.forward** (`vit.py`): Conv2d(in_chans, dim,
   kernel_size=patch, stride=patch), flatten the spatial grid, transpose to
   (B, N, dim). Teaches that patch embedding is one shared linear map per patch,
   exactly a strided convolution.
-- **Task 3 - ViT token assembly** (`_assemble_tokens` in `starter/vit.py`): prepend
+- **Task 3 - ViT token assembly** (`_assemble_tokens` in `vit.py`): prepend
   the learnable [CLS] token, add the learned absolute PE over [CLS]+patches, then
   append n_registers learnable register tokens with no PE. Result
   (B, 1 + N + n_registers, dim). Teaches sequence construction and register tokens.
-- **Task 4 - ViT pooling** (`_pool` in `starter/vit.py`): return the [CLS] token
+- **Task 4 - ViT pooling** (`_pool` in `vit.py`): return the [CLS] token
   (index 0) or the mean over the N patch tokens (indices 1 .. 1+N), selected by
   `self.pool`. Teaches the CLS-vs-mean-pool choice and that the mean must exclude
   the register tokens.
-- **Task 5 - interpolate_pos_embed** (`starter/vit.py`): bicubically resize the
+- **Task 5 - interpolate_pos_embed** (`vit.py`): bicubically resize the
   patch part of the PE table from old_grid^2 to new_grid^2 tokens (CLS row kept),
   returning (1, 1 + new_grid^2, dim). Teaches resolution generalization.
 
@@ -86,10 +86,10 @@ Run in this order (also in the README):
 6. `tests/test_overfit.py` - the assembled ViT overfits 8 synthetic seeded images
    to cross-entropy < 0.02 in 500 steps for both pool="cls" and pool="mean"
    (overfit-one-batch).
-7. `tests/test_forbidden_imports.py` - the solution and `nanovision/primitives.py`
-   use no prebuilt attention/transformer module, fused SDPA, `nn.LayerNorm`, timm,
-   or `torchvision.models` in actual code (mentions in prose are allowed). This one
-   passes on starter too.
+7. `tests/test_forbidden_imports.py` - the top-level files, the solution, and the
+   `nanovision/primitives.py` shim use no prebuilt attention/transformer module,
+   fused SDPA, `nn.LayerNorm`, timm, or `torchvision.models` in actual code
+   (mentions in prose are allowed). This one passes with the holes in place too.
 
 ## provided_boilerplate
 The A1 transformer encoder (imported, classic ViT config: LayerNorm + GELU MLP +

@@ -8,7 +8,7 @@ the magnitude) the selection becomes effectively exact.
 
 import torch
 
-from attention import scaled_dot_product_attention
+from nanovision.attention import scaled_dot_product_attention
 
 
 def test_onehot_keys_select_single_value():

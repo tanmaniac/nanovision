@@ -18,8 +18,11 @@ from pathlib import Path
 _ASSIGN = Path(__file__).resolve().parents[1]
 _REPO = _ASSIGN.parents[1]
 
-_FILES = sorted((_ASSIGN / "solution").glob("*.py")) + [
-    _REPO / "nanovision" / "primitives.py",
+_FILES = [
+    _ASSIGN / "convnext.py",  # student top-level
+    _ASSIGN / "vit.py",
+] + sorted((_ASSIGN / "solution").glob("*.py")) + [
+    _REPO / "nanovision" / "primitives.py",  # shim
 ]
 
 _FORBIDDEN = [

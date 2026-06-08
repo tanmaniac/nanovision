@@ -11,8 +11,8 @@ attention, so there is no separate positional-encoding module.
 import torch
 from torch import Tensor, nn
 
-from primitives import RMSNorm
-from transformer import TransformerDecoder
+from nanovision.primitives import RMSNorm
+from nanovision.transformer import TransformerDecoder
 
 
 class CharLM(nn.Module):

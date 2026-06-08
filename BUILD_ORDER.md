@@ -1,4 +1,4 @@
-# BUILD_ORDER.md — dependency-ordered build plan
+# BUILD_ORDER.md - dependency-ordered build plan
 
 This file tells the builder the order to construct assignments and exactly what
 each one depends on. Build strictly top-to-bottom; never build an assignment
@@ -19,9 +19,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
-## Phase 0 — Foundation (build first, everything depends on it)
+## Phase 0 - Foundation (build first, everything depends on it)
 
-### A0 — Harness & primitives  **[Core]**
+### A0 - Harness & primitives  **[Core]**
 - **Builds:** `nanovision.primitives` (LayerNorm, gelu, MLP),
   `nanovision.trainer.Trainer`, `nanovision.gradcheck`, `nanovision.determinism`,
   `nanovision.data.toy` + `nanovision.data.images`, `nanovision.viz` (stubs).
@@ -30,12 +30,12 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   toy linear-regression batch to ~0.
 - **Why first:** every later assignment imports the harness and primitives.
 
-### A1 — The Transformer, from scratch  **[Core]**
+### A1 - The Transformer, from scratch  **[Core]**
 - **Builds:** `nanovision.attention` (SDPA, MultiHeadAttention),
   `nanovision.transformer` (blocks, encoder/decoder, positional encodings,
   RoPE, RMSNorm, SwiGLU).
 - **Implements:** scaled dot-product attention, multi-head, causal masking;
-  the LLaMA-style block as the core — RMSNorm, RoPE, SwiGLU — with sinusoidal/
+  the LLaMA-style block as the core - RMSNorm, RoPE, SwiGLU - with sinusoidal/
   learned positional encodings and LayerNorm taught as historical contrast;
   GQA/MQA conceptually plus a toy implementation; AdamW+warmup recipe; trains a
   decoder-only tiny char-LM and a copy/sort toy task.
@@ -49,9 +49,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
-## Phase 1 — Visual representations
+## Phase 1 - Visual representations
 
-### A2 — Vision Transformers  **[Core]**
+### A2 - Vision Transformers  **[Core]**
 - **Implements:** patch embedding, class token, positional embeddings; assembles
   ViT from `nanovision.transformer`; register tokens (core, not stretch); the
   DeiT augmentation recipe (RandAugment, MixUp, CutMix, stochastic depth) as part
@@ -64,9 +64,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Notes:** 2D sincos / axial-RoPE positional schemes mentioned; Swin demoted
   to context for the isotropic-vs-hierarchical tradeoff.
 
-### A3 — Self-supervised learning (MAE + DINO)  **[Core]**
-- **Implements:** (a) MAE — random masking, encoder-on-visible-only, lightweight
-  decoder, pixel-reconstruction loss; (b) DINO (the build core) — EMA teacher,
+### A3 - Self-supervised learning (MAE + DINO)  **[Core]**
+- **Implements:** (a) MAE - random masking, encoder-on-visible-only, lightweight
+  decoder, pixel-reconstruction loss; (b) DINO (the build core) - EMA teacher,
   multi-crop, centering + sharpening, the collapse-avoidance mechanics; (c) iBOT
   as a ~20-line extension on DINO (the DINOv2 patch-level objective).
 - **Depends on:** A1, A2.
@@ -76,7 +76,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Conceptual page:** DINOv2's three-loss structure (DINO + iBOT + KoLeo) and
   the I-JEPA latent-prediction paradigm.
 
-### A3.5 — Video / temporal modeling  **[Core, compact]**
+### A3.5 - Video / temporal modeling  **[Core, compact]**
 - **Implements:** spatiotemporal tube masking extending MAE; tubelet embedding; a
   tiny video ViT.
 - **Depends on:** A2, A3.
@@ -85,7 +85,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Why:** bridges A3 → BEVFormer temporal attention (A11.5c) → world models
   (A12); temporal modeling was a gap in the original list.
 
-### A4 — CLIP & open-vocabulary  **[Core]**
+### A4 - CLIP & open-vocabulary  **[Core]**
 - **Implements:** dual encoder (reuse the A2 ViT image tower and A1 transformer
   text tower); the SigLIP sigmoid loss as the primary objective (it trains at
   small batch on 12GB), with softmax InfoNCE taught as the historical
@@ -98,9 +98,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
-## Phase 2 — Generative models
+## Phase 2 - Generative models
 
-### A5 — Diffusion (DDPM / DDIM)  **[Core]**
+### A5 - Diffusion (DDPM / DDIM)  **[Core]**
 - **Implements:** forward noising schedule (linear + cosine), time-embedded U-Net,
   v-prediction as the required objective (with an epsilon-vs-v comparison), the
   score-epsilon (Tweedie) derivation as an explicit exercise, ancestral (DDPM) +
@@ -112,7 +112,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   improves over training; this FITS and converges on a 4080.
 - **Reading:** Min-SNR loss weighting; EDM preconditioning; the score-SDE paper.
 
-### A6 — Flow matching & rectified flow  **[Core]**
+### A6 - Flow matching & rectified flow  **[Core]**
 - **Implements:** the conditional flow matching objective (velocity field along
   straight-ish probability paths); optimal-transport coupling as a first-class
   build task (straightens trajectories without reflow; the production default);
@@ -125,7 +125,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   paths as the spine; flag MeanFlow / Rectified Diffusion as the methods that
   supersede reflow for few-step generation.
 
-### A6.5 — VQ tokenizer  **[Core, compact]**
+### A6.5 - VQ tokenizer  **[Core, compact]**
 - **Implements:** a VQ-VAE/VQ-GAN codebook with the straight-through estimator; a
   tiny autoregressive prior over the discrete tokens (reuse A1).
 - **Depends on:** A1, A2.
@@ -136,10 +136,10 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Why:** unlocks the unified multimodal generation literature (Chameleon,
   Janus, LlamaGen); contrasts with the continuous KL-VAE of A7.
 
-### A7 — Latent diffusion & a tiny DiT  **[Core]**
+### A7 - Latent diffusion & a tiny DiT  **[Core]**
 - **Implements:** a small KL-VAE (encoder/decoder + KL), then a flow-matching DiT
-  (not DDPM) in the VAE latent space — patchify latents, condition on timestep +
-  class via adaLN-Zero — instead of the U-Net.
+  (not DDPM) in the VAE latent space - patchify latents, condition on timestep +
+  class via adaLN-Zero - instead of the U-Net.
 - **Depends on:** A1, A5, A6, A6.5.
 - **Verifiable result:** latent-space generation on a toy set; the DiT overfits a
   single batch; sampling reconstructs through the VAE decoder.
@@ -149,10 +149,10 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
-## Phase 3 — Multimodal understanding & 3D
+## Phase 3 - Multimodal understanding & 3D
 
-### A8 — Vision-Language Models  **[Core]**
-- **Implements:** LLaVA-style bridge — frozen vision encoder (A2/A4) + an MLP
+### A8 - Vision-Language Models  **[Core]**
+- **Implements:** LLaVA-style bridge - frozen vision encoder (A2/A4) + an MLP
   projector into the LM embedding space (core) + a tiny decoder-only LM (A1); an
   optional 1-layer cross-attention resampler so both connector families are
   concrete; the explicit two-stage train (projector-align then instruction-tune);
@@ -163,7 +163,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Note:** "frozen encoder" is a pedagogical simplification (2024+ models
   fine-tune the ViT).
 
-### A9 — NeRF (the prequel)  **[Core, compact]**
+### A9 - NeRF (the prequel)  **[Core, compact]**
 - **Implements:** positional (Fourier) encoding motivated by showing the
   spectral-bias failure first; the MLP radiance field; volumetric rendering (ray
   sampling, alpha compositing along rays); fit ONE tiny synthetic scene.
@@ -174,8 +174,8 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Notes:** coarse/fine sampling optional and ungraded; Instant-NGP/Zip-NeRF as
   one-paragraph context (the end of the NeRF arc before 3DGS).
 
-### A10 — 3D Gaussian Splatting  **[Core]**
-- **Implements:** the differentiable rasterizer FORWARD pass — 3D Gaussians
+### A10 - 3D Gaussian Splatting  **[Core]**
+- **Implements:** the differentiable rasterizer FORWARD pass - 3D Gaussians
   (position, covariance via scale+rotation, opacity, SH/color), the EWA Jacobian
   projection to a 2D covariance, tile/alpha compositing; fit a small scene from
   posed images by gradient descent (autograd through the forward, no custom CUDA).
@@ -187,20 +187,20 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   reading; 2DGS, Mip-Splatting, gsplat as context. Frame it as differentiable
   optimization over a 3D representation, close to bundle adjustment.
 
-### A10.5 — Geometry foundation models  **[Mixed]**
+### A10.5 - Geometry foundation models  **[Mixed]**
 - **Implements (build part):** a pointmap-regression head (DUSt3R-style) on a toy
-  stereo pair — regress per-pixel 3D points in a shared frame from an image pair.
+  stereo pair - regress per-pixel 3D points in a shared frame from an image pair.
 - **Survey part:** DepthAnything v2, Marigold (diffusion depth), MASt3R, VGGT
   (multi-view 3D in under a second).
 - **Depends on:** A1, A2, A9.
 - **Builds into shared lib:** pointmap/depth utilities in `nanovision.geometry`.
 - **Verifiable result:** the pointmap head overfits a toy stereo pair; predicted
   points reproject consistently across the two views.
-- **Why:** the learned replacement for the keypoint→COLMAP pipeline — the biggest
+- **Why:** the learned replacement for the keypoint→COLMAP pipeline - the biggest
   gap relative to this learner's SfM/SLAM background.
 
-### A11 — Modern detection & segmentation  **[Mixed]**
-- **Implements (Core part):** DETR-style set prediction — the Hungarian bipartite
+### A11 - Modern detection & segmentation  **[Mixed]**
+- **Implements (Core part):** DETR-style set prediction - the Hungarian bipartite
   matching loss and the query-based decoder head (reuse A1 cross-attention).
   Teach the matching cost (non-differentiable, for assignment) vs the training
   loss (differentiable, after assignment) explicitly.
@@ -213,21 +213,21 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
-## Phase 3.5 — Autonomous-driving perception (nuScenes-mini substrate)
+## Phase 3.5 - Autonomous-driving perception (nuScenes-mini substrate)
 
 > **Substrate:** nuScenes `v1.0-mini` (~4GB, account + license click-through).
 > A11.5a owns dataset setup ("step zero") and the loader/calibration utilities.
 > All training here targets correctness + few-scene overfitting; real BEV training
 > needs a cluster and will NOT fit a 4080. Each README sets that expectation.
 
-### A11.5a — Camera geometry & the BEV transform  **[Core]**
+### A11.5a - Camera geometry & the BEV transform  **[Core]**
 - **Builds:** `nanovision.geometry` (pinhole project/unproject, the four SE(3)
   primitives `make_transform`/`apply_transform`/`invert_transform`/
   `compose_transforms`, `CameraRig`, `ipm_to_bev`) and
   `nanovision.data.nuscenes_mini` (loader + calib utils).
 - **Implements:** the full intrinsic/extrinsic chain for the 6-camera nuScenes
   rig; the four-step lidar→camera projection chain; a temporal-offset exercise
-  (naive single-ego-pose vs timestamp-correct projection — ~50ms offset is ~1.5m
+  (naive single-ego-pose vs timestamp-correct projection - ~50ms offset is ~1.5m
   at highway speed); the ego-centric BEV grid definition (the shared contract for
   the whole module); ground-plane IPM to a first naive BEV. Pinhole projection is
   one-paragraph review for this audience.
@@ -240,7 +240,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   distortion terms); pyquaternion is scalar-first (w, x, y, z). State both.
 - **Hard prerequisite for:** A11.5b, c, d, e.
 
-### A11.5b — Lift-Splat-Shoot  **[Core]**
+### A11.5b - Lift-Splat-Shoot  **[Core]**
 - **Implements:** per-pixel categorical depth distribution; the outer-product
   "lift" into a frustum point cloud; "splat" via the cumsum-trick voxel/pillar
   pooling into a BEV feature map (the designed pooling, implemented from scratch);
@@ -253,9 +253,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Notes:** lineage LSS → BEVDet → BEVDepth; BEVPoolv2 is a deployment pointer;
   GaussianLSS (continuous depth) noted.
 
-### A11.5c — BEVFormer-style attention  **[Core]**
+### A11.5c - BEVFormer-style attention  **[Core]**
 - **Implements:** BEV queries that pull from multi-cam image features via spatial
-  cross-attention at projected 3D reference points — build the
+  cross-attention at projected 3D reference points - build the
   bilinear-sample-at-reference-points version first, add learned deformable
   offsets as a follow-on; temporal self-attention across consecutive frames.
   Reuse A1 attention + A11.5a projection + A3.5 temporal intuition.
@@ -267,9 +267,9 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   (Sparse4D/SparseDrive) now dominate detection while dense BEV persists for
   occupancy/mapping.
 
-### A11.5d — 3D occupancy  **[Core, compact]**
+### A11.5d - 3D occupancy  **[Core, compact]**
 - **Implements:** an occupancy head over a voxel grid (per-voxel occupancy +
-  semantics) supervised by NeRF-style 2D rendering (RenderOcc/OccNeRF) — because
+  semantics) supervised by NeRF-style 2D rendering (RenderOcc/OccNeRF) - because
   nuScenes-mini has no official Occ3D voxel labels, supervision comes from 2D
   lidar depth + camera semantics, reusing the A9 alpha-compositing integral
   directly; the volumetric loss with mandatory class-imbalance weighting (free
@@ -280,7 +280,7 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Notes:** the NeRF↔occupancy duality (same geometry from opposite ends) is the
   spine; sparse/Gaussian occupancy and the RayIoU metric as context.
 
-### A11.5e — Unified perception → prediction → planning  **[Mixed]**
+### A11.5e - Unified perception → prediction → planning  **[Mixed]**
 - **Implements (build part):** a multimodal motion-prediction head mapping BEV
   features to future agent trajectories with a winner-take-all min-of-N loss
   (select the winner by minFDE at the endpoint, regress in agent-centric
@@ -290,17 +290,17 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
   parallel); how a planning head bolts on. Full E2E planning is NOT built.
 - **Depends on:** A11.5b/c, A11.5d.
 - **Verifiable result:** the trajectory head overfits a few scenes.
-- **Notes:** make the open-loop-metric critique a primary teaching point — the
+- **Notes:** make the open-loop-metric critique a primary teaching point - the
   AD-MLP "ego status is all you need" result shows a velocity-only MLP matches
   full stacks because ~74% of nuScenes is straight driving; name NAVSIM and
   Bench2Drive as the real (closed-loop) evaluation standard.
 
 ---
 
-## Phase 4 — Action & dynamics
+## Phase 4 - Action & dynamics
 
-### A12 — World models (RSSM / Dreamer)  **[Core]**
-- **Implements:** a DreamerV3-style recurrent state-space model — deterministic
+### A12 - World models (RSSM / Dreamer)  **[Core]**
+- **Implements:** a DreamerV3-style recurrent state-space model - deterministic
   (GRU) + stochastic (categorical) latent, the reconstruction objective, KL
   balancing and free bits as distinct mechanisms, symlog + two-hot as a
   first-class exercise, unimix and actor-critic return normalization, the
@@ -309,11 +309,11 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 - **Depends on:** A0, A1, A3.5; conceptual link to A5/A7 (generative dynamics).
 - **Verifiable result:** the model imagines plausible latent rollouts;
   reconstructs observations; a simple policy learned in imagination beats random.
-- **Reading:** video world models (Genie 2, DIAMOND, DreamerV4) — the pixel-space
+- **Reading:** video world models (Genie 2, DIAMOND, DreamerV4) - the pixel-space
   vs latent-control distinction; DreamerV4's flow-matching transformer is where
   the field is heading but needs far more compute than a 4080.
 
-### A13 — VLA / embodied (capstone)  **[Core]**
+### A13 - VLA / embodied (capstone)  **[Core]**
 - **Implements:** a VLM-style policy (A8) with a flow-matching action head (A6,
   with DDPM as the contrast) doing action chunking on a toy 2D manipulation/
   navigation task; the chunk-size H=1 vs H>1 ablation is the central quantitative

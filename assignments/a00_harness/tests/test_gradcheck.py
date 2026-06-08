@@ -3,7 +3,7 @@
 import torch
 
 from nanovision.gradcheck import assert_shapes, check_gradients
-from primitives import MLP, LayerNorm
+from nanovision.primitives import MLP, LayerNorm
 
 
 def test_layernorm_gradcheck():

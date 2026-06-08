@@ -66,7 +66,7 @@ the multi-crop augmentation, the projection head, and the training-step wiring a
 provided.
 
 ## tasks
-- **Task 1 - random_masking** (`starter/mae.py`, `random_masking`): x is (B, N, D).
+- **Task 1 - random_masking** (`mae.py`, `random_masking`): x is (B, N, D).
   Compute n_keep = round((1 - mask_ratio) N), draw noise (B, N), argsort it to a
   random permutation ids_shuffle, take ids_restore = argsort(ids_shuffle). Gather
   the first n_keep shuffled indices into x_kept (B, n_keep, D). Build mask as
@@ -74,34 +74,34 @@ provided.
   patch order (1 = masked). Return (x_kept, mask, ids_restore). Teaches how the
   encoder is made to see only visible tokens while keeping a way to put everything
   back in grid order.
-- **Task 2 - append_mask_tokens** (`starter/mae.py`, `append_mask_tokens`): x_enc
+- **Task 2 - append_mask_tokens** (`mae.py`, `append_mask_tokens`): x_enc
   is (B, n_keep, D_dec) encoded visible tokens already projected to decoder dim;
   ids_restore is (B, N); mask_token is (1, 1, D_dec). Broadcast mask_token to the
   N - n_keep masked slots, concatenate [x_enc; masks] in shuffled order, and gather
   by ids_restore so position i holds its encoded visible token or a mask token, in
   original patch order. Return (B, N, D_dec). Teaches the decoder-side assembly that
   inverts the masking shuffle.
-- **Task 3 - mae_loss** (`starter/mae.py`, `mae_loss`): pred and target are
+- **Task 3 - mae_loss** (`mae.py`, `mae_loss`): pred and target are
   (B, N, p*p*C); target is per-patch-normalized pixels; mask is (B, N) with 1 on
   masked patches. Compute MSE per patch (mean over the pixel dim), then average over
   masked patches only using mask as the weight. Teaches "loss on masked patches
   only, per-patch normalized."
-- **Task 4 - dino_loss** (`starter/dino.py`, `dino_loss`): student_out is a list of
+- **Task 4 - dino_loss** (`dino.py`, `dino_loss`): student_out is a list of
   (B, K) logits over all crops; teacher_out is a list of (B, K) logits over the
   global crops. Teacher p_t = softmax((teacher_out - center) / teacher_temp) with
   stop-gradient; student log p_s = log_softmax(student_out / student_temp). Sum
   H(p_t, p_s) over (teacher global crop, student crop) pairs excluding the matched
   same-index pair, averaged over the counted pairs. Teaches centering + sharpening
   and the cross-view distillation objective.
-- **Task 5a - ema_update** (`starter/dino.py`, `ema_update`): under no_grad, for
+- **Task 5a - ema_update** (`dino.py`, `ema_update`): under no_grad, for
   every parameter and buffer set teacher <- momentum*teacher + (1-momentum)*student
   (copy integer buffers). Teaches the EMA teacher that gives a stable, slowly moving
   target.
-- **Task 5b - update_center** (`starter/dino.py`, `update_center`): teacher_out is
+- **Task 5b - update_center** (`dino.py`, `update_center`): teacher_out is
   (M, K); return center <- center_momentum*center + (1-center_momentum)*batch_mean,
   outside the autograd graph. Teaches the centering buffer that prevents single-mode
   collapse.
-- **Task 6 - teacher_entropy** (`starter/dino.py`, `teacher_entropy`): form
+- **Task 6 - teacher_entropy** (`dino.py`, `teacher_entropy`): form
   p_t = softmax((teacher_out - center) / teacher_temp) and return the mean over the
   batch of H = -sum_k p_t(k) log p_t(k). Teaches the instrument the collapse test
   reads.
@@ -132,10 +132,10 @@ Run in this order:
    (reference-value).
 8. `tests/test_forbidden_imports.py` - the solution uses no prebuilt
    attention/transformer module, fused SDPA, nn.LayerNorm, timm, or transformers in
-   actual code (prose mentions allowed). Passes on starter too.
+   actual code (prose mentions allowed). Passes with the holes in place too.
 
 ## provided_boilerplate
-`backbone.py` (identical in starter and solution): the ViT encoder (Conv2d patch
+`backbone.py` (identical at the top level and in solution): the ViT encoder (Conv2d patch
 embed, learned PE with bicubic resize for smaller crops, the A1 transformer stack),
 patchify / unpatchify / per_patch_normalize helpers, the DINO projection head
 (MLP -> L2 normalize -> weight-normalized prototype linear), the DINOModel

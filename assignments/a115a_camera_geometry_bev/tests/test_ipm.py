@@ -2,7 +2,7 @@
 
 import torch
 
-from geometry import BEVGrid, CameraRig, ipm_to_bev
+from nanovision.geometry import BEVGrid, CameraRig, ipm_to_bev
 from synthetic import make_ground_camera
 
 

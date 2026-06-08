@@ -1,4 +1,4 @@
-# nanovision — Architecture & Course Specification
+# nanovision - Architecture & Course Specification
 
 A from-scratch, implement-the-mechanism course covering computer vision from the
 transformer era through 2026 (ViT, SSL, CLIP, diffusion, flow matching, latent
@@ -50,28 +50,27 @@ Design principles, in priority order:
 
 ```
 nanovision/
-├── README.md                      # course overview, install, how to use
-├── pyproject.toml                 # single installable package `nanovision`
+├── README.md                      # course overview, how to use (no install step)
+├── pyproject.toml                 # dependency list + pytest config; NOT installed
 ├── environment.yml                # conda env (CUDA 12.x, PyTorch)
 ├── ARCHITECTURE.md                # this file
 ├── BUILD_ORDER.md                 # dependency-ordered build plan
-├── nanovision/                    # SHARED library (the `nanovision` package)
+├── nanovision/                    # SHARED library: shims + provided infra
 │   ├── __init__.py                # light; does not eagerly import submodules
-│   ├── primitives.py              # LayerNorm, gelu, MLP, ConvNeXt block (A0, A2)
-│   ├── attention.py               # SDPA / MHSA / cross-attn (A1, reused widely)
-│   ├── transformer.py             # blocks, enc/dec, RoPE/RMSNorm/SwiGLU,
-│   │                              #   tubelet patch embed (A1, A3.5)
-│   ├── quantize.py                # VQ codebook + straight-through (A6.5)
-│   ├── trainer.py                 # generic training loop, logging, ckpt (A0)
-│   ├── gradcheck.py               # gradcheck + shape-test helpers (A0)
-│   ├── determinism.py             # seeding, deterministic flags (A0)
+│   ├── _student.py                # loader: imports student symbols from assignments/
+│   ├── primitives.py              # SHIM -> a00 (LayerNorm/gelu/MLP), a01 (RMSNorm/SwiGLU), a02 (ConvNeXtBlock)
+│   ├── attention.py               # SHIM -> a01 (SDPA / MHSA / cross-attn, reused widely)
+│   ├── transformer.py             # SHIM -> a01 (blocks, enc/dec, RoPE/RMSNorm/SwiGLU)
+│   ├── quantize.py                # SHIM -> a06.5 (VQ codebook + straight-through)
+│   ├── trainer.py                 # SHIM -> a00 (generic training loop)
+│   ├── gradcheck.py               # provided: gradcheck + shape-test helpers (A0)
+│   ├── determinism.py             # provided: seeding, deterministic flags (A0)
 │   ├── data/                      # toy datasets + nuScenes-mini loader
 │   │   ├── toy.py                 # synthetic shapes, copy/sort, tiny char LM (A0)
 │   │   ├── images.py              # CIFAR / MNIST wrappers (A0)
 │   │   └── nuscenes_mini.py       # nuScenes-mini loader + calib utils (A11.5a)
-│   ├── geometry.py                # pinhole proj, SE3, CameraRig, ipm_to_bev,
-│   │                              #   pointmap/depth utils (A11.5a, A10.5)
-│   └── viz.py                     # attention maps, BEV grids, splat renders (A0)
+│   ├── geometry.py                # SHIM -> a11.5a (pinhole proj, SE3, CameraRig, ipm_to_bev)
+│   └── viz.py                     # provided: attention maps, BEV grids, splat renders (A0)
 ├── assignments/                   # 22 built assignments; see BUILD_ORDER.md
 │   ├── a00_harness/               # a09_nerf/
 │   ├── a01_transformer/           # a10_gaussian_splatting/
@@ -94,112 +93,132 @@ nanovision/
 ```
 assignments/aXX_name/
 ├── README.md          # the "handout": background, tasks, deliverables, hints
-├── conftest.py        # puts starter/ or solution/ on sys.path per NANOVISION_IMPL
-├── starter/           # code with `raise NotImplementedError` / TODO holes
-│   └── ...
+├── __init__.py        # makes the dir importable (the nanovision shims load from it)
+├── conftest.py        # puts the assignment dir (or solution/) on sys.path per NANOVISION_IMPL
+├── <module>.py        # the code the STUDENT edits, with `raise NotImplementedError` holes
+│   └── ...            #   (primitives.py, attention.py, vit.py, mae.py, ...)
+├── config.py          # per-assignment hyperparameters (where applicable)
 ├── solution/          # reference implementation (always visible; see below)
+│   ├── __init__.py
+│   └── <module>.py    # the filled-in answer key for each top-level <module>.py
 ├── tests/             # pytest: shape tests, gradcheck, overfit-one-batch
 ├── viz.py             # required: renders the result to out/ (eyeball check)
 ├── notebooks/         # pretrained-weights probes only (where applicable)
 └── ASSIGNMENT.md      # machine-readable spec for the builder (see TEMPLATE.md)
 ```
 
-**Solution access and the impl switch:** the builder produces both `starter/` and
-`solution/`. `solution/` sits next to `starter/` in plain sight — there is no
-gating; correctness rests on the learner's self-discipline, and the learner is
-expected to read `solution/` (and the matching shared-lib module) when stuck. The
-`starter/` is the solution with the pedagogically essential lines replaced by
+**The student edits the top-level files; solution/ is the answer key.** The code
+the learner writes lives at the top level of the assignment dir (`primitives.py`,
+`vit.py`, ...), with the pedagogically essential lines replaced by
 `raise NotImplementedError("...")` plus a docstring describing the contract
-(input/output shapes, what to implement, which formula).
+(input/output shapes, what to implement, which formula). `solution/` holds the
+filled-in copy of each of those files. It sits in plain sight: there is no gating;
+correctness rests on the learner's self-discipline, and the learner is expected to
+read `solution/` when stuck.
 
-Tests never hard-code `starter` or `solution`. Each assignment's `conftest.py`
-reads the `NANOVISION_IMPL` environment variable (`starter` by default,
-`solution` for verification) and puts the chosen directory on `sys.path`, so the
-same test file proves both. `make test A=aXX` runs the starter (expected to fail
-cleanly until filled); `make verify A=aXX` runs the solution (must be green);
-`make viz A=aXX` runs `viz.py`.
+**The student's work becomes the shared library.** Symbols that later assignments
+reuse (LayerNorm, attention, the Trainer, geometry, ...) are NOT written in the
+`nanovision/` package. They are written by the student in the owning assignment, and
+`nanovision/<module>.py` is a thin shim that imports them back from there through
+`nanovision/_student.py`. So once the learner implements `attention.py` in A1, every
+later assignment that does `from nanovision.attention import MultiHeadAttention` gets
+the learner's own code. See section 3 for the ownership map.
 
-**Where the canonical code lives.** For assignments that build shared-library
-symbols (A1 attention/transformer, A6.5 quantize, A11.5a geometry/loader, A10.5
-geometry additions), the canonical, readable implementation lives in the
-`nanovision/` package module, and that module is the reference the learner studies.
-The assignment's `solution/<module>.py` re-exports from the package
-(`from nanovision.<module> import *`) so the impl switch and downstream imports
-both resolve to one source of truth with no drift; `starter/<module>.py` is the
-standalone holed copy the learner edits. For assignments whose code is local and
-not part of the shared library (training scripts, the ViT/DiT/UNet model
-definitions, the LSS/BEVFormer heads), the real readable code lives directly in
-`solution/` and there is no package duplication.
+**The impl switch.** Tests never hard-code which copy to import. The loader and each
+conftest read the `NANOVISION_IMPL` environment variable: unset (the default) means
+the student's top-level files; `solution` means the `solution/` answer key. `make
+test A=aXX` runs the student's code (expected to fail cleanly until filled); `make
+verify A=aXX` runs `solution/` (must be green); `make viz A=aXX` runs `viz.py`
+against `solution/`. A shared symbol's owning file is imported ONLY through
+`nanovision.*` (never by bare name); an assignment-local file (vit.py, mae.py) is
+imported ONLY by bare name (never through nanovision). That split keeps each file a
+single module identity.
+
+**Local vs shared.** A file is shared (owned, exposed through `nanovision/`) when a
+later assignment imports it: primitives, attention, transformer, the Trainer,
+geometry. A file is local when it is glue for one assignment only (the ViT/DiT/UNet
+model definitions, training scripts, the LSS/BEVFormer heads, the SSL backbone); it
+lives at the top level and in `solution/`, imported by bare name, and never touches
+`nanovision/`.
 
 ---
 
 ## 3. Shared library contract (`nanovision/`)
 
-The shared package is built incrementally — A0 establishes it, later assignments
-add modules — but every public symbol below is a stable import path that downstream
-assignments depend on. The builder MUST honor these signatures so cross-assignment
-imports do not break.
+The shared package is built incrementally: A0 establishes it, later assignments add
+modules. Every public symbol below is a stable import path that downstream
+assignments depend on, and the builder MUST honor these signatures so
+cross-assignment imports do not break.
+
+The symbols are not defined in `nanovision/` itself. Each shared module there is a
+shim that loads its symbols from the assignment that owns them (via
+`nanovision/_student.py`, keyed on `NANOVISION_IMPL`). Ownership: `primitives`
+splits across A0 (`LayerNorm`, `gelu`, `MLP`), A1 (`RMSNorm`, `SwiGLU`), and A2
+(`ConvNeXtBlock`); `attention`/`transformer` are A1; `trainer` is A0; `geometry` is
+A11.5a; `quantize` is A6.5. An owning file imports its own dependencies through
+`nanovision.*` too (or, to avoid a self-cycle, through the loader directly), so the
+`NANOVISION_IMPL` switch stays consistent down the chain.
 
 ### `nanovision.primitives` (A0; ConvNeXt block A2)
-- `class LayerNorm(nn.Module)` — `(dim, eps=1e-5)`, implements normalization from
+- `class LayerNorm(nn.Module)` - `(dim, eps=1e-5)`, implements normalization from
   mean/var ops (no `nn.LayerNorm`).
-- `class RMSNorm(nn.Module)` — `(dim, eps=1e-6)`, the LLaMA-style norm (A1).
-- `def gelu(x: Tensor) -> Tensor` — exact (erf) GELU.
-- `class MLP(nn.Module)` — `(dim, hidden, dropout=0.0, act=gelu)`, two linear layers.
-- `class SwiGLU(nn.Module)` — `(dim, hidden)`, the gated SiLU FFN used in A1's
+- `class RMSNorm(nn.Module)` - `(dim, eps=1e-6)`, the LLaMA-style norm (A1).
+- `def gelu(x: Tensor) -> Tensor` - exact (erf) GELU.
+- `class MLP(nn.Module)` - `(dim, hidden, dropout=0.0, act=gelu)`, two linear layers.
+- `class SwiGLU(nn.Module)` - `(dim, hidden)`, the gated SiLU FFN used in A1's
   LLaMA-style block and downstream (A7 DiT, etc.).
-- `class ConvNeXtBlock(nn.Module)` — `(dim)`, depthwise conv + pointwise + LN
+- `class ConvNeXtBlock(nn.Module)` - `(dim)`, depthwise conv + pointwise + LN
   (built in A2 for the conv-vs-transformer comparison).
 
 ### `nanovision.attention` (A1)
-- `def scaled_dot_product_attention(q, k, v, mask=None) -> (out, attn)` — from
+- `def scaled_dot_product_attention(q, k, v, mask=None) -> (out, attn)` - from
   scratch; returns attention weights too (for viz/tests). No `F.sdpa`.
-- `class MultiHeadAttention(nn.Module)` — `(dim, n_heads, causal=False,
+- `class MultiHeadAttention(nn.Module)` - `(dim, n_heads, causal=False,
   n_kv_heads=None)`; supports self- and cross-attention via optional `kv` argument
   in `forward(x, kv=None, mask=None)`; `n_kv_heads < n_heads` gives GQA/MQA.
 
 ### `nanovision.transformer` (A1; tubelet embed A3.5)
-- `class TransformerBlock(nn.Module)` — pre-norm by default; `(dim, n_heads,
+- `class TransformerBlock(nn.Module)` - pre-norm by default; `(dim, n_heads,
   mlp_ratio, causal, cross_attn=False, norm="rms", ffn="swiglu", pos="rope")`.
   The LLaMA-style configuration (RMSNorm + RoPE + SwiGLU) is the default/core;
   LayerNorm + absolute PE + GELU-MLP are selectable for the historical contrast.
-- `class TransformerEncoder` / `class TransformerDecoder` — stacks.
-- `def build_causal_mask(seq_len) -> Tensor` — additive −inf upper-triangular mask.
-- `class SinusoidalPositionalEncoding`, `class LearnedPositionalEncoding` —
+- `class TransformerEncoder` / `class TransformerDecoder` - stacks.
+- `def build_causal_mask(seq_len) -> Tensor` - additive −inf upper-triangular mask.
+- `class SinusoidalPositionalEncoding`, `class LearnedPositionalEncoding` -
   absolute schemes (historical contrast).
-- `def apply_rope(q, k, ...)` — rotary position embedding; core in A1.
-- `class TubeletEmbedding(nn.Module)` — spatiotemporal patch embed for video (A3.5).
+- `def apply_rope(q, k, ...)` - rotary position embedding; core in A1.
+- `class TubeletEmbedding(nn.Module)` - spatiotemporal patch embed for video (A3.5).
 
 ### `nanovision.trainer` (A0)
-- `class Trainer` — `(model, optimizer, loss_fn, device, log_dir)`, methods
+- `class Trainer` - `(model, optimizer, loss_fn, device, log_dir)`, methods
   `fit(train_loader, val_loader=None, max_steps=...)`, `overfit_one_batch(batch,
   steps=...)`. Logs loss to console + a CSV the notebooks can plot. No external
   experiment-tracker dependency.
 
 ### `nanovision.gradcheck` (A0)
-- `def check_gradients(module, example_inputs, eps=1e-6) -> bool` — wraps
+- `def check_gradients(module, example_inputs, eps=1e-6) -> bool` - wraps
   `torch.autograd.gradcheck` with double precision and a readable failure message.
-- `def assert_shapes(fn, cases)` — table-driven shape testing helper.
+- `def assert_shapes(fn, cases)` - table-driven shape testing helper.
 
 ### `nanovision.geometry` (A11.5a; pointmap utils A10.5)
-- `def project_points(pts_cam, K) -> px` — pinhole projection.
-- `def unproject(px, depth, K) -> pts_cam` — inverse.
+- `def project_points(pts_cam, K) -> px` - pinhole projection.
+- `def unproject(px, depth, K) -> pts_cam` - inverse.
 - SE(3) primitives: `make_transform(R, t)`, `apply_transform(T, pts)`,
-  `invert_transform(T)`, `compose_transforms(*Ts)` — reused verbatim by every AV
+  `invert_transform(T)`, `compose_transforms(*Ts)` - reused verbatim by every AV
   assignment.
-- `class CameraRig` — holds per-camera K (intrinsics) and T (extrinsics, SE3),
+- `class CameraRig` - holds per-camera K (intrinsics) and T (extrinsics, SE3),
   with `world_to_cam`, `cam_to_world`, `world_to_pixel` for a multi-cam set.
-- `def ipm_to_bev(images, rig, bev_grid, ground_z=0.0)` — inverse perspective
+- `def ipm_to_bev(images, rig, bev_grid, ground_z=0.0)` - inverse perspective
   mapping onto a ground plane.
 - `def reproject_pointmap(pmap, K, T) -> px` and pointmap helpers (A10.5).
 
 ### `nanovision.quantize` (A6.5)
-- `class VectorQuantizer(nn.Module)` — `(codebook_size, dim, beta=0.25)`; forward
+- `class VectorQuantizer(nn.Module)` - `(codebook_size, dim, beta=0.25)`; forward
   returns `(quantized, indices, vq_loss)` with the straight-through estimator and
   the commitment loss. No prebuilt VQ layer.
 
 ### `nanovision.data.nuscenes_mini` (A11.5a)
-- `class NuScenesMini(Dataset)` — wraps `nuscenes-devkit`, exposes per-sample:
+- `class NuScenesMini(Dataset)` - wraps `nuscenes-devkit`, exposes per-sample:
   6 camera images, per-camera K & extrinsics, lidar points, ego pose, and
   (where used) BEV-rasterized map / box annotations. Downsamples images to a
   configurable size (default ~400×224) to fit 12GB.
@@ -213,22 +232,28 @@ imports do not break.
 
 ## 4. Environment & dependencies
 
+- **No install step.** `nanovision` is not pip-installed; the repo runs from its
+  root. pytest puts the root on `sys.path` via `pythonpath = ["."]` in
+  `pyproject.toml`, and scripts run as modules from the root (`python -m
+  assignments.aXX.viz`). `pyproject.toml` documents the dependency set only.
+  Importing `nanovision` from outside the repo is a non-goal.
 - Python 3.11, PyTorch 2.x with CUDA 12.x (must run on a single 12GB GPU and also
   on CPU for the tiny gradcheck tests).
-- Core deps: `torch`, `torchvision`, `numpy`, `einops` (allowed — it's notation,
+- Core deps: `torch`, `torchvision`, `numpy`, `einops` (allowed - it's notation,
   not a shortcut for the taught mechanism), `matplotlib`, `pytest`, `tqdm`.
 - Assignment-specific (declared as extras in `pyproject.toml`):
   - `a04_clip`, `a08_vlm`: `open_clip_torch` and/or `transformers` (ONLY for
-    loading pretrained weights in the probe notebooks — never for the from-scratch
+    loading pretrained weights in the probe notebooks - never for the from-scratch
     parts).
   - `a02_vit`, `a03_ssl`, `a035_video`: `timm` (pretrained DINOv2 / video probes).
   - `a105_geometry_foundation`: `transformers` / model-hub access for the
     DepthAnything / Marigold / VGGT survey probes (probe notebooks only).
   - `a115*`: `nuscenes-devkit`, `pyquaternion`, `shapely`.
 - **Anti-cheat principle:** pretrained-weight libraries are import-allowed ONLY in
-  clearly-marked probe notebooks, NEVER in `starter/`/`solution/` mechanism code.
-  Each `ASSIGNMENT.md` lists explicit `forbidden_imports` for its mechanism code,
-  and a test greps the solution to enforce it.
+  clearly-marked probe notebooks, NEVER in assignment mechanism code (the top-level
+  files or `solution/`). Each `ASSIGNMENT.md` lists explicit `forbidden_imports` for
+  its mechanism code, and a test greps both the student top-level files and the
+  solution to enforce it.
 
 ---
 
@@ -292,18 +317,18 @@ See `BUILD_ORDER.md` for the dependency-ordered build plan and per-assignment
 one-line scope, and `docs/curriculum_review.md` for the validation that shaped it.
 The modules:
 
-- **Module 0 — Foundations:** A0 harness, A1 transformer-from-scratch
+- **Module 0 - Foundations:** A0 harness, A1 transformer-from-scratch
   (LLaMA-style: RMSNorm/RoPE/SwiGLU core).
-- **Module 1 — Visual representations:** A2 ViT (+ register tokens, ConvNeXt),
+- **Module 1 - Visual representations:** A2 ViT (+ register tokens, ConvNeXt),
   A3 SSL (MAE+DINO+iBOT), A3.5 video/temporal, A4 CLIP (SigLIP).
-- **Module 2 — Generative:** A5 diffusion (DDPM/DDIM, v-pred), A6 flow matching/
+- **Module 2 - Generative:** A5 diffusion (DDPM/DDIM, v-pred), A6 flow matching/
   rectified flow, A6.5 VQ tokenizer, A7 latent diffusion + flow-matching DiT.
-- **Module 3 — Multimodal & 3D:** A8 VLM, A9 NeRF, A10 Gaussian splatting,
+- **Module 3 - Multimodal & 3D:** A8 VLM, A9 NeRF, A10 Gaussian splatting,
   A10.5 geometry foundation models, A11 detection/segmentation.
-- **Module 3.5 — Autonomous-driving perception:** A11.5a camera geometry & BEV,
+- **Module 3.5 - Autonomous-driving perception:** A11.5a camera geometry & BEV,
   A11.5b Lift-Splat-Shoot, A11.5c BEVFormer attention, A11.5d 3D occupancy,
   A11.5e prediction → planning.
-- **Module 4 — Action & dynamics:** A12 world models (RSSM/Dreamer),
+- **Module 4 - Action & dynamics:** A12 world models (RSSM/Dreamer),
   A13 VLA capstone.
 
 Reading-only notes (not built, in `notes/`): video generation; VLA data engines/

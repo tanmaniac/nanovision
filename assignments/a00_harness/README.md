@@ -185,28 +185,28 @@ flowchart LR
 
 ## What you'll implement
 
-`gelu`, `LayerNorm.forward`, and `MLP.forward` in `starter/primitives.py`, and
-`Trainer.step` in `starter/trainer.py`. Four small holes. Everything else - the
+`gelu`, `LayerNorm.forward`, and `MLP.forward` in `primitives.py`, and
+`Trainer.step` in `trainer.py`. Four small holes. Everything else - the
 gradcheck and shape helpers, determinism, the toy datasets, the rest of the
 `Trainer`, and the viz - is provided.
 
 ## Tasks
 
-1. **gelu** (`starter/primitives.py`, `gelu`) - return the exact erf GELU of `x`,
+1. **gelu** (`primitives.py`, `gelu`) - return the exact erf GELU of `x`,
    same shape in and out. Teaches the activation as a smooth gate, and that
    `gelu(0) == 0`.
-2. **LayerNorm.forward** (`starter/primitives.py`, `LayerNorm`) - normalize over
+2. **LayerNorm.forward** (`primitives.py`, `LayerNorm`) - normalize over
    the last dim using mean and biased variance, then scale and shift by the learned
    `weight` and `bias`. Teaches normalization built from primitive ops rather than
    `nn.LayerNorm`.
-3. **MLP.forward** (`starter/primitives.py`, `MLP`) - the two-layer position-wise
+3. **MLP.forward** (`primitives.py`, `MLP`) - the two-layer position-wise
    feed-forward, `fc2(drop(act(fc1(x))))`. Teaches the block's per-token
    computation.
-4. **Trainer.step** (`starter/trainer.py`, `Trainer.step`) - one optimization step
+4. **Trainer.step** (`trainer.py`, `Trainer.step`) - one optimization step
    returning the scalar loss. Teaches the zero-grad / forward / backward / step
    rhythm that `overfit_one_batch` and `fit` drive.
 
-Each task maps to one `raise NotImplementedError(...)` in `starter/` and to one
+Each task maps to one `raise NotImplementedError(...)` in the top-level module files and to one
 test.
 
 ## How to verify
@@ -216,7 +216,7 @@ test order is the workflow: shapes first (cheapest, catches axis and broadcast
 mistakes), then gradcheck (certifies the forward is differentiably correct), then
 overfit (proves the whole loop).
 
-    make test A=a00_harness      # your starter; red until you fill the holes
+    make test A=a00_harness      # your top-level code; red until you fill the holes
 
 That runs, in order:
 
@@ -232,7 +232,7 @@ To confirm the reference passes and render the loss curve:
     make verify A=a00_harness    # reference solution; should be green
     make viz    A=a00_harness    # writes out/loss_curve.png
 
-The reference is visible in `nanovision/primitives.py` and `nanovision/trainer.py`;
+The reference is visible in `solution/primitives.py` and `solution/trainer.py`;
 read it if you get stuck.
 
 ## Compute notes
@@ -249,9 +249,9 @@ at the model or loss, not the optimizer.
 
 ## Stretch goals
 
-1. Add `RMSNorm` to `nanovision.primitives` (A1 needs it) and gradcheck it. It is
-   already present in the package reference; implement it yourself in the starter
-   and confirm `check_gradients` passes.
+1. Preview A1: implement `RMSNorm` (rescale by the root-mean-square over the last
+   axis times a learned gain, no bias) as a small `nn.Module` and confirm
+   `check_gradients` passes. A1 builds it for real in its own `primitives.py`.
 2. Have `Trainer.fit` log a validation loss when given a `val_loader`.
 3. Animate the linreg fit (prediction vs. iteration) from the CSV log the `Trainer`
    writes.

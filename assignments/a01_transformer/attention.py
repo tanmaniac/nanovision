@@ -1,6 +1,6 @@
-"""A1 starter - attention from scratch. Fill the holes, then run the tests.
+"""A1 - attention from scratch. Fill the holes, then run the tests.
 
-The reference implementation lives in `nanovision/attention.py` (read it if you
+The reference implementation lives in this assignment's `solution/attention.py` (read it if you
 get stuck). Do not import it here; implement the bodies yourself.
 
 Shape convention: tensors are (B, H, S, Dh) inside attention - B batch, H heads,

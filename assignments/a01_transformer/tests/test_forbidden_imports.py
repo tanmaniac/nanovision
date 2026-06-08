@@ -15,9 +15,11 @@ _ASSIGN = Path(__file__).resolve().parents[1]
 _REPO = _ASSIGN.parents[1]
 
 _FILES = [
-    _ASSIGN / "solution" / "attention.py",
+    _ASSIGN / "attention.py",            # student top-level
+    _ASSIGN / "transformer.py",
+    _ASSIGN / "solution" / "attention.py",  # reference
     _ASSIGN / "solution" / "transformer.py",
-    _REPO / "nanovision" / "attention.py",
+    _REPO / "nanovision" / "attention.py",  # shims (must stay free of shortcuts too)
     _REPO / "nanovision" / "transformer.py",
 ]
 

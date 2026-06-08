@@ -228,12 +228,12 @@ the logits `(B, K)`.
 
 Five holes:
 
-- `ConvNeXtBlock.forward` in `starter/primitives.py` (canonical in
-  `nanovision/primitives.py`; the one new shared-library symbol).
-- `PatchEmbed.forward` in `starter/vit.py`.
-- `ViT._assemble_tokens` (CLS + PE + register tokens) in `starter/vit.py`.
-- `ViT._pool` (CLS vs mean) in `starter/vit.py`.
-- `interpolate_pos_embed` in `starter/vit.py`.
+- `ConvNeXtBlock.forward` in `convnext.py` (the one new shared-library symbol;
+  exposed as `nanovision.primitives.ConvNeXtBlock`).
+- `PatchEmbed.forward` in `vit.py`.
+- `ViT._assemble_tokens` (CLS + PE + register tokens) in `vit.py`.
+- `ViT._pool` (CLS vs mean) in `vit.py`.
+- `interpolate_pos_embed` in `vit.py`.
 
 The ViT module construction, the A1 transformer encoder (imported with
 `norm="layer"`, `ffn="mlp"`, `pos="none"` for the classic ViT block), the
@@ -243,27 +243,27 @@ bodies.
 
 ## Tasks
 
-Each task maps 1:1 to a `raise NotImplementedError(...)` in `starter/` and 1:1 to a
+Each task maps 1:1 to a `raise NotImplementedError(...)` in the top-level module files and 1:1 to a
 test.
 
-1. `ConvNeXtBlock.forward` (`starter/primitives.py`, canonical in
-   `nanovision/primitives.py`): depthwise 7x7 conv, permute to channels-last,
+1. `ConvNeXtBlock.forward` (`convnext.py`, exposed as
+   `nanovision.primitives.ConvNeXtBlock`): depthwise 7x7 conv, permute to channels-last,
    LayerNorm, Linear `d->4d`, GELU, Linear `4d->d`, optional layer-scale gamma,
    permute back, residual add. Input and output `(B, d, H, W)`. Teaches the
    modernized-ResNet design and that spatial mixing (the depthwise conv) and channel
    mixing (the MLP) separate the same way attention and the FFN do.
-2. `PatchEmbed.forward` (`starter/vit.py`): apply the `Conv2d(k=p, s=p)`, flatten
+2. `PatchEmbed.forward` (`vit.py`): apply the `Conv2d(k=p, s=p)`, flatten
    the spatial grid to `(B, d, N)`, transpose to `(B, N, d)`. Teaches that patch
    embedding is one shared linear map per patch, exactly a strided convolution.
-3. `ViT._assemble_tokens` (`starter/vit.py`): expand and prepend the CLS token to
+3. `ViT._assemble_tokens` (`vit.py`): expand and prepend the CLS token to
    get `(B, 1+N, d)`, add `pos_embed` over the CLS-plus-patch rows, then (if
    `n_registers > 0`) expand and append the register tokens with no PE. Result
    `(B, 1+N+n_reg, d)`. Teaches sequence construction and register tokens.
-4. `ViT._pool` (`starter/vit.py`): for `pool="cls"` return `tokens[:, 0]`; for
+4. `ViT._pool` (`vit.py`): for `pool="cls"` return `tokens[:, 0]`; for
    `pool="mean"` return the mean over `tokens[:, 1:1+N]`, excluding the CLS token
    and the register tokens. Teaches the CLS-vs-mean-pool choice and that the mean
    must skip the registers.
-5. `interpolate_pos_embed` (`starter/vit.py`): split off the CLS row, reshape the
+5. `interpolate_pos_embed` (`vit.py`): split off the CLS row, reshape the
    patch rows to `(1, g, g, d)`, permute to `(1, d, g, g)`, bicubically resize to
    `(g', g')`, permute and reshape back to `(1, g'^2, d)`, concatenate the CLS row.
    Returns `(1, 1+g'^2, d)`. Teaches resolution generalization.
@@ -272,7 +272,7 @@ test.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a02_vit      # your starter (red until you fill the holes)
+    make test A=a02_vit      # your top-level code (red until you fill the holes)
 
 The tests run in this order, which is also the intended workflow:
 
@@ -292,10 +292,10 @@ The tests run in this order, which is also the intended workflow:
 6. `tests/test_overfit.py` - the assembled ViT overfits 8 synthetic seeded images
    to cross-entropy < 0.02 in 500 steps for both `pool="cls"` and `pool="mean"`
    (overfit-one-batch).
-7. `tests/test_forbidden_imports.py` - the solution and `nanovision/primitives.py`
-   use no prebuilt attention/transformer module, fused SDPA, `nn.LayerNorm`, `timm`,
-   or `torchvision.models` in actual code (mentions in prose are allowed). This one
-   passes on starter too.
+7. `tests/test_forbidden_imports.py` - the top-level files, the solution, and the
+   `nanovision/primitives.py` shim use no prebuilt attention/transformer module,
+   fused SDPA, `nn.LayerNorm`, `timm`, or `torchvision.models` in actual code
+   (mentions in prose are allowed). This one passes with the holes in place too.
 
 To confirm the reference passes and render the figures:
 
@@ -303,7 +303,7 @@ To confirm the reference passes and render the figures:
     make viz    A=a02_vit    # writes the loss curve and attention rollout to out/
 
 The reference implementation is visible in `solution/vit.py` and
-`nanovision/primitives.py`; read it if you get stuck.
+`solution/convnext.py`; read it if you get stuck.
 
 ## Compute notes
 

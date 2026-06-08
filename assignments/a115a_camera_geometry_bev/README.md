@@ -244,7 +244,7 @@ distance from the camera, which is why tall objects streak outward in the BEV.
 
 ## What you'll implement
 
-In `starter/geometry.py`: `project_points` / `unproject`, the four SE(3)
+In `geometry.py`: `project_points` / `unproject`, the four SE(3)
 primitives (`make_transform`, `apply_transform`, `invert_transform`,
 `compose_transforms`), `CameraRig` (`world_to_cam`, `cam_to_world`,
 `world_to_pixel`), and `ipm_to_bev`. The `BEVGrid` dataclass is provided. The
@@ -260,14 +260,14 @@ nuScenes loader is provided boilerplate; you do not implement the devkit plumbin
    projection with an in-front (z > 0) and in-bounds visibility mask.
 4. `ipm_to_bev` - warp images onto the ego ground plane via `grid_sample`.
 
-Each maps to a `raise NotImplementedError("A11.5a Task N: ...")` in `starter/`
+Each maps to a `raise NotImplementedError("A11.5a Task N: ...")` in the top-level module files
 and to one test file.
 
 ## How to verify
 
 Run from the repo root with the `nanovision` env active, in this order:
 
-    make test A=a115a_camera_geometry_bev      # your starter (red until filled)
+    make test A=a115a_camera_geometry_bev      # your top-level code (red until filled)
 
 The tests run in workflow order: projection (reference values, axis point,
 round-trip, float64 gradcheck) -> SE(3) (block layout, applied-point reference,
@@ -288,7 +288,7 @@ The nuScenes loader test reports as skipped unless the dataset is present; that 
 expected, and `viz.py` falls back to a synthetic cube and a ground-checkerboard
 warp when `NUSCENES_DATAROOT` is unset. A forbidden-imports test greps the
 solution for cv2/kornia shortcuts. The reference implementation is visible in
-`nanovision/geometry.py`; read it if you get stuck.
+`solution/geometry.py`; read it if you get stuck.
 
 ## Dataset step zero (optional, only for the real-data overlay)
 
@@ -298,8 +298,8 @@ overlay and stitched BEV in `viz.py`:
 1. Create a nuScenes account and accept the license at
    https://www.nuscenes.org/nuscenes#download.
 2. Download the `v1.0-mini` split (~4 GB) and extract it.
-3. Install the dataset extra: `pip install -e ".[av]"` (pulls in `nuscenes-devkit`
-   and `pyquaternion`).
+3. Install the AV dependencies: `pip install nuscenes-devkit pyquaternion shapely`
+   (the `av` extra group in `pyproject.toml`).
 4. Set `NUSCENES_DATAROOT` to the directory that contains the `v1.0-mini` folder,
    e.g. `export NUSCENES_DATAROOT=$HOME/data/nuscenes`.
 

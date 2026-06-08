@@ -1,6 +1,6 @@
-"""A0 starter — fill the one hole in `Trainer.step`.
+"""A0 - fill the one hole in `Trainer.step`.
 
-The reference implementation lives in `nanovision/trainer.py`. Everything except
+The reference implementation lives in this assignment's `solution/trainer.py`. Everything except
 the optimization step is given; implement the step rhythm yourself.
 """
 

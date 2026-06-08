@@ -1,4 +1,4 @@
-"""A3 starter - MAE. Fill the three holes (Tasks 1-3), then run the tests.
+"""A3 - MAE. Fill the three holes (Tasks 1-3), then run the tests.
 
 The three taught mechanisms are the bodies of `random_masking`,
 `append_mask_tokens`, and `mae_loss`. The MAE module that chains them through the

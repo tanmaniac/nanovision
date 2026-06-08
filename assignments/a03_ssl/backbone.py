@@ -1,11 +1,11 @@
-"""Provided substrate for A3: a minimal ViT encoder plus patch helpers and the
+"""Provided scaffolding for A3: a minimal ViT encoder plus patch helpers and the
 DINO multi-crop augmentation and projection head.
 
 None of this file is a hole. The learner built PatchEmbed in A2; here the patch
 embed, positional embedding, and the transformer stack are given so A3 can focus
 on the self-supervised mechanisms (random masking, the MAE loss, the DINO loss,
-the EMA teacher, centering, and the collapse instrument). The same file is shipped
-in starter/ and solution/ unchanged.
+the EMA teacher, centering, and the collapse instrument). The same file ships
+at the top level and in solution/ unchanged.
 
 Shapes: images are (B, C, H, W); patchify gives (B, N, p*p*C) with
 N = (H/p) * (W/p); the ViT encoder maps a token sequence (B, L, dim) to (B, L, dim).

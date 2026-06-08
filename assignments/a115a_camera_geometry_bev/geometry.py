@@ -1,6 +1,6 @@
-"""A11.5a starter - fill the holes, then run the tests.
+"""A11.5a - fill the holes, then run the tests.
 
-The reference implementation lives in `nanovision/geometry.py` (read it if you
+The reference implementation lives in this assignment's `solution/geometry.py` (read it if you
 get stuck). Do not import it here; implement the bodies yourself.
 
 Conventions

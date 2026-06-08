@@ -1,6 +1,6 @@
-"""A0 starter — fill the three holes, then run the tests.
+"""A0 - fill the three holes, then run the tests.
 
-The reference implementation lives in `nanovision/primitives.py` (read it if you
+The reference implementation lives in this assignment's `solution/primitives.py` (read it if you
 get stuck). Do not import it here; implement the bodies yourself.
 """
 

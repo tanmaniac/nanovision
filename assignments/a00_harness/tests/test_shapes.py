@@ -2,7 +2,7 @@
 
 import torch
 
-from primitives import MLP, LayerNorm, gelu
+from nanovision.primitives import MLP, LayerNorm, gelu
 
 
 def test_gelu_shape_and_zero():

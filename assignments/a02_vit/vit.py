@@ -1,4 +1,4 @@
-"""A2 starter - the ViT. Fill the four holes (Tasks 2-5), then run the tests.
+"""A2 - the ViT. Fill the four holes (Tasks 2-5), then run the tests.
 
 The ViT is assignment-local glue: it chains the A1 transformer encoder (classic
 ViT config: LayerNorm + GELU MLP + absolute PE, non-causal) over image patch

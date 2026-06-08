@@ -1,4 +1,4 @@
-"""A3 starter - DINO. Fill the three holes (Tasks 4-6), then run the tests.
+"""A3 - DINO. Fill the three holes (Tasks 4-6), then run the tests.
 
 The taught mechanisms are `dino_loss`, the pair `ema_update` / `update_center`,
 and `teacher_entropy`. The student/teacher construction and the training-step

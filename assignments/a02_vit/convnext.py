@@ -1,20 +1,19 @@
-"""A2 starter - the one new primitive (ConvNeXtBlock). Fill the hole.
+"""A2 - the one new primitive (ConvNeXtBlock). Fill the hole.
 
-LayerNorm, gelu, MLP (A0) and RMSNorm, SwiGLU (A1) are re-exported from the shared
-library; you only implement the new ConvNeXt block below. The reference lives in
-`nanovision/primitives.py` (read it if you get stuck).
+You only implement the ConvNeXt block below. It needs LayerNorm and gelu (built in
+A0). They are pulled from the A0 owner through the student loader rather than from
+`nanovision.primitives`, because nanovision.primitives sources ConvNeXtBlock from
+this file; importing it back would be a cycle. The reference is in this assignment's
+solution/convnext.py.
 """
 
 import torch
 from torch import Tensor, nn
 
-from nanovision.primitives import (  # noqa: F401  (A0/A1, not A2 tasks)
-    MLP,
-    LayerNorm,
-    RMSNorm,
-    SwiGLU,
-    gelu,
-)
+from nanovision._student import load
+
+_a0 = load("a00_harness", "primitives")
+LayerNorm, gelu = _a0.LayerNorm, _a0.gelu
 
 
 class ConvNeXtBlock(nn.Module):

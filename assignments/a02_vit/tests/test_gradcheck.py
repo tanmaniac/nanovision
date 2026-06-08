@@ -3,7 +3,7 @@
 import torch
 
 from nanovision.gradcheck import check_gradients
-from primitives import ConvNeXtBlock
+from nanovision.primitives import ConvNeXtBlock
 from vit import PatchEmbed
 
 

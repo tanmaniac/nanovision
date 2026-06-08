@@ -4,8 +4,8 @@ import torch
 from torch import nn
 
 from nanovision.gradcheck import check_gradients
-from attention import MultiHeadAttention, scaled_dot_product_attention
-from primitives import RMSNorm, SwiGLU
+from nanovision.attention import MultiHeadAttention, scaled_dot_product_attention
+from nanovision.primitives import RMSNorm, SwiGLU
 
 
 class _SDPAModule(nn.Module):

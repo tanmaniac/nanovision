@@ -1,4 +1,4 @@
-# nanovision — spec package (read me first)
+# nanovision - spec package (read me first)
 
 This package is a **specification to be built**, not the built course. Hand it to
 a Claude Code instance (or an engineer) to implement the `nanovision` repository.
@@ -15,14 +15,14 @@ and VLA. The subject list was validated against 2026 sources (see
 
 ## Read in this order
 
-1. **ARCHITECTURE.md** — design philosophy, repo layout, the shared-library
+1. **ARCHITECTURE.md** - design philosophy, repo layout, the shared-library
    contract (stable import paths every assignment depends on), environment, and
    house style. This is authoritative; when in doubt it wins.
-2. **BUILD_ORDER.md** — the dependency-ordered build plan, what each assignment
+2. **BUILD_ORDER.md** - the dependency-ordered build plan, what each assignment
    implements, depends on, and its Core/Survey/Mixed designation. Build strictly
    in this order.
-3. **TEMPLATE.md** — the per-assignment `ASSIGNMENT.md` format you fill in.
-4. **EXAMPLE_a01_transformer.md** — a fully worked `ASSIGNMENT.md` showing the
+3. **TEMPLATE.md** - the per-assignment `ASSIGNMENT.md` format you fill in.
+4. **EXAMPLE_a01_transformer.md** - a fully worked `ASSIGNMENT.md` showing the
    required level of detail. Match this depth for every assignment.
 
 ## The build contract (non-negotiable)
@@ -32,17 +32,20 @@ and VLA. The subject list was validated against 2026 sources (see
   reference values, and overfit-one-batch.
 - **Honor the shared-library signatures** in ARCHITECTURE.md §3 exactly, or
   cross-assignment imports break.
-- **Enforce `forbidden_imports`** per assignment with a grep test over
-  `solution/` — the whole point is the learner builds the mechanism, not imports
-  it.
+- **Enforce `forbidden_imports`** per assignment with a grep test over the
+  student's top-level files and `solution/` - the whole point is the learner builds
+  the mechanism, not imports it.
 - **12GB ceiling.** Every "real run" must fit an RTX 4080. Where it can't, the
   assignment is overfit-only and says so, with the reason, so a flat loss curve
   isn't misread as a bug.
-- **Each assignment ships:** `README.md` (handout), `starter/` (TODO holes),
-  `solution/` (passes all tests), `tests/` (one test per task, ordered), and any
-  `notebooks/` (pretrained-weight probes only — never mechanism code).
-- **`solution/` must make `tests/` pass; `starter/` must fail cleanly** at each
-  unfilled TODO with a contract-describing message.
+- **Each assignment ships:** `README.md` (handout), the top-level module files the
+  student edits (TODO holes), `solution/` (passes all tests), `tests/` (one test per
+  task, ordered), and any `notebooks/` (pretrained-weight probes only - never
+  mechanism code).
+- **`solution/` must make `tests/` pass; the student's top-level files must fail
+  cleanly** at each unfilled TODO with a contract-describing message.
+- **No install.** The repo runs from its root: pytest gets it via `pythonpath`,
+  scripts run with `python -m`. Use `make test/verify/viz A=aXX`.
 
 ## Suggested first deliverable
 

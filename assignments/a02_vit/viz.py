@@ -22,8 +22,10 @@ import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
 # Make the assignment's ViT importable when run as a script (no pytest conftest).
-sys.path.insert(0, str(Path(__file__).parent / "solution"))
+# Render uses NANOVISION_IMPL=solution, so solution/ goes on last (highest priority)
+# for the bare imports; the top level still provides config.py.
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent / "solution"))
 
 from vit import ViT  # noqa: E402
 

@@ -5,7 +5,7 @@ import math
 import torch
 
 from nanovision.gradcheck import check_gradients
-from geometry import (
+from nanovision.geometry import (
     apply_transform,
     compose_transforms,
     invert_transform,

@@ -240,10 +240,10 @@ head_dim) inside attention, and attention weights are (batch, heads, seq_q, seq_
 Seven holes:
 
 - `scaled_dot_product_attention` and `MultiHeadAttention.forward` in
-  `starter/attention.py`.
+  `attention.py`.
 - `build_causal_mask`, `apply_rope`, and `TransformerBlock.forward` in
-  `starter/transformer.py`.
-- `RMSNorm.forward` and `SwiGLU.forward` in `starter/primitives.py`.
+  `transformer.py`.
+- `RMSNorm.forward` and `SwiGLU.forward` in `primitives.py`.
 
 The encoder/decoder stacks, the RoPE attention wrapper, the sinusoidal and learned
 absolute positional encodings, and the char-LM assembly are provided. You write
@@ -251,27 +251,27 @@ only the seven mechanism bodies.
 
 ## Tasks
 
-Each task maps 1:1 to a `raise NotImplementedError(...)` in `starter/` and 1:1 to a
+Each task maps 1:1 to a `raise NotImplementedError(...)` in the top-level module files and 1:1 to a
 test.
 
-1. `scaled_dot_product_attention` (`starter/attention.py`): given q,k,v of shape
+1. `scaled_dot_product_attention` (`attention.py`): given q,k,v of shape
    (B,H,Sq,Dh)/(B,H,Sk,Dh) and an optional additive mask, return (out, attn) with
    out (B,H,Sq,Dh) and attn (B,H,Sq,Sk). Subtract the row max before exp. The core
    gather and the stable softmax.
-2. `MultiHeadAttention.forward` (`starter/attention.py`): project x (and kv if
+2. `MultiHeadAttention.forward` (`attention.py`): project x (and kv if
    cross-attention) to Q,K,V; split heads; repeat_interleave KV heads for GQA; call
    Task 1; merge heads; output projection. Self-vs-cross is just where K,V come
    from; GQA shares KV across query groups.
-3. `build_causal_mask` (`starter/transformer.py`): additive (S,S) mask, -inf above
+3. `build_causal_mask` (`transformer.py`): additive (S,S) mask, -inf above
    the diagonal (use torch.triu(..., diagonal=1)). Why a decoder cannot see the
    future.
-4. `apply_rope` (`starter/transformer.py`): rotate q,k by position. Relative
+4. `apply_rope` (`transformer.py`): rotate q,k by position. Relative
    position as rotation; the modern positional scheme.
-5. `RMSNorm.forward` (`starter/primitives.py`): rescale by RMS times a learned
+5. `RMSNorm.forward` (`primitives.py`): rescale by RMS times a learned
    gain. The LLaMA-style norm and why mean subtraction is dropped.
-6. `SwiGLU.forward` (`starter/primitives.py`): gated SiLU feed-forward. The gated
+6. `SwiGLU.forward` (`primitives.py`): gated SiLU feed-forward. The gated
    FFN used across the modern stack.
-7. `TransformerBlock.forward` (`starter/transformer.py`): the two (or three, with
+7. `TransformerBlock.forward` (`transformer.py`): the two (or three, with
    cross-attention) pre-norm residual sub-layers. Residual + norm placement; the
    block is the unit reused everywhere.
 
@@ -279,7 +279,7 @@ test.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a01_transformer     # your starter (red until you fill the holes)
+    make test A=a01_transformer     # your top-level code (red until you fill the holes)
 
 The tests run in this order, which is also the intended workflow:
 
@@ -292,17 +292,18 @@ The tests run in this order, which is also the intended workflow:
    an explicit-mask reference (reference-value).
 5. `tests/test_overfit.py` - the assembled char-LM overfits one batch to
    cross-entropy < 0.05 in 500 steps on CPU (overfit-one-batch).
-6. `tests/test_forbidden_imports.py` - the solution and shared-lib modules use no
-   `nn.MultiheadAttention` / `nn.Transformer*` / `F.scaled_dot_product_attention`
-   in actual code (mentions in comments and docstrings are allowed).
+6. `tests/test_forbidden_imports.py` - the top-level files, the solution, and the
+   `nanovision/` shims use no `nn.MultiheadAttention` / `nn.Transformer*` /
+   `F.scaled_dot_product_attention` in actual code (mentions in comments and
+   docstrings are allowed).
 
 To confirm the reference passes and render the figures:
 
     make verify A=a01_transformer   # reference solution (should be green)
     make viz    A=a01_transformer   # writes out/causal_attention.png, out/charlm_loss.png
 
-The reference implementation is visible in `nanovision/attention.py`,
-`nanovision/transformer.py`, and `nanovision/primitives.py`; read it if you get
+The reference implementation is visible in `solution/attention.py`,
+`solution/transformer.py`, and `solution/primitives.py`; read it if you get
 stuck.
 
 ## Compute notes

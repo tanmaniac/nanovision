@@ -4,7 +4,7 @@ import torch
 
 from nanovision.data.toy import linreg_batch
 from nanovision.determinism import set_seed
-from trainer import Trainer
+from nanovision.trainer import Trainer
 
 
 def test_overfit_linreg():

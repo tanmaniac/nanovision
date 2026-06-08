@@ -17,21 +17,29 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Pretrained-weight libraries — ALLOWED ONLY in clearly marked probe notebooks,
-# never in starter/ or solution/ mechanism code (see ARCHITECTURE.md §4).
+# Pretrained-weight libraries: allowed ONLY in clearly marked probe notebooks,
+# never in assignment mechanism code (see ARCHITECTURE.md section 4).
 probe = ["timm>=1.0", "open_clip_torch>=2.24", "transformers>=4.40"]
-# Autonomous-driving substrate (A11.5*).
+# Autonomous-driving libraries (A11.5*).
 av = ["nuscenes-devkit>=1.1", "pyquaternion>=0.9", "shapely>=2.0"]
 dev = ["pytest>=8.0"]
 
-[tool.setuptools.packages.find]
-include = ["nanovision*"]
+# nanovision is NOT pip-installed. This file documents the dependency set; the repo
+# runs from its root (pythonpath below for tests, `python -m` for scripts). The
+# [build-system] / [project] tables are kept only so `pip install -r` style tooling
+# can read the dependency list, not so the package is built or installed.
 
 [tool.pytest.ini_options]
+# pythonpath puts the repo root on sys.path for the test session so `import
+# nanovision` and `import assignments.aXX...` both resolve. The shared-library
+# shims (nanovision/primitives.py, attention.py, ...) pull the student's code out
+# of the assignment dirs through nanovision/_student.py, keyed on NANOVISION_IMPL.
+#
 # Run one assignment at a time: `make test A=aXX` / `make verify A=aXX`, or the
 # aggregate `make test-all` / `make verify-all` which use one pytest process per
 # assignment. Assignments reuse test-file and module basenames (test_shapes.py,
-# primitives.py, ...) and the impl-switch imports them by bare name, so a single
-# shared process would collide; per-assignment processes (prepend import mode,
-# the default) keep each isolated and let tests import local helpers.
+# vit.py, ...) and conftest imports the assignment-local files by bare name, so a
+# single shared process would collide; per-assignment processes (prepend import
+# mode, the default) keep each isolated.
+pythonpath = ["."]
 addopts = "-q"

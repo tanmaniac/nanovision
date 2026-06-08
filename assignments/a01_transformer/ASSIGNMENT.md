@@ -57,23 +57,23 @@ SwiGLU `(silu(W_g x) * (W_u x)) W_d` with inner width ~8/3 dim; the pre-norm blo
   contrast and are not graded holes.
 
 ## tasks
-- **Task 1 - scaled_dot_product_attention** (`starter/attention.py`): given q,k,v
+- **Task 1 - scaled_dot_product_attention** (`attention.py`): given q,k,v
   of shape (B,H,Sq,Dh)/(B,H,Sk,Dh) and an optional additive mask, return
   (out, attn) with out (B,H,Sq,Dh) and attn (B,H,Sq,Sk). Subtract the row max
   before exponentiating. Teaches: the core gather and stable softmax.
-- **Task 2 - MultiHeadAttention.forward** (`starter/attention.py`): project x (and
+- **Task 2 - MultiHeadAttention.forward** (`attention.py`): project x (and
   kv if cross-attention) to Q,K,V; split heads; repeat KV heads for GQA; call
   Task 1; merge heads; output projection. Teaches: head split/merge; self-vs-cross
   is just where K,V come from; GQA shares KV across query groups.
-- **Task 3 - build_causal_mask** (`starter/transformer.py`): additive (S,S) mask,
+- **Task 3 - build_causal_mask** (`transformer.py`): additive (S,S) mask,
   -inf above the diagonal. Teaches: why a decoder cannot see the future.
-- **Task 4 - apply_rope** (`starter/transformer.py`): rotate q,k by position.
+- **Task 4 - apply_rope** (`transformer.py`): rotate q,k by position.
   Teaches: relative position as rotation; the modern positional scheme.
-- **Task 5 - RMSNorm.forward** (`starter/primitives.py`): rescale by RMS times a
+- **Task 5 - RMSNorm.forward** (`primitives.py`): rescale by RMS times a
   learned gain. Teaches: the LLaMA-style norm and why mean subtraction is dropped.
-- **Task 6 - SwiGLU.forward** (`starter/primitives.py`): gated SiLU FFN. Teaches:
+- **Task 6 - SwiGLU.forward** (`primitives.py`): gated SiLU FFN. Teaches:
   the gated feed-forward used across the modern stack.
-- **Task 7 - TransformerBlock.forward** (`starter/transformer.py`): the two (or
+- **Task 7 - TransformerBlock.forward** (`transformer.py`): the two (or
   three, with cross-attention) pre-norm residual sub-layers. Teaches: residual +
   norm placement; the block is the unit reused everywhere.
 
@@ -88,7 +88,8 @@ Run in this order (also in the README):
    an explicit-mask reference (reference-value).
 5. `tests/test_overfit.py` - the assembled char-LM overfits one batch to
    cross-entropy < 0.05 in 500 steps on CPU (overfit-one-batch).
-6. `tests/test_forbidden_imports.py` - the solution and shared-lib modules contain
+6. `tests/test_forbidden_imports.py` - the top-level files, the solution, and the
+   `nanovision/` shims contain
    no `nn.MultiheadAttention` / `nn.Transformer*` / `F.scaled_dot_product_attention`
    in actual code (string/comment mentions are allowed).
 

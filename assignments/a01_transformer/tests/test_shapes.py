@@ -2,9 +2,9 @@
 
 import torch
 
-from attention import MultiHeadAttention, scaled_dot_product_attention
-from primitives import RMSNorm, SwiGLU
-from transformer import (
+from nanovision.attention import MultiHeadAttention, scaled_dot_product_attention
+from nanovision.primitives import RMSNorm, SwiGLU
+from nanovision.transformer import (
     TransformerBlock,
     TransformerDecoder,
     TransformerEncoder,

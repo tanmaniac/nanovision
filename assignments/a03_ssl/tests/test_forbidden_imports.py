@@ -16,7 +16,11 @@ from pathlib import Path
 
 _ASSIGN = Path(__file__).resolve().parents[1]
 
-_FILES = sorted((_ASSIGN / "solution").glob("*.py"))
+_FILES = [
+    _ASSIGN / "backbone.py",  # student top-level
+    _ASSIGN / "mae.py",
+    _ASSIGN / "dino.py",
+] + sorted((_ASSIGN / "solution").glob("*.py"))
 
 _FORBIDDEN = [
     r"nn\.MultiheadAttention",

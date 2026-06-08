@@ -46,22 +46,22 @@ Exact GELU: `GELU(x) = x · 0.5 · (1 + erf(x / √2))`. MLP:
 - `Trainer.step` (the one optimization step).
 
 ## tasks
-- **Task 1 - gelu** (file: `starter/primitives.py`, symbol: `gelu`):
+- **Task 1 - gelu** (file: `primitives.py`, symbol: `gelu`):
   `x: (...,)` → `(...,)` same shape. Formula `x * 0.5 * (1 + torch.erf(x /
   math.sqrt(2)))`. Test: `test_shapes.py::test_gelu_shape_and_zero`. Teaches the
   activation as a smooth gate, and `gelu(0) == 0`.
-- **Task 2 - LayerNorm.forward** (file: `starter/primitives.py`, symbol:
+- **Task 2 - LayerNorm.forward** (file: `primitives.py`, symbol:
   `LayerNorm`): `x: (..., dim)` → `(..., dim)`. `mean = x.mean(-1, keepdim=True)`,
   `var = x.var(-1, keepdim=True, unbiased=False)`, then
   `(x - mean) / sqrt(var + eps) * weight + bias` with `weight`, `bias` of shape
   `(dim,)`, `eps=1e-5`. Test: `test_shapes.py::test_layernorm_shape_and_stats` and
   `test_gradcheck.py::test_layernorm_gradcheck`. Teaches normalization from
   primitive ops, not `nn.LayerNorm`.
-- **Task 3 - MLP.forward** (file: `starter/primitives.py`, symbol: `MLP`):
+- **Task 3 - MLP.forward** (file: `primitives.py`, symbol: `MLP`):
   `x: (..., dim)` → `(..., dim)`, inner width `hidden`. Return
   `fc2(drop(act(fc1(x))))`. Test: `test_shapes.py::test_mlp_shape` and
   `test_gradcheck.py::test_mlp_gradcheck`. Teaches the block's position-wise FFN.
-- **Task 4 - Trainer.step** (file: `starter/trainer.py`, symbol: `Trainer.step`):
+- **Task 4 - Trainer.step** (file: `trainer.py`, symbol: `Trainer.step`):
   `batch = (inputs, targets)` → scalar `float`. Move batch to device,
   `model.train()`, `optimizer.zero_grad()`, `pred = model(inputs)`,
   `loss = loss_fn(pred, targets)`, `loss.backward()`, `optimizer.step()`,

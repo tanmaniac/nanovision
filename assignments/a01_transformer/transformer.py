@@ -1,14 +1,14 @@
-"""A1 starter - transformer blocks and positional schemes.
+"""A1 - transformer blocks and positional schemes.
 
-The reference implementation lives in `nanovision/transformer.py` (read it if you
-get stuck). Do not import it here; implement the bodies yourself.
+The reference implementation lives in this assignment's solution/transformer.py
+(read it if you get stuck). Do not import it here; implement the bodies yourself.
 
 The LLaMA-style configuration is the core/default: pre-norm RMSNorm, RoPE, and a
 SwiGLU feed-forward. LayerNorm, sinusoidal/learned absolute encodings, and the
 GELU MLP are selectable for the historical contrast.
 
-This module imports `attention` and `primitives` by bare name; the conftest puts
-the chosen impl directory on sys.path so they resolve to starter/ or solution/.
+Attention (A1) and the primitives (A0/A1) come from `nanovision.*`, which routes
+to your top-level code or to solution/ depending on NANOVISION_IMPL.
 """
 
 import math
@@ -17,8 +17,8 @@ from typing import Optional
 import torch
 from torch import Tensor, nn
 
-from attention import MultiHeadAttention, scaled_dot_product_attention
-from primitives import MLP, LayerNorm, RMSNorm, SwiGLU
+from nanovision.attention import MultiHeadAttention, scaled_dot_product_attention
+from nanovision.primitives import MLP, LayerNorm, RMSNorm, SwiGLU
 
 
 def build_causal_mask(seq_len: int) -> Tensor:
@@ -151,7 +151,7 @@ class TransformerBlock(nn.Module):
     With cross_attn=True a cross-attention sub-layer (attending to kv) sits
     between the self-attention and FFN sub-layers.
 
-    Args: see nanovision/transformer.py. norm in {"rms","layer"};
+    Args: see solution/transformer.py. norm in {"rms","layer"};
     ffn in {"swiglu","mlp"}; pos in {"rope","none"}; n_kv_heads for GQA/MQA.
 
     forward(x, kv=None, mask=None): x is (B, S, dim); returns (B, S, dim).
