@@ -8,7 +8,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] `nanovision.primitives` (A0; RMSNorm/SwiGLU added in A1; ConvNeXt block in A2)
 - [x] `nanovision.trainer` / `gradcheck` / `determinism` / `data` (A0)
 - [x] `nanovision.attention` + `nanovision.transformer` (A1; RoPE/RMSNorm/SwiGLU/GQA)
-- [ ] `nanovision.transformer.TubeletEmbedding` (A3.5)
+- [x] `nanovision.transformer.TubeletEmbedding` (A3.5)
 - [ ] `nanovision.quantize` (A6.5)
 - [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
 - [ ] `nanovision.geometry` pointmap/depth utils (A10.5)
@@ -20,7 +20,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 ## Phase 1 - Visual representations
 - [x] A2  vision transformers         [Core]   deps: A0,A1   (+register tokens, ConvNeXt)
 - [x] A3  self-supervised (MAE+DINO)  [Core]   deps: A1,A2   (+iBOT)
-- [ ] A3.5 video / temporal modeling  [Core]   deps: A2,A3
+- [x] A3.5 video / temporal modeling  [Core]   deps: A2,A3   (video MAE, tube masking)
 - [ ] A4  CLIP & open-vocab           [Core]   deps: A1,A2   (SigLIP primary)
 
 ## Phase 2 - Generative

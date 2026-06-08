@@ -154,10 +154,12 @@ The symbols are not defined in `nanovision/` itself. Each shared module there is
 shim that loads its symbols from the assignment that owns them (via
 `nanovision/_student.py`, keyed on `NANOVISION_IMPL`). Ownership: `primitives`
 splits across A0 (`LayerNorm`, `gelu`, `MLP`), A1 (`RMSNorm`, `SwiGLU`), and A2
-(`ConvNeXtBlock`); `attention`/`transformer` are A1; `trainer` is A0; `geometry` is
-A11.5a; `quantize` is A6.5. An owning file imports its own dependencies through
-`nanovision.*` too (or, to avoid a self-cycle, through the loader directly), so the
-`NANOVISION_IMPL` switch stays consistent down the chain.
+(`ConvNeXtBlock`); `attention` is A1; `transformer` is A1 except `TubeletEmbedding`,
+which is A3.5; `trainer` is A0; `geometry` is A11.5a; `quantize` is A6.5. A single
+shim can source different symbols from different owners (the `transformer` shim is the
+example). An owning file imports its own dependencies through `nanovision.*` too (or,
+to avoid a self-cycle, through the loader directly), so the `NANOVISION_IMPL` switch
+stays consistent down the chain.
 
 ### `nanovision.primitives` (A0; ConvNeXt block A2)
 - `class LayerNorm(nn.Module)` - `(dim, eps=1e-5)`, implements normalization from
