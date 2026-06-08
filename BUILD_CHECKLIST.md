@@ -10,6 +10,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] `nanovision.attention` + `nanovision.transformer` (A1; RoPE/RMSNorm/SwiGLU/GQA)
 - [x] `nanovision.transformer.TubeletEmbedding` (A3.5)
 - [x] `nanovision.quantize` (A6.5)
+- [x] `nanovision.vit` (A2 ViT exposed; `ViT.forward_features` patch grid added for A8)
 - [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
 - [ ] `nanovision.geometry` pointmap/depth utils (A10.5)
 
@@ -30,7 +31,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A7  latent diffusion + DiT      [Core]   deps: A1,A5,A6,A6.5  (flow-matching DiT)
 
 ## Phase 3 - Multimodal & 3D
-- [ ] A8  VLM (LLaVA-style)           [Core]   deps: A1,A2,A4
+- [x] A8  VLM (LLaVA-style)           [Core]   deps: A1,A2,A4
 - [ ] A9  NeRF (prequel)              [Core]   deps: A0
 - [ ] A10 Gaussian splatting          [Core]   deps: A9
 - [ ] A10.5 geometry foundation models[Mixed]  deps: A1,A2,A9

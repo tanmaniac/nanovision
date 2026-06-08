@@ -145,6 +145,21 @@ class ViT(nn.Module):
         """
         raise NotImplementedError("A2 Task 4: implement _pool (cls vs mean)")
 
+    def forward_features(self, x: Tensor) -> Tensor:
+        """Patch-grid features for downstream use (VLM visual tokens, dense prediction).
+
+        Runs the patch embed, encoder, and final norm, then returns only the N patch
+        tokens (dropping the [CLS] at index 0 and any register tokens): (B, n_patches,
+        dim). Unlike forward, it stops before pooling and the classification head, so a
+        downstream model gets one feature vector per image patch. Does not touch _pool,
+        so it works whether or not _pool is implemented.
+        """
+        patches = self.patch_embed(x)
+        tokens = self._assemble_tokens(patches)
+        tokens = self.encoder(tokens)
+        tokens = self.norm(tokens)
+        return tokens[:, 1 : 1 + self.n_patches]
+
     def forward(self, x: Tensor) -> Tensor:
         patches = self.patch_embed(x)        # (B, N, dim)
         tokens = self._assemble_tokens(patches)
