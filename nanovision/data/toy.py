@@ -199,3 +199,39 @@ def diffusion_image_batch(n: int = 16, num_classes: int = 3, size: int = 16,
             mask = ((dx <= arm) & (dy <= r)) | ((dy <= arm) & (dx <= r))
         imgs[i, 0][mask] = 1.0
     return imgs.to(device), labels.to(device)
+
+
+def eight_gaussians(n: int = 256, scale: float = 4.0, std: float = 0.25,
+                    generator: torch.Generator | None = None, device: str = "cpu") -> Tensor:
+    """A 2D mixture of eight Gaussians on a ring, for flow matching (A6).
+
+    Returns (n, 2). Eight well-separated modes at the corners and edge-midpoints of a
+    square ring; the clear mode structure makes optimal-transport coupling's trajectory
+    straightening legible at batch size ~256.
+    """
+    g = generator or torch.Generator().manual_seed(0)
+    centers = scale * torch.tensor([
+        [1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0],
+        [0.7071, 0.7071], [0.7071, -0.7071], [-0.7071, 0.7071], [-0.7071, -0.7071],
+    ])
+    idx = torch.randint(0, 8, (n,), generator=g)
+    return (centers[idx] + std * torch.randn(n, 2, generator=g)).to(device)
+
+
+def two_moons(n: int = 256, noise: float = 0.1,
+              generator: torch.Generator | None = None, device: str = "cpu") -> Tensor:
+    """The two-moons 2D distribution, for flow matching (A6).
+
+    Returns (n, 2). Two interleaving half-circle manifolds; a non-Gaussian-manifold target
+    that complements the eight-Gaussians mixture.
+    """
+    g = generator or torch.Generator().manual_seed(0)
+    n0 = n // 2
+    n1 = n - n0
+    t0 = torch.rand(n0, generator=g) * torch.pi
+    upper = torch.stack([torch.cos(t0), torch.sin(t0)], dim=1)
+    t1 = torch.rand(n1, generator=g) * torch.pi
+    lower = torch.stack([1.0 - torch.cos(t1), 1.0 - torch.sin(t1) - 0.5], dim=1)
+    pts = torch.cat([upper, lower], dim=0)
+    pts = pts + noise * torch.randn(n, 2, generator=g)
+    return (pts * 2.0).to(device)        # scale up to a few units across

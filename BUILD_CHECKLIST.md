@@ -25,7 +25,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 
 ## Phase 2 - Generative
 - [x] A5  diffusion (DDPM/DDIM)       [Core]   deps: A0,A1   (v-prediction)
-- [ ] A6  flow matching / rect. flow  [Core]   deps: A5      (+OT coupling)
+- [x] A6  flow matching / rect. flow  [Core]   deps: A5      (+OT coupling)
 - [ ] A6.5 VQ tokenizer               [Core]   deps: A1,A2
 - [ ] A7  latent diffusion + DiT      [Core]   deps: A1,A5,A6,A6.5  (flow-matching DiT)
 
