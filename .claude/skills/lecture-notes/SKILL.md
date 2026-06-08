@@ -51,8 +51,39 @@ with a prompt that:
    a small reproducible script produces it. Prefer (a) for anything structural.
    Do not invent or hotlink figures you have not confirmed exist.
 
+## Style review (mandatory, context-less subagent)
+
+After the README is drafted, run a SEPARATE style-review subagent before considering
+the notes done. The writer (and the main session) cannot see their own filler, so the
+reviewer must start from a clean context: spawn a general-purpose subagent (foreground)
+that is given ONLY the README path and the writing-style rules, NOT the build context
+or this conversation. The user's CLAUDE.md "Writing style" and "Claims and reasoning"
+sections are the authority; the reviewer reads `~/.claude/CLAUDE.md` itself.
+
+Its single job: find and remove flowery, meaningless, or meta-commentary prose and
+rewrite it to be direct, editing ONLY the README. Specifically it must strip:
+- Empty meta-commentary that asserts a sentence matters instead of stating the content
+  ("the question this assignment answers is the smallest one that matters", "the honest
+  answer is", "the whole point is", "what this means is", "the key insight", "the
+  takeaway", "it's worth noting/restating").
+- Banned vocabulary and tells from the CLAUDE.md list ("honest", "genuine", "robust",
+  "leverage", "crucial", "delve", "fundamentally", "seamless", inflated-significance
+  words, copula avoidance, negative parallelism, the rule of three as default rhythm,
+  "Label: detail" headings, em dashes).
+- Sentences that can be deleted with no loss of technical content.
+It must NOT add claims, soften technical precision, or touch code/shapes/citations. It
+returns the list of edits it made so the change is auditable.
+
+Prompt the reviewer to: "Read ~/.claude/CLAUDE.md (Writing style + Claims and reasoning)
+and the README at <path>. You have no other context and do not need any. Edit ONLY that
+README to remove filler, meta-commentary, and banned vocabulary per those rules, and
+rewrite flagged sentences to state the content directly. Do not add content, do not
+change technical claims, shapes, numbers, or citations. Return a numbered list of every
+edit."
+
 ## Verify after
 
 Read the rendered `README.md` yourself for accuracy (the subagent can still get a
 claim wrong) and spot-check a couple of the cited arXiv links resolve to the
-stated titles.
+stated titles. The style review is part of generation, not optional polish: a README is
+not done until it has passed the context-less style pass.

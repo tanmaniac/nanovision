@@ -30,25 +30,24 @@ sat on top of two RNNs that retained the sequential bottleneck.
 "Attention Is All You Need" (Vaswani et al., 2017,
 [arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)) took the obvious next
 step that nobody had committed to: throw out the recurrence entirely and keep only
-the attention. The point that made people pay attention was not a new layer type
-but what removing recurrence bought. With no hidden-state chain, every position is
+the attention. Removing recurrence bought two things. With no hidden-state chain, every position is
 computed independently and in parallel, so a sequence is one big matrix multiply
-instead of n sequential steps, which is what makes training at scale practical on
+instead of n sequential steps, which makes training at scale practical on
 GPUs. And any two tokens are now one attention hop apart regardless of how far
 apart they sit in the sequence, a constant path length, so long-range dependencies
 are modeled directly rather than surviving a long gauntlet of recurrent steps. The
-concrete result that landed: state-of-the-art BLEU on WMT English-German and
+result was state-of-the-art BLEU on WMT English-German and
 English-French translation at a fraction of the training cost of the recurrent and
 convolutional systems it beat. Within a few years the same architecture, scaled up
 and trained on raw text, became GPT and BERT, and the decoder-only variant became
 the backbone of the entire LLM era.
 
-The core idea, stated plainly: attention is a content-based gather over a set. Each
+Attention is a content-based gather over a set. Each
 query position emits a query vector, every position emits a key and a value, the
 query is compared against all keys by dot product to produce a weight per position,
 and the output is the weighted sum of the values. Because it operates on a set,
-attention is permutation-equivariant - shuffle the inputs and the outputs shuffle
-the same way - which means raw attention has no notion of order. Order is
+attention is permutation-equivariant (shuffle the inputs and the outputs shuffle
+the same way), so raw attention has no notion of order. Order is
 reintroduced separately by positional encoding. Running several attention
 operations in parallel on different learned projections of the input gives
 multi-head attention, where each head can specialize in a different relation
@@ -81,8 +80,8 @@ it LLaMA-style. The 2017 components (LayerNorm, sinusoidal/learned absolute
 encodings, GELU MLP) stay in the code as selectable options so you can run the
 historical contrast.
 
-The block you write here is reused, by direct import of `nanovision.attention` and
-`nanovision.transformer`, across most of the rest of the course. A2 (ViT) applies
+The block you write here is reused by direct import of `nanovision.attention` and
+`nanovision.transformer` across most of the rest of the course. A2 (ViT) applies
 this exact transformer block to image patches instead of text tokens. A4 (CLIP)
 uses it as the text tower. A7's DiT denoiser is a stack of these blocks with adaLN
 conditioning on the diffusion timestep. A8 (VLM) feeds visual tokens into a

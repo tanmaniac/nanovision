@@ -4,23 +4,20 @@
 
 Everything up to here treats an image as a static grid. Real perception is temporal:
 a self-driving stack reasons about motion, a world model predicts the next frame, and
-a video understanding system needs to tell a person sitting down from a person
-standing up, which a single frame cannot. The question this assignment answers is the
-smallest one that matters: what changes when you add a time axis to the ViT and the
-MAE you already built, and what is genuinely new versus just one more dimension.
-
-The honest answer is that most of it is not new. A2's patch embedding becomes a
-tubelet embedding (a 3D strided convolution instead of a 2D one), A3's masked
-autoencoder reconstructs space-time tubelets instead of 2D patches, and the encoder is
-the same A1 transformer run over a longer token sequence. The two things that are
-actually new are worth isolating, which is why this is a compact assignment rather than
-a full one. The first is the tubelet itself: how to turn a clip into tokens. ViViT
+telling a person sitting down from a person standing up needs more than one frame. This
+assignment extends the ViT and the MAE you already built to video, and most of the
+extension is mechanical. A2's patch embedding becomes a tubelet embedding (a 3D strided
+convolution instead of a 2D one), A3's masked autoencoder reconstructs space-time
+tubelets instead of 2D patches, and the encoder is the same A1 transformer run over a
+longer token sequence. Two components are new, which is why this is a compact assignment
+rather than a full one. The first is the tubelet, how to turn a clip into tokens. ViViT
 (Arnab et al., 2021, [arxiv.org/abs/2103.15691](https://arxiv.org/abs/2103.15691))
 named the standard choice, "tubelet embedding," a non-overlapping 3D convolution with
 kernel and stride `(t, p, p)` that maps each `t x p x p` space-time block to one token.
 The second is the masking. VideoMAE (Tong et al., 2022,
 [arxiv.org/abs/2203.12602](https://arxiv.org/abs/2203.12602)) showed that the image
-recipe does not port directly, for a reason that is the whole point of the assignment.
+recipe does not port directly, because video is temporally redundant in a way images
+are not.
 
 Video is far more redundant than a single image, because adjacent frames are nearly
 identical. If you mask patches independently at random, the way A3 does, then a masked
@@ -32,9 +29,8 @@ set of spatial positions to drop and drop them in every frame, so a masked locat
 absent for the entire clip and cannot be copied from a neighbor in time. To keep the
 task hard despite the redundancy, VideoMAE also masks an extreme fraction, 90 to 95
 percent, far above image MAE's 75 percent (the 90-95% figure is stated directly in the
-VideoMAE abstract). Tube masking plus a very high ratio is what makes masked
-autoencoding work for video, and reproducing that contrast on a tiny clip is the
-concrete skill here.
+VideoMAE abstract). Tube masking plus a very high ratio makes masked
+autoencoding work for video, and you reproduce that contrast on a tiny clip here.
 
 The architectural simplification this assignment makes, and that you should know it is
 making, is joint space-time attention: the A1 encoder attends over all `N = T' * S'`
@@ -55,9 +51,9 @@ on a different token set; having built tube masking and a space-time encoder mak
 temporal attention concrete rather than abstract. A12 (world models) predicts future
 latent states from past ones, the predictive cousin of masked reconstruction; the
 spatiotemporal tokenization here is the input representation those models operate on.
-The narrow skill is the tubelet tokenization and the tube mask; the broad point is that
-adding time is mostly a tokenization change, plus one masking insight that the
-redundancy of video forces on you.
+A3.5 covers the tubelet tokenization and the tube mask. Adding time is mostly a
+tokenization change, plus one masking insight that the redundancy of video forces
+on you.
 
 ## Background
 
@@ -206,9 +202,8 @@ so a healthy curve drops from ~1.0 toward ~1e-2; a curve flat at ~1.0 means the 
 not seeing the masked tubelets, and one that stalls high points at the tube indexing or
 the reassembly being inconsistent with the token order. The whole setup fits 12GB
 trivially; the gating signal is correctness, not scale. The overfit test verifies the
-mechanism plumbing, not that the learned representation is good (the same honesty caveat
-A3 makes for its linear probe): the representation benefit of tube masking shows only at
-real video scale.
+mechanism plumbing, not that the learned representation is good (as A3 notes for its
+linear probe): the representation benefit of tube masking shows only at real video scale.
 
 Two simplifications the toy makes, stated so they are not mistaken for the recipe. The
 masking ratio is 0.875, below VideoMAE's 90-95 percent, lowered only so a tiny model

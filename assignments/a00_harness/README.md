@@ -5,7 +5,7 @@
 This course is organized around one rule: prove a mechanism is correct on a tiny
 problem before you ever run real training. A0 builds the tools that make that rule
 operational, and it builds them on the three primitives every transformer block is
-made of. So this first assignment is about the course's method as much as about
+made of. This first assignment is about the course's method as much as about
 LayerNorm and GELU.
 
 The method exists because of how training failures actually present themselves. If
@@ -34,9 +34,9 @@ floating-point error that grows as `eps` shrinks; in float32 those two error
 sources leave no `eps` where the estimate is sharp, and the check is too loose to
 catch real bugs. In float64 there is a wide window where the numerical gradient is
 accurate to many digits, so agreement is close to a proof that your hand-written
-forward is correct - and you got there without writing a single line of backward
-pass. That is the whole point of leaning on autograd: you implement the mechanism
-forward, and gradcheck certifies the gradient for free.
+forward is correct, and you got there without writing a single line of backward
+pass. You implement the mechanism forward, and gradcheck certifies the gradient
+for free.
 
 The second is overfit-one-batch, driven by `Trainer.overfit_one_batch`. You take
 one fixed batch and train on it, and only it, until the loss reaches approximately
@@ -46,29 +46,29 @@ broken. This is the canonical first signal in the course that an end-to-end syst
 is correct, and it is diagnostic in a specific way. A loss that falls smoothly to
 ~0 means the forward pass, the loss, the backward pass, and the optimizer step are
 all connected and the gradients point downhill. A loss that stays flat from step
-one usually means the optimization step itself is broken - a missing
-`zero_grad`, `backward`, or `optimizer.step` - so no parameter is actually moving.
+one usually means the optimization step itself is broken (a missing
+`zero_grad`, `backward`, or `optimizer.step`), so no parameter is actually moving.
 A loss that drops a bit and then stalls points at the model: insufficient capacity,
 a dead activation, a detached tensor cutting the graph. Because the batch is fixed
 and noiseless, generalization is not a confound; the only thing being tested is
 whether the machine can fit data it has full capacity to fit. Throughout the
 course, when an assignment says "a flat curve here is expected, not a bug" (the
-12GB ceiling means some topics never get a real training run), it is overfit-one-
-batch that tells you the difference between a flat curve from a correct-but-
-underpowered run and a flat curve from a wiring mistake.
+12GB ceiling means some topics never get a real training run), overfit-one-batch
+tells you the difference between a flat curve from a correct-but-underpowered run
+and a flat curve from a wiring mistake.
 
 The primitives you build alongside these tools are the right first mechanisms
 because every transformer block in the rest of the course is exactly these three
 plus attention. LayerNorm normalizes each sample's activations across the feature
 dimension to zero mean and unit variance, then rescales by a learned gain and
-shift. It is what lets deep stacks train: without it, the scale of activations
+shift. It lets deep stacks train: without it, the scale of activations
 drifts layer to layer and gradients explode or vanish. Ba, Kiros and Hinton
 introduced it in
 [Layer Normalization](https://arxiv.org/abs/1607.06450) (2016) specifically because
 batch normalization's per-batch statistics are awkward for recurrent and
 sequence models; layer norm computes its statistics per sample, over the features,
 so it is independent of batch size and identical at train and test time. That
-property is what makes the pre-norm residual block - normalize, sublayer, add -
+property makes the pre-norm residual block - normalize, sublayer, add -
 the standard structure you will build in A1 and reuse everywhere after.
 
 GELU is the activation. Hendrycks and Gimpel proposed it in
@@ -88,7 +88,7 @@ between tokens; the MLP is where each token is transformed on its own, and it ho
 the majority of a transformer's parameters. Building it here as a reusable
 `nn.Module` means A1 can drop it into the block without rewriting it.
 
-Forward connections are concrete. A1 imports `LayerNorm`, `gelu`, and `MLP` from
+A1 imports `LayerNorm`, `gelu`, and `MLP` from
 `nanovision.primitives` to assemble the transformer block (it also adds `RMSNorm`
 and `SwiGLU` to the same module for the LLaMA-style default). Every assignment from
 A1 onward verifies its new mechanism with `check_gradients` and proves its
@@ -168,7 +168,7 @@ The optimization step is the standard rhythm. Given a batch `(inputs, targets)`:
 
 `overfit_one_batch` calls `step` on the same batch for a fixed number of steps and
 records the loss each time; a correct setup drives it to ~0. The order inside `step`
-is what makes it correct: `zero_grad` clears the previous step's gradients before
+makes it correct: `zero_grad` clears the previous step's gradients before
 `backward` accumulates new ones, and `optimizer.step` reads those gradients before
 the next `zero_grad` wipes them. Drop or reorder any one of these and the loss stays
 flat.

@@ -4,8 +4,8 @@
 
 Around 2020 the dominant paradigm for camera perception in autonomous driving
 shifted from per-image, per-camera detection to a shared bird's-eye-view (BEV)
-representation built from a surround-view camera rig. The driver of that shift
-was practical. A car needs a single, metric, top-down map of its surroundings to
+representation built from a surround-view camera rig. That shift was practical.
+A car needs a single, metric, top-down map of its surroundings to
 plan in, and stitching together six monocular detections in image space (each
 with its own depth ambiguity, its own occlusions, and an awkward seam between
 adjacent cameras) never produced a clean one. The fix was to commit to a fixed
@@ -48,8 +48,8 @@ lidar-time ego pose for the camera step, is exactly the bug this assignment make
 you see. You build both the naive and the timestamp-correct chain and watch them
 disagree by the ego motion.
 
-The other thing to internalize is why a naive flat-ground BEV is not enough, so
-that the later assignments have a reason to exist. Inverse perspective mapping
+A naive flat-ground BEV is not enough, which is why the later assignments exist.
+Inverse perspective mapping
 (IPM) warps a camera image into a top-down image by assuming every pixel is a
 point on the flat z = 0 ground plane, which reduces the projection to a 3x3
 homography from image to ground. That assumption is exact for road markings and
@@ -69,7 +69,7 @@ and stored rectified, so the stored K is an exact pinhole intrinsic with no
 radial or tangential distortion terms. (The nuImages spin-off keeps distortion;
 the core dataset does not.) You do not implement any undistortion here.
 
-Forward connections. This assignment builds `nanovision.geometry` (`project_points`
+This assignment builds `nanovision.geometry` (`project_points`
 / `unproject`, the four SE(3) primitives `make_transform` / `apply_transform` /
 `invert_transform` / `compose_transforms`, the `CameraRig`, and `ipm_to_bev`)
 plus the nuScenes-mini loader, and these are the shared dependency for the rest of
@@ -130,7 +130,7 @@ A camera-frame point (X, Y, Z) with Z > 0 projects to a pixel by
 and back-projects at depth d by X = (u - cx) d / fx, Y = (v - cy) d / fy, Z = d.
 Shapes: `project_points(pts_cam (N,3), K (3,3)) -> px (N,2)`;
 `unproject(px (N,2), depth (N,) or scalar, K (3,3)) -> pts_cam (N,3)`.
-Back-projection is what every BEV lift depends on; the only place to get it wrong
+Every BEV lift depends on back-projection; the only place to get it wrong
 is the sign/order when you chain it with the extrinsics.
 
 The forward pass is a divide by depth followed by the intrinsic scale and offset:
@@ -186,9 +186,9 @@ between the two timestamps, which is the 1.5 m the test measures.
 ### The pyquaternion convention
 
 nuScenes stores rotations as scalar-first quaternions `(w, x, y, z)` in both
-`calibrated_sensor` and `ego_pose`. The point is SE(3) composition, not quaternion
-algebra: build the 4x4 matrices immediately and chain them. The loader already
-does the quaternion-to-matrix step for you; you work in 4x4 matrix form.
+`calibrated_sensor` and `ego_pose`. You work in SE(3) composition rather than
+quaternion algebra: build the 4x4 matrices immediately and chain them. The loader
+already does the quaternion-to-matrix step for you; you work in 4x4 matrix form.
 
 ### The ego-centric BEV grid (the module-wide contract)
 

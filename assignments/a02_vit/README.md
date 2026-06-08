@@ -28,10 +28,10 @@ data through self-attention and a learned positional embedding table. An image
 becomes a sentence of patch tokens, and the architecture does not know it is looking
 at an image.
 
-What made this matter at the time was twofold. First, one architecture now covered
+Two things made this matter at the time. First, one architecture now covered
 both modalities. The same block built in A1 (multi-head self-attention, an MLP, two
 residual connections, layer norm) runs on text tokens and on image patch tokens
-with no vision-specific layer in between, which is what later made joint
+with no vision-specific layer in between, which later made joint
 vision-language models (CLIP, the VLMs in A8) straightforward to build: both towers
 are transformers. Second, with the inductive bias removed, attention is global from
 the first layer, so any patch can attend to any other patch immediately rather than
@@ -44,9 +44,9 @@ so. DeiT (Touvron et al., 2021,
 [arxiv.org/abs/2012.12877](https://arxiv.org/abs/2012.12877)) closed most of that
 gap without the giant dataset by leaning on strong augmentation and regularization
 (RandAugment, MixUp, CutMix, label smoothing, stochastic depth) plus a distillation
-token, training a competitive ViT on ImageNet-1k alone. The lesson that survives:
-a ViT needs either large data or a strong recipe to make up for the priors it does
-not have, and that tradeoff is the thing this assignment makes concrete.
+token, training a competitive ViT on ImageNet-1k alone. A ViT needs either large
+data or a strong recipe to make up for the priors it does not have, and this
+assignment makes that tradeoff concrete.
 
 The technical core is small. Patch embedding is a strided convolution: a
 `Conv2d` with kernel size and stride both equal to the patch size `p` applies one
@@ -88,11 +88,11 @@ checkpoints. The ConvNeXt block (Liu et al., 2022,
 answer to ViT. It takes a ResNet and modernizes it piece by piece (depthwise 7x7
 convolution for spatial mixing, an inverted bottleneck MLP for channel mixing,
 LayerNorm, GELU, fewer normalization and activation layers, layer scale) until a
-pure-convolution network matches Swin and ViT at the same compute. The point it
-makes is that the transformer's accuracy gains came largely from the macro design
-(separate spatial and channel mixing, large effective kernels, the modern training
-recipe) rather than from attention being fundamentally better than convolution, so
-you build the block here as the controlled counterpoint to the attention stack.
+pure-convolution network matches Swin and ViT at the same compute. ConvNeXt shows that
+the transformer's accuracy gains came largely from the macro design (separate spatial
+and channel mixing, large effective kernels, the modern training recipe) rather than
+from attention itself beating convolution, so you build the block here as the
+controlled counterpoint to the attention stack.
 
 This is the visual backbone the rest of the course imports. A3 (self-supervised
 learning): MAE reuses the patch embedding and masks 75% of the patch tokens before
@@ -104,8 +104,8 @@ model's token space. A11 (detection and segmentation) and A11.5b (Lift-Splat-Sho
 the patch tokens are reshaped from a `(B, N, d)` sequence back to a
 `(B, H/p, W/p, d)` spatial feature map, because a detector or a BEV lift needs to
 know which patch sits where, not just a single pooled vector. Getting the patch
-tokenizer, the sequence layout, and the pooling right here is what makes all of
-those downstream uses a matter of importing and reshaping.
+tokenizer, the sequence layout, and the pooling right here makes those downstream
+uses a matter of importing and reshaping.
 
 ## Background
 
@@ -315,7 +315,7 @@ or a misshaped PE add), not a tuning problem. The tiny ViT fits 12GB trivially. 
 optional real CIFAR-10 run (`solution/train_cifar.py`) is a wiring sanity run, not a
 convergence run: a tiny ViT from scratch underfits CIFAR-10 without the DeiT recipe
 (RandAugment, MixUp, CutMix, label smoothing, stochastic depth), and that gap is the
-lesson, the inductive-bias deficit rather than a bug in the architecture.
+inductive-bias deficit rather than a bug in the architecture.
 
 ## Stretch goals
 

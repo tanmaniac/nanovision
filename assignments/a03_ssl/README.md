@@ -13,7 +13,7 @@ scales with raw image count instead of annotation budget, and the resulting back
 transfers to detection, segmentation, retrieval, and depth with a small labeled head
 on top.
 
-The 2018-2020 wave of image SSL was dominated by contrastive learning. The idea: take
+The 2018-2020 wave of image SSL was dominated by contrastive learning. Take
 an image, make two random augmentations of it, and train the network so the two views
 of the same image land near each other in feature space while views of different
 images are pushed apart. SimCLR (Chen et al., 2020,
@@ -56,8 +56,7 @@ moving, more stable version of the student that the student chases. The obvious 
 mode is collapse: nothing in "match the teacher" stops both networks from ignoring the
 input and emitting the same constant vector, which matches perfectly and is useless.
 DINO avoids it with two cheap operations on the teacher only, centering and sharpening,
-which is the single most important thing to understand in this assignment and the part
-the tests instrument directly. What made DINO matter was an emergent property nobody
+which the tests instrument directly. What made DINO matter was an emergent property nobody
 trained for: the attention maps of a DINO-trained ViT segment the main object in the
 image without ever being shown a segmentation label, and the frozen features do
 k-nearest-neighbor classification on ImageNet at high accuracy with no fine-tuning.
@@ -75,9 +74,9 @@ makes clear what CLIP buys by paying for paired text. A8 (VLM) feeds a frozen se
 supervised ViT's patch tokens into a language model, so the quality of those tokens is
 exactly what A3 is about. A10.5 (geometry foundation models) and the AV perception
 assignments lean on self-supervised or large-pretrained backbones as the feature
-extractor under the geometry. The narrow, concrete skill A3 teaches is how a pretext
-task and an anti-collapse mechanism turn unlabeled pixels into a transferable feature,
-and how to measure whether that is actually happening rather than collapsing.
+extractor under the geometry. A3 teaches how a pretext task and an anti-collapse
+mechanism turn unlabeled pixels into a transferable feature, and how to measure
+whether that is happening rather than collapsing.
 
 ## Background
 
@@ -111,7 +110,7 @@ flowchart LR
     ASM --> DEC["+ decoder PE -> decoder<br/>-> Linear -> (B, N, p·p·C)"]
 ```
 
-The asymmetry is the whole point: the encoder is large (dim 64, depth 4 here) and sees
+The asymmetry makes MAE cheap: the encoder is large (dim 64, depth 4 here) and sees
 only the 16 visible tokens; the decoder is light (dim 48, depth 2) and sees the full
 64-token grid. The reassembly, `append_mask_tokens`, broadcasts the one shared learned
 `mask_token` to the `N - n_keep` masked slots, concatenates `[x_enc; masks]` in
@@ -180,7 +179,7 @@ centering pushes the teacher distribution toward uniform. Sharpening is dividing
 small `tau_teacher = 0.04` before the softmax, which makes the distribution peaky and
 confident, pushing it away from uniform. The student temperature is larger
 (`tau_student = 0.1`), so the student is asked to match a sharper target than it
-produces, which is what transfers information. Balanced, the two keep the teacher in a
+produces, which transfers information. Balanced, the two keep the teacher in a
 healthy middle: confident per image, spread across prototypes over the batch.
 
 The collapse instrument is the mean teacher entropy:
@@ -313,8 +312,8 @@ uses no momentum at all (frozen teacher). These are opposite teacher regimes on 
 The whole tiny setup fits 12GB trivially; the gating signal is correctness, not scale.
 
 The optional CIFAR-10 linear-probe comparison (frozen DINO features vs MAE features vs
-random init, with a single linear layer trained on top) is the honest end-to-end check
-that the representation is good, not just that the loss went down. It is described here
+random init, with a single linear layer trained on top) measures whether the
+representation is good, not just whether the loss went down. It is described here
 but is not part of the tests because it needs the dataset and more than overfit-scale
 compute.
 
