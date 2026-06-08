@@ -1,7 +1,7 @@
-# assignments/a03_ssl/ASSIGNMENT.md
+# assignments/a03_0_ssl/ASSIGNMENT.md
 
 ```yaml
-id: a03_ssl
+id: a03_0_ssl
 title: Self-supervised learning - MAE and DINO
 module: 1
 type: Core

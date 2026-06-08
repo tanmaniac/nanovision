@@ -127,7 +127,7 @@ nanovision/
 └── assignments/
     ├── a00_harness/
     ├── a01_transformer/
-    └── a115a_camera_geometry_bev/
+    └── a11_5a_camera_geometry_bev/
 ```
 
 Each assignment directory carries `README.md`, `ASSIGNMENT.md`, `starter/`,

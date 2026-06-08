@@ -5,7 +5,7 @@ If NUSCENES_DATAROOT is set and the data + devkit are present, this renders the
 real sample. Otherwise it falls back to a fully synthetic scene: a cube projected
 into a synthetic rig, and a ground checkerboard warped into the BEV grid.
 
-Run with: make viz A=a115a_camera_geometry_bev  (uses the reference solution).
+Run with: make viz A=a11_5a_camera_geometry_bev  (uses the reference solution).
 """
 
 import math

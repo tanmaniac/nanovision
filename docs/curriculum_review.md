@@ -70,7 +70,7 @@ attention maps. Changes: register tokens to core, name the DeiT recipe as part o
 the mechanism, add a CLS-vs-mean-pool measurement, demote Swin to context, mention
 2D sincos/axial-RoPE positional schemes.
 
-### A3 SSL, MAE + DINO (`a03_ssl.md`)
+### A3 SSL, MAE + DINO (`a03_0_ssl.md`)
 Core stands; original DINO remains the right build target. Key concepts: the
 collapse problem and why centering + sharpening + EMA teacher together avoid it;
 MAE's asymmetric encoder-decoder and the load-bearing 75% mask ratio; the family
@@ -151,7 +151,7 @@ positional slots. Changes (survey): fill the lineage with DAB-DETR/DN-DETR, add
 RT-DETR (removes the "too slow" objection), Mask2Former for the segmentation half,
 GroundingDINO for open-vocab, update the SAM arc to SAM -> SAM2 -> SAM3.
 
-### A11.5a camera geometry & BEV (`a115a_camera_geometry_bev.md`)
+### A11.5a camera geometry & BEV (`a11_5a_camera_geometry_bev.md`)
 Core stands; primitives are exactly what the later AV assignments need. Key
 concepts: the four-step lidar-to-camera chain and the ~50ms lidar/camera temporal
 offset (~1.5m error at speed); the ego-centric BEV grid as the shared contract for

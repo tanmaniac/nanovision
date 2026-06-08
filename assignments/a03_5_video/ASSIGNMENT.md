@@ -1,12 +1,12 @@
-# assignments/a035_video/ASSIGNMENT.md
+# assignments/a03_5_video/ASSIGNMENT.md
 
 ```yaml
-id: a035_video
+id: a03_5_video
 title: Video and temporal modeling - video MAE with tube masking
 module: 1
 type: Core
 estimated_learner_hours: 5
-depends_on: [a00_harness, a01_transformer, a02_vit, a03_ssl]
+depends_on: [a00_harness, a01_transformer, a02_vit, a03_0_ssl]
 builds_into_shared_lib:
   - nanovision.transformer.TubeletEmbedding
 forbidden_imports:

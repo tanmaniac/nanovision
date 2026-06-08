@@ -115,7 +115,7 @@ lazily and no import cycle forms.
   LearnedPositionalEncoding` -> a01_transformer/transformer.py.
 - `geometry`: `project_points, unproject, make_transform, apply_transform,
   invert_transform, compose_transforms, CameraRig, BEVGrid, ipm_to_bev`
-  -> a115a_camera_geometry_bev/geometry.py.
+  -> a11_5a_camera_geometry_bev/geometry.py.
 - Native (no student holes, stay in nanovision/): `gradcheck, determinism,
   data.toy, data.images, data.nuscenes_mini, viz`.
 

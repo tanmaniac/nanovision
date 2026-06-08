@@ -1,7 +1,7 @@
-# assignments/a115a_camera_geometry_bev/ASSIGNMENT.md
+# assignments/a11_5a_camera_geometry_bev/ASSIGNMENT.md
 
 ```yaml
-id: a115a_camera_geometry_bev
+id: a11_5a_camera_geometry_bev
 title: Camera geometry & the BEV transform
 module: 3.5
 type: Core

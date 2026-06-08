@@ -75,8 +75,8 @@ nanovision/
 │   ├── a00_harness/               # a09_nerf/
 │   ├── a01_transformer/           # a10_gaussian_splatting/
 │   ├── a02_vit/                   # a105_geometry_foundation/
-│   ├── a03_ssl/                   # a11_detection_segmentation/
-│   ├── a035_video/                # a115a_camera_geometry_bev/
+│   ├── a03_0_ssl/                   # a11_detection_segmentation/
+│   ├── a03_5_video/                # a11_5a_camera_geometry_bev/
 │   ├── a04_clip/                  # a115b_lift_splat_shoot/
 │   ├── a05_diffusion/             # a115c_bevformer/
 │   ├── a06_flow_matching/         # a115d_occupancy/
@@ -247,7 +247,7 @@ stays consistent down the chain.
   - `a04_clip`, `a08_vlm`: `open_clip_torch` and/or `transformers` (ONLY for
     loading pretrained weights in the probe notebooks - never for the from-scratch
     parts).
-  - `a02_vit`, `a03_ssl`, `a035_video`: `timm` (pretrained DINOv2 / video probes).
+  - `a02_vit`, `a03_0_ssl`, `a03_5_video`: `timm` (pretrained DINOv2 / video probes).
   - `a105_geometry_foundation`: `transformers` / model-hub access for the
     DepthAnything / Marigold / VGGT survey probes (probe notebooks only).
   - `a115*`: `nuscenes-devkit`, `pyquaternion`, `shapely`.

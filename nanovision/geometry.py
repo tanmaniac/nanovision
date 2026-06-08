@@ -1,13 +1,13 @@
 """Camera geometry and BEV, sourced from A11.5a.
 
-Loaded from assignments/a115a_camera_geometry_bev/geometry.py (or solution/ under
+Loaded from assignments/a11_5a_camera_geometry_bev/geometry.py (or solution/ under
 NANOVISION_IMPL=solution) through nanovision/_student.py. Import as
 `from nanovision.geometry import project_points`, etc.
 """
 
 from nanovision._student import load
 
-_m = load("a115a_camera_geometry_bev", "geometry")
+_m = load("a11_5a_camera_geometry_bev", "geometry")
 
 project_points = _m.project_points
 unproject = _m.unproject

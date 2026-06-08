@@ -252,7 +252,7 @@ only the six mechanism bodies.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a03_ssl      # your top-level code (red until you fill the holes)
+    make test A=a03_0_ssl      # your top-level code (red until you fill the holes)
 
 The tests run in this order, which is also the intended workflow:
 
@@ -284,8 +284,8 @@ The tests run in this order, which is also the intended workflow:
 
 To confirm the reference passes and render the figures:
 
-    make verify A=a03_ssl    # reference solution (should be green)
-    make viz    A=a03_ssl    # writes the MAE reconstruction and DINO entropy curves to out/
+    make verify A=a03_0_ssl    # reference solution (should be green)
+    make viz    A=a03_0_ssl    # writes the MAE reconstruction and DINO entropy curves to out/
 
 The reference implementation is visible in `solution/mae.py` and `solution/dino.py`;
 read it if you get stuck.

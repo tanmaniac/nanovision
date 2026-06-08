@@ -1,7 +1,7 @@
 """Transformer blocks and positional schemes (A1) plus the tubelet embed (A3.5).
 
 Most symbols are sourced from assignments/a01_transformer/transformer.py;
-TubeletEmbedding is sourced from assignments/a035_video/tubelet.py. Both go through
+TubeletEmbedding is sourced from assignments/a03_5_video/tubelet.py. Both go through
 nanovision/_student.py (or solution/ under NANOVISION_IMPL=solution). Import as
 `from nanovision.transformer import TransformerEncoder`, etc.
 """
@@ -20,7 +20,7 @@ TransformerEncoder = _m.TransformerEncoder
 TransformerDecoder = _m.TransformerDecoder
 
 # Spatiotemporal tubelet embed for video, built in A3.5.
-_v = load("a035_video", "tubelet")
+_v = load("a03_5_video", "tubelet")
 TubeletEmbedding = _v.TubeletEmbedding
 
 __all__ = [

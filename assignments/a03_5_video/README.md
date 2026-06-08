@@ -161,7 +161,7 @@ encoder, the mask-token reassembly, and the `VideoMAE` module wiring are provide
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a035_video      # your top-level code (red until you fill the holes)
+    make test A=a03_5_video      # your top-level code (red until you fill the holes)
 
 The tests run in this order:
 
@@ -186,8 +186,8 @@ The tests run in this order:
 
 To confirm the reference passes and render the filmstrip:
 
-    make verify A=a035_video    # reference solution (should be green)
-    make viz    A=a035_video    # writes the masked-vs-reconstructed filmstrip to out/
+    make verify A=a03_5_video    # reference solution (should be green)
+    make viz    A=a03_5_video    # writes the masked-vs-reconstructed filmstrip to out/
 
 The reference implementation is visible in `solution/tubelet.py` and
 `solution/video_mae.py`; read it if you get stuck.

@@ -1,7 +1,7 @@
 """Render the video MAE: a tube-masked clip and its reconstruction filmstrip.
 
-Run from the repo root: `python -m assignments.a035_video.viz` (or `make viz
-A=a035_video`). Overfits one toy-clip batch, then renders, for one clip, three rows
+Run from the repo root: `python -m assignments.a03_5_video.viz` (or `make viz
+A=a03_5_video`). Overfits one toy-clip batch, then renders, for one clip, three rows
 across the T frames: the original, the tube-masked input (masked tubelets blanked),
 and the reconstruction. Also writes the overfit loss curve. The masked columns are the
 same across all frames, which is the tube the model has to infer.

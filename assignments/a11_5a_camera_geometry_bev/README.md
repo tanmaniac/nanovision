@@ -268,7 +268,7 @@ and to one test file.
 
 Run from the repo root with the `nanovision` env active, in this order:
 
-    make test A=a115a_camera_geometry_bev      # your top-level code (red until filled)
+    make test A=a11_5a_camera_geometry_bev      # your top-level code (red until filled)
 
 The tests run in workflow order: projection (reference values, axis point,
 round-trip, float64 gradcheck) -> SE(3) (block layout, applied-point reference,
@@ -282,8 +282,8 @@ agree). All of these run on synthetic cameras with no dataset.
 
 To confirm the reference passes and render the figures:
 
-    make verify A=a115a_camera_geometry_bev    # reference solution (green)
-    make viz    A=a115a_camera_geometry_bev    # writes PNGs to out/
+    make verify A=a11_5a_camera_geometry_bev    # reference solution (green)
+    make viz    A=a11_5a_camera_geometry_bev    # writes PNGs to out/
 
 The nuScenes loader test reports as skipped unless the dataset is present; that is
 expected, and `viz.py` falls back to a synthetic cube and a ground-checkerboard

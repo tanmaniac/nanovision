@@ -17,9 +17,9 @@ instead of independent per-token masking.
 `nanovision.transformer.TubeletEmbedding` (ARCHITECTURE.md section 3 already lists
 it). Under the current layout this means:
 
-- It is owned by `assignments/a035_video/tubelet.py` (the student writes it there).
+- It is owned by `assignments/a03_5_video/tubelet.py` (the student writes it there).
 - `nanovision/transformer.py` (currently a pure A1 shim) grows one more line that
-  loads `TubeletEmbedding` from a035 via `load("a035_video", "tubelet")`, while the
+  loads `TubeletEmbedding` from a035 via `load("a03_5_video", "tubelet")`, while the
   rest of the transformer symbols keep loading from a01. The shim sources different
   symbols from different owners; that is fine.
 - ARCHITECTURE.md section 3 needs no signature change (already documented). The
@@ -130,7 +130,7 @@ following the lesson from A3: cheap tests with a reachable bar, no threshold hun
 ## Layout (new convention)
 
 ```
-assignments/a035_video/
+assignments/a03_5_video/
   __init__.py
   conftest.py            # standard: _here then _impl on sys.path
   config.py
@@ -148,7 +148,7 @@ assignments/a035_video/
 
 ## Shared-lib + docs touch-ups
 
-- `nanovision/transformer.py`: add `_v = load("a035_video", "tubelet");
+- `nanovision/transformer.py`: add `_v = load("a03_5_video", "tubelet");
   TubeletEmbedding = _v.TubeletEmbedding` and add it to `__all__`. Keep the a01
   loads as they are. Guard: a035 must exist before A3.5; until then the shim must
   not eagerly import a035 (it will once A3.5 lands, which is now).
@@ -199,4 +199,4 @@ internalizing the toy as the real recipe.
 3. Hole the top-level tubelet.py / video_mae.py; wire nanovision.transformer shim.
 4. Tests; confirm solution green and holed fails cleanly at the NotImplementedError.
 5. viz.py (filmstrip), README lecture notes, ASSIGNMENT.md.
-6. Run make verify A=a035_video green; update docs/checklist; commit.
+6. Run make verify A=a03_5_video green; update docs/checklist; commit.

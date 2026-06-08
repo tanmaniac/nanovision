@@ -8,7 +8,7 @@ installed and DINO weights are reachable, loads a pretrained DINO ViT and shows 
 [CLS] attention; it falls back cleanly and prints a message if timm/internet are
 missing.
 
-Run with: make viz A=a03_ssl  (uses the reference solution).
+Run with: make viz A=a03_0_ssl  (uses the reference solution).
 """
 
 import sys
