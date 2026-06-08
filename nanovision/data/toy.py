@@ -113,3 +113,51 @@ def video_batch(batch: int = 8, n_frames: int = 6, size: int = 16, channels: int
                 blob = amp * torch.exp(-(((xs - cx) ** 2 + (ys - cy) ** 2) / (2.0 * sigma ** 2)))
                 vid[b, c, t] += blob
     return vid.clamp(0.0, 1.0).to(device)
+
+
+def image_text_batch(batch: int = 8, size: int = 16, channels: int = 3, n_classes: int = 4,
+                     n_attrs: int = 4, vocab_size: int = 32, max_len: int = 8, seed: int = 0,
+                     device: str = "cpu") -> tuple[Tensor, Tensor]:
+    """A batch of paired (image, caption) examples for contrastive learning (A4).
+
+    Returns (images (B, C, H, W), token_ids (B, L)). Each pair draws a latent class c
+    and a nuisance attribute a, with the (c, a) combinations chosen distinct within the
+    batch. The class sets the blob's channel (color) and the attribute sets its
+    position; the caption is [class_token(c), attr_token(a), EOS, pad...]. Because
+    n_classes < batch, classes repeat across pairs, so two same-class pairs are in-batch
+    "negatives" yet semantically close (the false-negative pathology of in-batch
+    contrastive learning). EOS is the largest token id (vocab_size - 1), so the CLIP
+    argmax-of-token-ids EOS-pooling trick lands on it.
+
+    Token id layout: 0 = pad, 1..n_classes = class tokens, n_classes+1..n_classes+n_attrs
+    = attribute tokens, vocab_size-1 = EOS.
+    """
+    g = torch.Generator().manual_seed(seed)
+    eos = vocab_size - 1
+    assert n_classes + n_attrs + 1 < vocab_size, "vocab too small for the token layout"
+    assert batch <= n_classes * n_attrs, "need at least `batch` distinct (class, attr) combos"
+
+    # Distinct (class, attr) combinations, classes repeating since n_classes < batch.
+    combos = [(c, a) for c in range(n_classes) for a in range(n_attrs)]
+    perm = torch.randperm(len(combos), generator=g)[:batch]
+    pairs = [combos[i] for i in perm.tolist()]
+
+    images = torch.zeros(batch, channels, size, size)
+    tokens = torch.zeros(batch, max_len, dtype=torch.long)
+    ys = torch.arange(size).float().view(size, 1)
+    xs = torch.arange(size).float().view(1, size)
+    margin = size / 6.0
+    for i, (c, a) in enumerate(pairs):
+        ch = c % channels
+        # Attribute -> a position on a small grid of cell centers.
+        side = max(1, int(round(n_attrs ** 0.5)))
+        ax, ay = a % side, a // side
+        cx = margin + (size - 2 * margin) * (ax / max(1, side - 1) if side > 1 else 0.5)
+        cy = margin + (size - 2 * margin) * (ay / max(1, side - 1) if side > 1 else 0.5)
+        sigma = 1.5 + 0.5 * (c / max(1, n_classes - 1))
+        blob = torch.exp(-(((xs - cx) ** 2 + (ys - cy) ** 2) / (2.0 * sigma ** 2)))
+        images[i, ch] += blob
+        tokens[i, 0] = 1 + c                  # class token
+        tokens[i, 1] = 1 + n_classes + a      # attribute token
+        tokens[i, 2] = eos                    # EOS (largest id); rest stay pad (0)
+    return images.clamp(0.0, 1.0).to(device), tokens.to(device)

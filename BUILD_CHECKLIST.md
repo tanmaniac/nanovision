@@ -21,7 +21,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A2  vision transformers         [Core]   deps: A0,A1   (+register tokens, ConvNeXt)
 - [x] A3  self-supervised (MAE+DINO)  [Core]   deps: A1,A2   (+iBOT)
 - [x] A3.5 video / temporal modeling  [Core]   deps: A2,A3   (video MAE, tube masking)
-- [ ] A4  CLIP & open-vocab           [Core]   deps: A1,A2   (SigLIP primary)
+- [x] A4  CLIP & open-vocab           [Core]   deps: A1,A2   (SigLIP primary)
 
 ## Phase 2 - Generative
 - [ ] A5  diffusion (DDPM/DDIM)       [Core]   deps: A0,A1   (v-prediction)
