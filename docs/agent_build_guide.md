@@ -64,6 +64,12 @@ ONLY bare (never via `nanovision`). `conftest.py` puts the assignment dir then t
   path + `~/.claude/CLAUDE.md`, per the skill) and apply its edits.
 - ASSIGNMENT.md is the concise builder contract in `TEMPLATE.md` format; do not echo the README's
   prose. No stray trailing code fence.
+- DEVICE: graded tests stay on CPU (device-agnostic + deterministic - gradcheck and exact-equality
+  assertions break under CUDA). But viz.py and any heavy training/visualization demo MUST use the
+  GPU when present: `from nanovision.determinism import default_device; dev = default_device()`
+  (CUDA if available, else CPU) and move the model + batches to `dev`. The machine has an RTX 4080;
+  a CPU-only viz that does real training will crawl. Keep tensors that feed matplotlib on CPU
+  (`.cpu()`).
 - Style on everything (code comments, README, ASSIGNMENT): match `~/.claude/CLAUDE.md` - plain
   American English, sentence-case headings, single-hyphen not em dash, straight quotes, no filler
   ("delve/leverage/robust/crucial/seamless/fundamentally/spine/..."), active voice (no "X is what
