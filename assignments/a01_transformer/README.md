@@ -83,8 +83,8 @@ historical contrast.
 The block you write here is reused by direct import of `nanovision.attention` and
 `nanovision.transformer` across most of the rest of the course. A2 (ViT) applies
 this exact transformer block to image patches instead of text tokens. A4 (CLIP)
-uses it as the text tower. A7's DiT denoiser is a stack of these blocks with adaLN
-conditioning on the diffusion timestep. A8 (VLM) feeds visual tokens into a
+uses it as the text tower. A7 (the diffusion transformer, DiT) stacks these blocks with
+adaLN conditioning on the diffusion timestep. A8 (VLM) feeds visual tokens into a
 decoder-only stack just like the char-LM you assemble here. A11.5c (BEVFormer)
 relies on the cross-attention path to pull image features into BEV queries. A13
 (the VLA policy capstone) is again a transformer over interleaved vision, language,

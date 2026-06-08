@@ -6,10 +6,11 @@ Everything up to here treats an image as a static grid. Real perception is tempo
 a self-driving stack reasons about motion, a world model predicts the next frame, and
 telling a person sitting down from a person standing up needs more than one frame. This
 assignment extends the ViT and the MAE you already built to video, and most of the
-extension is mechanical. A2's patch embedding becomes a tubelet embedding (a 3D strided
-convolution instead of a 2D one), A3's masked autoencoder reconstructs space-time
-tubelets instead of 2D patches, and the encoder is the same A1 transformer run over a
-longer token sequence. Two components are new, which is why this is a compact assignment
+extension is mechanical. The ViT patch embedding becomes a tubelet embedding (a tubelet
+is a small block of pixels spanning a few frames and one spatial patch; the embedding is
+a 3D strided convolution instead of a 2D one), the masked autoencoder (MAE) reconstructs
+space-time tubelets instead of 2D patches, and the encoder is the same transformer run
+over a longer token sequence. Two components are new, which is why this is a compact assignment
 rather than a full one. The first is the tubelet, how to turn a clip into tokens. ViViT
 (Arnab et al., 2021, [arxiv.org/abs/2103.15691](https://arxiv.org/abs/2103.15691))
 named the standard choice, "tubelet embedding," a non-overlapping 3D convolution with
@@ -20,7 +21,7 @@ recipe does not port directly, because video is temporally redundant in a way im
 are not.
 
 Video is far more redundant than a single image, because adjacent frames are nearly
-identical. If you mask patches independently at random, the way A3 does, then a masked
+identical. If you mask patches independently at random, the way image MAE does, then a masked
 patch in frame `t` almost always has an unmasked copy of nearly the same content in
 frame `t-1` or `t+1`. The reconstruction task collapses into "copy the patch from the
 neighboring frame," which the model solves by learning motion-compensated copying and
@@ -33,7 +34,7 @@ VideoMAE abstract). Tube masking plus a very high ratio makes masked
 autoencoding work for video, and you reproduce that contrast on a tiny clip here.
 
 The architectural simplification this assignment makes, and that you should know it is
-making, is joint space-time attention: the A1 encoder attends over all `N = T' * S'`
+making, is joint space-time attention: the transformer encoder attends over all `N = T' * S'`
 tubelet tokens at once, which is `O(N^2)`. For a real clip `N` is large and that
 quadratic cost is exactly why video transformers were expensive and why the field moved
 to factorized attention. TimeSformer (Bertasius et al., 2021,
@@ -42,7 +43,7 @@ within time in separate sub-layers ("divided space-time attention"), turning
 `O((T'S')^2)` into `O(T' S'^2 + T'^2 S')`, and ViViT proposes factorized-encoder and
 factorized-attention variants for the same reason. Joint attention is fine here because
 `N = 48`; at scale it is not, and the README for any real system would lead with the
-factorization. We build joint attention because it is the A1 encoder unchanged, and
+factorization. We build joint attention because it is the transformer encoder unchanged, and
 name the cost so the simplification is explicit.
 
 This bridges forward in two directions. A11.5c (BEVFormer) uses temporal self-attention
@@ -71,7 +72,7 @@ each non-overlapping space-time tubelet:
 
 The conv output is `(B, dim, T', H', W')`; flattening the three grid dims
 temporal-outermost and transposing gives `(B, N, dim)` with token index
-`idx = t' * S' + (h'*W' + w')`. This is the exact 3D analog of A2's patch embed, and the
+`idx = t' * S' + (h'*W' + w')`. This is the exact 3D analog of the ViT patch embedding, and the
 same identity holds: the embed equals unfolding each tubelet into a `(C*t*p*p)` vector
 and multiplying by the conv weight reshaped to `(C*t*p*p, dim)`.
 
@@ -92,8 +93,8 @@ this way; transposing it silently breaks the tube test.
 
 Tube masking draws one spatial keep set and applies it to every temporal step, so the
 visible tokens form spatiotemporal tubes. The construction has to be explicit (not
-A3's per-token `argsort(noise)`) so the visible set is structured yet the append and
-unshuffle reassembly from A3 still works. Per sample: permute the `S'` spatial
+image MAE's per-token `argsort(noise)`) so the visible set is structured yet the append and
+unshuffle reassembly from image MAE still works. Per sample: permute the `S'` spatial
 positions, keep the first `n_keep_spatial = round((1-r)*S')`, then lift each kept and
 dropped spatial index to full-token indices for all `T'` steps (`idx = t'*S' + s`),
 concatenate `[keep; drop]` into `ids_shuffle`, and take `ids_restore =
@@ -123,7 +124,7 @@ ratio to `1 - k/16`.
 The asymmetric MAE design carries over unchanged: the heavy encoder sees only the 6
 visible tubelets, a shared learned mask token fills the 42 masked slots, a light decoder
 sees the full 48-token grid, and a linear head predicts `(B, N, t*p*p*C)` per-tubelet
-pixels. The loss is A3's masked-patch MSE with the patch enlarged from `p*p` to
+pixels. The loss is MAE's masked-patch MSE with the patch enlarged from `p*p` to
 `t*p*p`, on per-tubelet-normalized targets, averaged over masked tubelets only:
 
     target  = per_tubelet_normalize(tubeletify(clip))     # (B, N, t*p*p*C)
@@ -150,11 +151,11 @@ encoder, the mask-token reassembly, and the `VideoMAE` module wiring are provide
 2. `tube_masking` (`video_mae.py`): draw one per-sample spatial keep set and apply it
    to all `T'` temporal steps; build `ids_keep`/`ids_drop`/`ids_shuffle`/`ids_restore`
    explicitly, gather `x_kept`, and build the original-order `mask`. Teaches why video
-   needs tube masking instead of A3's per-token masking: a per-token mask leaks through
+   needs tube masking instead of image MAE's per-token masking: a per-token mask leaks through
    time, a tube does not.
 3. `video_mae_loss` (`video_mae.py`): per-tubelet MSE (mean over the pixel dim),
    averaged over masked tubelets only via the `mask` weight. Teaches that the video loss
-   is A3's loss on a bigger patch, not a new objective.
+   is the image MAE loss on a bigger patch, not a new objective.
 
 ## How to verify
 
@@ -174,7 +175,7 @@ The tests run in this order:
    the unshuffle restores visible tubelets to their original positions, deterministic
    under a fixed seed.
 4. `tests/test_tubelet_equivalence.py` - the Conv3d tubelet embed equals
-   unfold-into-tubes times the reshaped conv weight (the 3D analog of A2's
+   unfold-into-tubes times the reshaped conv weight (the 3D analog of the ViT
    patch-equivalence test).
 5. `tests/test_overfit.py` - the VideoMAE memorizes one fixed toy-clip batch (fixed
    tube mask) to masked-tubelet MSE < 0.05.
@@ -207,7 +208,7 @@ linear probe): the representation benefit of tube masking shows only at real vid
 
 Two simplifications the toy makes, stated so they are not mistaken for the recipe. The
 masking ratio is 0.875, below VideoMAE's 90-95 percent, lowered only so a tiny model
-overfits one clip. The encoder uses joint space-time attention (the A1 encoder over all
+overfits one clip. The encoder uses joint space-time attention (the transformer encoder over all
 48 tokens), which is `O(N^2)`; real systems factorize space and time (TimeSformer,
 ViViT) to avoid the quadratic cost.
 

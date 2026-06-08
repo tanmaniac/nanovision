@@ -29,7 +29,7 @@ becomes a sentence of patch tokens, and the architecture does not know it is loo
 at an image.
 
 Two things made this matter at the time. First, one architecture now covered
-both modalities. The same block built in A1 (multi-head self-attention, an MLP, two
+both modalities. The same transformer block (multi-head self-attention, an MLP, two
 residual connections, layer norm) runs on text tokens and on image patch tokens
 with no vision-specific layer in between, which later made joint
 vision-language models (CLIP, the VLMs in A8) straightforward to build: both towers
@@ -235,7 +235,7 @@ Five holes:
 - `ViT._pool` (CLS vs mean) in `vit.py`.
 - `interpolate_pos_embed` in `vit.py`.
 
-The ViT module construction, the A1 transformer encoder (imported with
+The ViT module construction, the transformer encoder (imported with
 `norm="layer"`, `ffn="mlp"`, `pos="none"` for the classic ViT block), the
 CLS/PE/register parameters and their init, `config.py`, the CIFAR-10 wiring in
 `train_cifar.py`, and the plotting are provided. You write only the five mechanism

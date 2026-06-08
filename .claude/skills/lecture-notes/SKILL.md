@@ -71,6 +71,13 @@ rewrite it to be direct, editing ONLY the README. Specifically it must strip:
   words, copula avoidance, negative parallelism, the rule of three as default rhythm,
   "Label: detail" headings, em dashes).
 - Sentences that can be deleted with no loss of technical content.
+- References to previously-taught concepts by assignment NUMBER instead of by name:
+  "A2's patch embedding" -> "ViT's patch embedding", "the A1 encoder" -> "the
+  transformer encoder", "A3's MAE" -> "the masked autoencoder (MAE)". A bare number is
+  not readable on its own. (Forward pointers that name the upcoming topic are fine.)
+- New jargon used before it is defined: if a term (tubelet, register token, EOS
+  pooling, ...) is used before a clause explains what it is, add a short gloss at first
+  use or flag it. The reader should never hit a word they cannot understand in place.
 It must NOT add claims, soften technical precision, or touch code/shapes/citations. It
 returns the list of edits it made so the change is auditable.
 

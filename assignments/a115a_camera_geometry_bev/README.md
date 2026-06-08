@@ -24,7 +24,8 @@ nuScenes defines three nested frames: each sensor's own frame (lidar points in
 the lidar frame; the scene in each camera's OpenCV frame, +x right, +y down, +z
 forward), the ego frame (vehicle body, origin at the rear-axle midpoint, x
 forward / y left / z up), and a fixed ENU global frame that all 3-D annotations
-live in. Two record types carry the transforms. `calibrated_sensor` stores the
+live in (ENU is East-North-Up: a fixed world frame with axes pointing east, north, and
+up). Two record types carry the transforms. `calibrated_sensor` stores the
 sensor-to-ego rigid transform (translation in meters plus a rotation quaternion)
 and, for cameras, the 3x3 intrinsic. `ego_pose` stores the ego-to-global rigid
 transform plus a timestamp. Both quaternions are scalar-first `(w, x, y, z)`;

@@ -67,7 +67,9 @@ the encoder is the ViT and transformer you already built.
 
 The dual encoder maps an image and a token sequence to L2-normalized vectors in a shared
 space of dimension D. The image tower is a small ViT pooled to one vector; the text tower
-is a small causal transformer pooled at the EOS token, then projected. Both end in an L2
+is a small causal transformer pooled at the EOS token (the end-of-sequence marker that
+closes every caption; its hidden state is taken as the sentence summary), then projected.
+Both end in an L2
 normalize, so a dot product between two embeddings is their cosine similarity.
 
 ```mermaid

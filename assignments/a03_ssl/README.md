@@ -50,7 +50,8 @@ route, self-distillation with no labels and no negatives. There are two networks
 identical architecture, a student and a teacher. Both see crops of the same image, the
 teacher sees the large global crops and the student sees those plus several small local
 crops, and the student is trained so its output distribution over a set of learned
-"prototypes" matches the teacher's. The teacher is not trained by backprop at all: its
+"prototypes" (K learned direction vectors; each crop's features are scored against all
+of them to give a distribution over the K prototypes) matches the teacher's. The teacher is not trained by backprop at all: its
 weights are an exponential moving average (EMA) of the student's, so it is a slowly
 moving, more stable version of the student that the student chases. The obvious failure
 mode is collapse: nothing in "match the teacher" stops both networks from ignoring the
@@ -80,7 +81,7 @@ whether that is happening rather than collapsing.
 
 ## Background
 
-The shared setup is the A2 patch grid. An image is `(B, C, H, W)`; with patch size
+The shared setup is the ViT patch grid. An image is `(B, C, H, W)`; with patch size
 `p` it becomes `N = (H/p)*(W/p)` patch tokens of dimension `D`. For the tiny config
 here (32x32 images, `p = 4`) that is `N = 64`.
 
