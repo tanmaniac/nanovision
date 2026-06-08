@@ -9,7 +9,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] `nanovision.trainer` / `gradcheck` / `determinism` / `data` (A0)
 - [x] `nanovision.attention` + `nanovision.transformer` (A1; RoPE/RMSNorm/SwiGLU/GQA)
 - [x] `nanovision.transformer.TubeletEmbedding` (A3.5)
-- [ ] `nanovision.quantize` (A6.5)
+- [x] `nanovision.quantize` (A6.5)
 - [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
 - [ ] `nanovision.geometry` pointmap/depth utils (A10.5)
 
@@ -26,7 +26,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 ## Phase 2 - Generative
 - [x] A5  diffusion (DDPM/DDIM)       [Core]   deps: A0,A1   (v-prediction)
 - [x] A6  flow matching / rect. flow  [Core]   deps: A5      (+OT coupling)
-- [ ] A6.5 VQ tokenizer               [Core]   deps: A1,A2
+- [x] A6.5 VQ tokenizer               [Core]   deps: A1,A2
 - [ ] A7  latent diffusion + DiT      [Core]   deps: A1,A5,A6,A6.5  (flow-matching DiT)
 
 ## Phase 3 - Multimodal & 3D
