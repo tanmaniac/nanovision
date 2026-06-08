@@ -564,3 +564,195 @@ def bev_toy_scene(
         "bins": bins.to(device),
     }
     return out
+
+
+def bev_multicam_scene(
+    n_cams: int = 4,
+    n_vehicles: int = 4,
+    bev: tuple[float, float] = (-8.0, 8.0),
+    res: float = 1.0,
+    img: int = 32,
+    stride: int = 4,
+    n_frames: int = 1,
+    ego_step: float = 1.0,
+    focal: float | None = None,
+    occlude_moving: bool = False,
+    cam_height: float = 1.5,
+    vehicle_z: float = 0.75,
+    seed: int = 0,
+    device: str = "cpu",
+) -> dict:
+    """A tiny multi-camera ring BEV scene for BEVFormer-style attention (A11.5c).
+
+    n_cams cameras at ego (0, 0, cam_height) with yaw uniformly over 360 degrees (front, left,
+    back, right for n_cams=4), OpenCV convention. Each "vehicle" is rendered as a colored blob in
+    whichever cameras see its centroid. The centered BEV occupancy ground truth marks each
+    vehicle's ego cell. BEV cells reaching back into image space (the query-pull view transform)
+    can recover the occupancy because the projection geometry is exact.
+
+    A 4-camera cardinal ring does not produce cells seen by two cameras at once (the FOV
+    boundaries meet along the diagonals), so every BEV cell is single-view or unseen regardless of
+    focal; the multi-view averaging in spatial cross-attention is exercised by its unit test, not
+    by this toy's geometry. The default focal (img / 2, ~90 degree FOV) covers almost the whole
+    grid (only the far corners are unseen) while keeping many single-view cells for the hit-mask
+    test.
+
+    Conventions match nanovision.geometry: ego x forward, y left, z up; camera OpenCV x right,
+    y down, z forward; extrinsic E = T_cam_ego. A camera at ego yaw a has axes z_cam=(cos a,
+    sin a, 0), x_cam=(sin a, -cos a, 0), y_cam=(0, 0, -1); at a=0 this is the forward camera of
+    bev_toy_scene. The default focal (img) gives a ~53 degree FOV so adjacent cameras leave gaps
+    and some BEV cells are single-view (the spatial-cross-attention hit-mask test needs that).
+
+    Temporal use (n_frames=2): the ego moves forward ego_step meters per frame; vehicles are fixed
+    in the world, so their ego coordinates shift backward by ego_step each frame. ego_deltas
+    carries the per-frame SE(2) ego motion (forward, lateral, yaw). With occlude_moving=True, one
+    vehicle is rendered into every frame EXCEPT the last (current) frame, but stays in the BEV
+    ground truth of every frame; occluded_cells marks its current-frame cells, the region the
+    temporal-self-attention test scores (recoverable from warped history, not from the current
+    image alone).
+
+    Args:
+        n_cams: number of ring cameras.
+        n_vehicles: vehicles to place (including the moving/occluded one when occlude_moving).
+        bev: ego BEV extent (meters), same for x and y (centered grid).
+        res: BEV cell size (meters).
+        img: square image side (pixels).
+        stride: backbone downsample (feature grid is img // stride per side).
+        n_frames: number of frames (1 for the single-frame tests, 2 for the temporal test).
+        ego_step: forward ego motion per frame (meters), used when n_frames > 1.
+        focal: pinhole focal (pixels); defaults to img / 2 (~90 deg FOV).
+        occlude_moving: render one vehicle into all frames but the last (temporal test).
+        cam_height, vehicle_z: camera and vehicle-centroid heights (meters).
+        seed: RNG seed.
+        device: target device.
+
+    Returns:
+        dict with:
+            images: (n_frames, n_cams, 3, img, img) in [0, 1].
+            K: (3, 3) shared intrinsic.
+            E: (n_cams, 4, 4) per-camera T_cam_ego (frame-independent; ego motion moves vehicles).
+            bev_gt: (n_frames, nx, ny) vehicle occupancy on the centered BEV grid.
+            ego_deltas: (n_frames, 3) SE(2) ego motion (forward, lateral, yaw); frame 0 is zero.
+            vehicles: (n_frames, n_vehicles, 2) ego (x, y) per frame.
+            occluded_cells: (k, 2) long current-frame cells of the moving vehicle, or an empty
+                tensor when occlude_moving is False.
+    """
+    g = torch.Generator().manual_seed(seed)
+    f = float(focal) if focal is not None else img / 2.0
+    cx = cy = (img - 1) / 2.0
+    K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
+    n = int(round((bev[1] - bev[0]) / res))  # nx == ny (centered square grid)
+
+    # Per-camera extrinsics E = T_cam_ego for the ring.
+    Es, R_ecs, t_ecs = [], [], []
+    for k in range(n_cams):
+        a = 2.0 * torch.pi * k / n_cams
+        ca, sa = float(torch.cos(torch.tensor(a))), float(torch.sin(torch.tensor(a)))
+        x_cam = torch.tensor([sa, -ca, 0.0])
+        y_cam = torch.tensor([0.0, 0.0, -1.0])
+        z_cam = torch.tensor([ca, sa, 0.0])
+        R_ce = torch.stack([x_cam, y_cam, z_cam], dim=1)  # columns are cam axes in ego
+        R_ec = R_ce.T
+        t_ec = -R_ec @ torch.tensor([0.0, 0.0, cam_height])
+        E = torch.eye(4)
+        E[:3, :3] = R_ec
+        E[:3, 3] = t_ec
+        Es.append(E)
+        R_ecs.append(R_ec)
+        t_ecs.append(t_ec)
+
+    def project(cam: int, x: float, y: float, z: float):
+        p_cam = R_ecs[cam] @ torch.tensor([x, y, z]) + t_ecs[cam]
+        if float(p_cam[2]) <= 0:
+            return None
+        u = float(f * p_cam[0] / p_cam[2] + cx)
+        v = float(f * p_cam[1] / p_cam[2] + cy)
+        if 0.0 <= u < img and 0.0 <= v < img:
+            return u, v
+        return None
+
+    def cell_of(x: float, y: float):
+        ix = int((x - bev[0]) / res)
+        iy = int((y - bev[0]) / res)
+        if 0 <= ix < n and 0 <= iy < n:
+            return ix, iy
+        return None
+
+    # Place vehicles in the WORLD frame (= frame-0 ego frame): inside the grid and seen by >=1
+    # camera at every frame's ego pose. The last vehicle is the moving/occluded one.
+    world: list[tuple[float, float]] = []
+    margin = ego_step * (n_frames - 1) + 1.0  # keep vehicles in-grid across all frames
+    for _ in range(4000):
+        if len(world) == n_vehicles:
+            break
+        wx = bev[0] + margin + float(torch.rand(1, generator=g)) * (bev[1] - bev[0] - 2 * margin)
+        wy = bev[0] + margin + float(torch.rand(1, generator=g)) * (bev[1] - bev[0] - 2 * margin)
+        # Visible from some camera at every frame's ego pose?
+        ok = True
+        for fr in range(n_frames):
+            ex, ey = wx - fr * ego_step, wy  # ego coords at frame fr (pure forward ego motion)
+            if cell_of(ex, ey) is None or all(
+                project(c, ex, ey, vehicle_z) is None for c in range(n_cams)
+            ):
+                ok = False
+                break
+        if not ok:
+            continue
+        if any(abs(wx - ox) < res and abs(wy - oy) < res for ox, oy in world):
+            continue
+        world.append((wx, wy))
+    if len(world) < n_vehicles:
+        raise ValueError(
+            f"placed only {len(world)}/{n_vehicles} vehicles; widen focal or shrink ego_step"
+        )
+
+    moving_idx = n_vehicles - 1 if occlude_moving else -1
+    color = torch.tensor([1.0, 0.6, 0.2])
+    images = torch.full((n_frames, n_cams, 3, img, img), 0.3)
+    bev_gt = torch.zeros(n_frames, n, n)
+    veh_ego = torch.zeros(n_frames, n_vehicles, 2)
+    ego_deltas = torch.zeros(n_frames, 3)
+    vs, us = torch.meshgrid(
+        torch.arange(img, dtype=torch.float32),
+        torch.arange(img, dtype=torch.float32),
+        indexing="ij",
+    )
+    for fr in range(n_frames):
+        if fr > 0:
+            ego_deltas[fr] = torch.tensor([ego_step, 0.0, 0.0])
+        for vi, (wx, wy) in enumerate(world):
+            ex, ey = wx - fr * ego_step, wy
+            veh_ego[fr, vi] = torch.tensor([ex, ey])
+            cell = cell_of(ex, ey)
+            if cell is not None:
+                bev_gt[fr, cell[0], cell[1]] = 1.0  # physically present even if occluded
+            # Occluded vehicle is not rendered into the LAST (current) frame's images.
+            if vi == moving_idx and fr == n_frames - 1:
+                continue
+            for c in range(n_cams):
+                p = project(c, ex, ey, vehicle_z)
+                if p is None:
+                    continue
+                u, v = p
+                depth = float((R_ecs[c] @ torch.tensor([ex, ey, vehicle_z]) + t_ecs[c])[2])
+                sigma = float(min(max(8.0 / depth, 1.0), 6.0))
+                blob = torch.exp(-((us - u) ** 2 + (vs - v) ** 2) / (2.0 * sigma * sigma))
+                images[fr, c] = torch.maximum(images[fr, c], color[:, None, None] * blob[None])
+
+    occluded_cells = torch.zeros(0, 2, dtype=torch.long)
+    if occlude_moving:
+        wx, wy = world[moving_idx]
+        ex, ey = wx - (n_frames - 1) * ego_step, wy
+        cell = cell_of(ex, ey)
+        if cell is not None:
+            occluded_cells = torch.tensor([[cell[0], cell[1]]], dtype=torch.long)
+
+    return {
+        "images": images.clamp(0.0, 1.0).to(device),
+        "K": K.to(device),
+        "E": torch.stack(Es).to(device),
+        "bev_gt": bev_gt.to(device),
+        "ego_deltas": ego_deltas.to(device),
+        "vehicles": veh_ego.to(device),
+        "occluded_cells": occluded_cells.to(device),
+    }
