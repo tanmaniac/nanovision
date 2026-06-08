@@ -130,9 +130,10 @@ Run in this order:
    synthetic batch, reading teacher_entropy. End-state entropies satisfy
    collapse (no centering) < full < uniform (no sharpening), with margins
    (reference-value).
-8. `tests/test_forbidden_imports.py` - the solution uses no prebuilt
-   attention/transformer module, fused SDPA, nn.LayerNorm, timm, or transformers in
-   actual code (prose mentions allowed). Passes with the holes in place too.
+8. `tests/test_forbidden_imports.py` - the top-level files and the solution use no
+   prebuilt attention/transformer module, fused SDPA, nn.LayerNorm, timm, or
+   transformers in actual code (prose mentions allowed). Passes with the holes in
+   place too.
 
 ## provided_boilerplate
 `backbone.py` (identical at the top level and in solution): the ViT encoder (Conv2d patch
@@ -205,9 +206,11 @@ collapse_momentum (0.9) so the degenerate state appears within ~150 steps. End-s
 mean entropies (last 10 steps): no-centering ~0.0, full DINO ~1.3, no-sharpening
 ~4.85. The test asserts e_collapse < 0.5, e_uniform > 0.9 log K, and
 e_collapse + 0.3 < e_full < e_uniform - 0.3; the observed values clear every margin.
-The overfit and collapse tests need opposite teacher regimes (a stable target to
-converge to vs a fast-tracking teacher that follows the student into collapse),
-which is why config carries both overfit_momentum and collapse_momentum.
+The overfit and collapse tests need opposite teacher regimes: the overfit test
+freezes the teacher entirely (a stable captured target to converge to, no EMA), while
+the collapse test wants a fast-tracking teacher that follows the student into
+collapse. So config carries only collapse_momentum; the overfit test uses no
+momentum at all.
 
 The forbidden-imports scan strips comments and docstrings via tokenize, so the
 modules may name the forbidden symbols in prose. backbone.py uses nn.GELU and
