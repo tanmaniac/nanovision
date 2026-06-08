@@ -70,6 +70,13 @@ ONLY bare (never via `nanovision`). `conftest.py` puts the assignment dir then t
   (CUDA if available, else CPU) and move the model + batches to `dev`. The machine has an RTX 4080;
   a CPU-only viz that does real training will crawl. Keep tensors that feed matplotlib on CPU
   (`.cpu()`).
+- TOY RESULTS DO NOT OVERRIDE SCALE: a 16x16 / few-primitive toy is a mechanism demonstrator, not
+  evidence against a result established in real research. When a measured toy number diverges from
+  the at-scale finding (e.g. the splat that is not faster than the MLP at toy resolution, or a
+  component that "doesn't help" on one sphere), state the RESEARCH finding as ground truth and
+  explain the toy number as a scale artifact (resolution, primitive count, no CUDA path, no
+  pretraining) - never let the toy read as "so the paper's claim is wrong here." Still report the
+  real measured number honestly; just frame it against the established truth.
 - Style on everything (code comments, README, ASSIGNMENT): match `~/.claude/CLAUDE.md` - plain
   American English, sentence-case headings, single-hyphen not em dash, straight quotes, no filler
   ("delve/leverage/robust/crucial/seamless/fundamentally/spine/..."), active voice (no "X is what

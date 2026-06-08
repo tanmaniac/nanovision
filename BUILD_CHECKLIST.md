@@ -13,7 +13,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] `nanovision.vit` (A2 ViT exposed; `ViT.forward_features` patch grid added for A8)
 - [x] `nanovision.volume` (A9: volume_render + ray generation; reused by A10, A11.5d)
 - [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
-- [ ] `nanovision.geometry` pointmap/depth utils (A10.5)
+- [x] `nanovision.geometry` pointmap/depth utils (A10.5)
 
 ## Phase 0 - Foundation
 - [x] A0  harness & primitives        [Core]   deps: none
@@ -35,7 +35,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A8  VLM (LLaVA-style)           [Core]   deps: A1,A2,A4
 - [x] A9  NeRF (prequel)              [Core]   deps: A0
 - [x] A10 Gaussian splatting          [Core]   deps: A9
-- [ ] A10.5 geometry foundation models[Mixed]  deps: A1,A2,A9
+- [x] A10.5 geometry foundation models[Mixed]  deps: A1,A2,A9
 - [ ] A11 detection & segmentation    [Mixed]  deps: A1,A2
 
 ## Phase 3.5 - Autonomous-driving perception (nuScenes-mini)
