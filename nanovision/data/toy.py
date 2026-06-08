@@ -756,3 +756,157 @@ def bev_multicam_scene(
         "vehicles": veh_ego.to(device),
         "occluded_cells": occluded_cells.to(device),
     }
+
+
+def occupancy_toy_scene(
+    grid: tuple[int, int, int] = (8, 32, 32),
+    bounds: tuple[tuple[float, float], tuple[float, float], tuple[float, float]] = (
+        (-4.0, 4.0),
+        (-4.0, 4.0),
+        (-1.0, 2.0),
+    ),
+    n_classes: int = 4,
+    n_boxes: int = 2,
+    n_cams: int = 3,
+    img: int = 24,
+    pixel_stride: int = 2,
+    cam_dist: float = 6.0,
+    z_near: float = 1.0,
+    z_far: float = 15.0,
+    seed: int = 0,
+    device: str = "cpu",
+) -> dict:
+    """A tiny synthetic 3D occupancy scene with analytic ray-box ground truth (A11.5d).
+
+    A few axis-aligned solid boxes (each a distinct occupied class) sit in a voxel grid. Cameras
+    ring the scene and cast rays whose first-hit depth and semantic class are computed by the
+    ray-AABB slab method, INDEPENDENT of any volume renderer (the non-circularity guarantee, like
+    nerf_synthetic_scene's closed-form ray-sphere chord). A student whose differentiable occupancy
+    renderer reproduces these depths has shown the rendering integral inverts to the hard geometry.
+
+    The grid axes are (Z, Y, X) in the ego frame; bounds gives the metric extent of each. Voxel
+    centers follow the align_corners=False cell-center convention (center i at a + (i+0.5)*cell).
+    Boxes are >= 2 voxels thick per side and occupied voxels are a small fraction of the grid (the
+    class-imbalance lesson). Cameras use the OpenCV look-at of nerf_synthetic_scene (camera +z into
+    the scene). Miss rays get GT depth z_far, matching the renderer's leftover-transmittance term.
+
+    Args:
+        grid: (Z, Y, X) voxel counts.
+        bounds: ((x0,x1),(y0,y1),(z0,z1)) metric extent (meters), ego frame.
+        n_classes: number of classes including free=0 (so n_boxes <= n_classes-1).
+        n_boxes: number of solid boxes (occupied classes 1..n_boxes).
+        n_cams: number of cameras ringing the scene.
+        img: square image side (pixels).
+        pixel_stride: subsample stride over image pixels when forming rays.
+        cam_dist: camera distance from the scene center.
+        z_near, z_far: ray sampling bracket and the miss-ray GT depth.
+        seed: RNG seed (deterministic boxes).
+        device: target device.
+
+    Returns:
+        dict with:
+            sem_gt: (Z, Y, X) long voxel class, 0 = free.
+            occ_gt: (Z, Y, X) float in {0, 1}.
+            K: (3, 3) shared intrinsic; E/poses: (n_cams, 4, 4) camera-to-world (c2w).
+            rays_o, rays_d: (R, 3) ego-frame ray origins and unit directions.
+            gt_depth: (R,) analytic first-hit depth (z_far for misses).
+            gt_sem: (R,) long first-hit box class (0 for misses).
+            grid_bounds: the bounds tuple; z_near, z_far: floats.
+    """
+    g = torch.Generator().manual_seed(seed)
+    Z, Y, X = grid
+    (x0, x1), (y0, y1), (z0, z1) = bounds
+    cellx, celly, cellz = (x1 - x0) / X, (y1 - y0) / Y, (z1 - z0) / Z
+    assert n_boxes <= n_classes - 1, "n_boxes must leave class 0 for free"
+
+    # Place axis-aligned solid boxes on voxel-index ranges (>= 2 voxels thick per side).
+    sem_gt = torch.zeros(Z, Y, X, dtype=torch.long)
+    boxes = []  # (lo_xyz, hi_xyz) metric AABB + class
+    placed_ranges: list[tuple] = []
+    for b in range(n_boxes):
+        for _ in range(200):
+            dz = int(torch.randint(2, max(3, Z // 2), (1,), generator=g))
+            dy = int(torch.randint(3, max(4, Y // 3), (1,), generator=g))
+            dx = int(torch.randint(3, max(4, X // 3), (1,), generator=g))
+            iz = int(torch.randint(0, Z - dz + 1, (1,), generator=g))
+            iy = int(torch.randint(0, Y - dy + 1, (1,), generator=g))
+            ix = int(torch.randint(0, X - dx + 1, (1,), generator=g))
+            rng = (iz, iz + dz, iy, iy + dy, ix, ix + dx)
+            overlap = any(
+                not (rng[1] <= p[0] or rng[0] >= p[1] or rng[3] <= p[2] or rng[2] >= p[3]
+                     or rng[5] <= p[4] or rng[4] >= p[5])
+                for p in placed_ranges
+            )
+            if not overlap:
+                break
+        placed_ranges.append(rng)
+        cls = b + 1
+        sem_gt[iz:iz + dz, iy:iy + dy, ix:ix + dx] = cls
+        lo = torch.tensor([x0 + ix * cellx, y0 + iy * celly, z0 + iz * cellz])
+        hi = torch.tensor([x0 + (ix + dx) * cellx, y0 + (iy + dy) * celly, z0 + (iz + dz) * cellz])
+        boxes.append((lo, hi, cls))
+    occ_gt = (sem_gt > 0).float()
+
+    # Cameras on a horizontal ring looking at the scene center (OpenCV +z forward).
+    cx = cy = (img - 1) / 2.0
+    f = float(img)
+    K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
+    poses, rays_o_l, rays_d_l = [], [], []
+    for c in range(n_cams):
+        ang = 2.0 * torch.pi * c / n_cams
+        cam_pos = torch.tensor([cam_dist * float(torch.cos(torch.tensor(ang))),
+                                cam_dist * float(torch.sin(torch.tensor(ang))),
+                                0.5])
+        forward = -cam_pos / cam_pos.norm()
+        world_up = torch.tensor([0.0, 0.0, 1.0])  # ego +z up
+        right = torch.cross(forward, world_up, dim=0)
+        right = right / right.norm()
+        down = torch.cross(forward, right, dim=0)
+        Rwc = torch.stack([right, down, forward], dim=1)  # columns are cam axes in world
+        c2w = torch.eye(4)
+        c2w[:3, :3] = Rwc
+        c2w[:3, 3] = cam_pos
+        poses.append(c2w)
+        # Rays for a subsampled pixel grid.
+        vs, us = torch.meshgrid(
+            torch.arange(0, img, pixel_stride, dtype=torch.float32),
+            torch.arange(0, img, pixel_stride, dtype=torch.float32),
+            indexing="ij",
+        )
+        dirs_cam = torch.stack([(us - cx) / f, (vs - cy) / f, torch.ones_like(us)], dim=-1)
+        dirs_world = dirs_cam.reshape(-1, 3) @ Rwc.T
+        dirs_world = dirs_world / dirs_world.norm(dim=-1, keepdim=True)
+        rays_d_l.append(dirs_world)
+        rays_o_l.append(cam_pos[None].expand_as(dirs_world))
+    rays_o = torch.cat(rays_o_l, dim=0)
+    rays_d = torch.cat(rays_d_l, dim=0)
+
+    # Analytic ray-AABB first-hit (slab method), independent of any renderer.
+    R = rays_o.shape[0]
+    gt_depth = torch.full((R,), float(z_far))
+    gt_sem = torch.zeros(R, dtype=torch.long)
+    eps = 1e-9
+    for lo, hi, cls in boxes:
+        inv = 1.0 / (rays_d + eps)
+        t1 = (lo[None] - rays_o) * inv      # (R, 3)
+        t2 = (hi[None] - rays_o) * inv
+        tmin = torch.minimum(t1, t2).max(dim=1).values  # entry
+        tmax = torch.maximum(t1, t2).min(dim=1).values  # exit
+        hit = (tmin < tmax) & (tmax > 0) & (tmin > 0)
+        closer = hit & (tmin < gt_depth)
+        gt_depth = torch.where(closer, tmin, gt_depth)
+        gt_sem = torch.where(closer, torch.full_like(gt_sem, cls), gt_sem)
+
+    return {
+        "sem_gt": sem_gt.to(device),
+        "occ_gt": occ_gt.to(device),
+        "K": K.to(device),
+        "E": torch.stack(poses).to(device),
+        "rays_o": rays_o.to(device),
+        "rays_d": rays_d.to(device),
+        "gt_depth": gt_depth.to(device),
+        "gt_sem": gt_sem.to(device),
+        "grid_bounds": bounds,
+        "z_near": float(z_near),
+        "z_far": float(z_far),
+    }
