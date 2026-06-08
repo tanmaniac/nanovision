@@ -14,6 +14,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] `nanovision.volume` (A9: volume_render + ray generation; reused by A10, A11.5d)
 - [x] `nanovision.geometry` + `nanovision.data.nuscenes_mini` (A11.5a)
 - [x] `nanovision.geometry` pointmap/depth utils (A10.5)
+- [x] `nanovision.lift_splat` (A11.5b: depth lift + frustum + cumsum splat; reused by A11.5d)
 
 ## Phase 0 - Foundation
 - [x] A0  harness & primitives        [Core]   deps: none
@@ -40,7 +41,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 
 ## Phase 3.5 - Autonomous-driving perception (nuScenes-mini)
 - [x] A11.5a camera geometry & BEV    [Core]   deps: A0       (owns dataset "step zero")
-- [ ] A11.5b lift-splat-shoot         [Core]   deps: A11.5a,A2
+- [x] A11.5b lift-splat-shoot         [Core]   deps: A11.5a,A2
 - [ ] A11.5c BEVFormer attention      [Core]   deps: A11.5a,A1,A11.5b,A3.5
 - [ ] A11.5d 3D occupancy             [Core]   deps: A11.5a,A9,A11.5b/c  (render-supervised)
 - [ ] A11.5e prediction → planning    [Mixed]  deps: A11.5b/c,A11.5d

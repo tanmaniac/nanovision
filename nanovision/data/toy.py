@@ -415,3 +415,152 @@ def detection_batch(
             mask[b, j] = True
 
     return images.to(device), boxes.to(device), labels.to(device), mask.to(device)
+
+
+def bev_toy_scene(
+    n_vehicles: int = 3,
+    bev_x: tuple[float, float] = (0.0, 8.0),
+    bev_y: tuple[float, float] = (-8.0, 8.0),
+    res: float = 1.0,
+    img: int = 32,
+    stride: int = 4,
+    d_min: float = 1.0,
+    d_max: float = 9.0,
+    d_step: float = 1.0,
+    focal: float | None = None,
+    cam_height: float = 1.5,
+    vehicle_z: float = 0.75,
+    seed: int = 0,
+    device: str = "cpu",
+) -> dict:
+    """A tiny single-camera BEV scene for Lift-Splat-Shoot (A11.5b).
+
+    One forward camera at ego (0, 0, cam_height) looking along +x renders a few "vehicles"
+    as colored blobs at the pixels where their 3-D centroids project. The ground-truth BEV
+    occupancy marks each vehicle's ego cell. The image -> BEV mapping is geometrically exact
+    (a blob sits at its vehicle's projected centroid, depth = ego forward distance), so an LSS
+    pipeline with correct frustum geometry can overfit it while one that ignores the geometry
+    cannot route a blob to the right pillar.
+
+    Conventions match nanovision.geometry: ego frame x forward, y left, z up; camera frame
+    OpenCV x right, y down, z forward. The extrinsic E is T_cam_ego (ego -> camera). For a
+    forward camera, camera-frame depth equals the ego forward coordinate x exactly, so vehicles
+    are placed with x in [d_min, d_max) to stay reachable by the depth bins. Vehicle cells are
+    rejection-sampled to be both in-frame and depth-reachable; a ValueError is raised if
+    n_vehicles cannot be placed (the focal is too narrow).
+
+    Args:
+        n_vehicles: number of vehicles to place.
+        bev_x, bev_y: ego BEV extent (meters). bev_x forward extent must lie within the depth
+            range [d_min, d_max] - the frustum cannot reach past the deepest bin.
+        res: BEV cell size (meters), square cells. Grid is (nx, ny) with nx along x, ny along y.
+        img: square image side in pixels.
+        stride: backbone downsample; the feature grid is (img // stride) per side.
+        d_min, d_max, d_step: depth-bin spec; centers are arange(d_min, d_max, d_step).
+        focal: pinhole focal in pixels; defaults to img / 2 (a ~90 degree horizontal FOV).
+        cam_height: camera height above the ego origin (meters).
+        vehicle_z: vehicle centroid height (meters).
+        seed: RNG seed (deterministic placement).
+        device: target device for returned tensors.
+
+    Returns:
+        dict with:
+            image: (1, 3, img, img) in [0, 1].
+            K: (3, 3) pinhole intrinsic.
+            E: (4, 4) T_cam_ego extrinsic (ego -> camera).
+            bev_gt: (nx, ny) float in {0, 1}, vehicle occupancy on the BEV grid.
+            depth_bin_labels: (Hf, Wf) long, nearest depth bin at each vehicle's feature cell.
+            depth_mask: (Hf, Wf) bool, True at the labeled cells.
+            vehicles: (n_vehicles, 2) ego (x, y) of each vehicle (for viz).
+            bins: (D,) depth-bin centers.
+    """
+    g = torch.Generator().manual_seed(seed)
+    f = float(focal) if focal is not None else img / 2.0
+    cx = cy = (img - 1) / 2.0
+    K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
+
+    # E = T_cam_ego for a forward camera: cam x = ego -y, cam y = ego -z, cam z = ego +x.
+    R_ec = torch.tensor([[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]])
+    t_ec = -R_ec @ torch.tensor([0.0, 0.0, cam_height])
+    E = torch.eye(4)
+    E[:3, :3] = R_ec
+    E[:3, 3] = t_ec
+
+    bins = torch.arange(d_min, d_max, d_step)  # (D,) bin centers
+    nx = int(round((bev_x[1] - bev_x[0]) / res))
+    ny = int(round((bev_y[1] - bev_y[0]) / res))
+    Hf = Wf = img // stride
+
+    def project(x: float, y: float, z: float):
+        # ego (x, y, z) -> camera frame -> pixel (u, v) and depth.
+        p_ego = torch.tensor([x, y, z])
+        p_cam = R_ec @ p_ego + t_ec
+        depth = float(p_cam[2])
+        u = float(f * p_cam[0] / p_cam[2] + cx)
+        v = float(f * p_cam[1] / p_cam[2] + cy)
+        return u, v, depth
+
+    # Place one vehicle per depth band so depths (and forward pillars) are distinct: stratify x
+    # into n_vehicles equal bands over the reachable range, then rejection-sample an in-frame y.
+    x_lo = max(bev_x[0], float(d_min))
+    x_hi = min(bev_x[1], float(d_max))
+    vehicles: list[tuple[float, float]] = []
+    cells: set[tuple[int, int]] = set()
+    for k in range(n_vehicles):
+        band_lo = x_lo + (x_hi - x_lo) * k / n_vehicles
+        band_hi = x_lo + (x_hi - x_lo) * (k + 1) / n_vehicles
+        for _ in range(2000):
+            x = band_lo + float(torch.rand(1, generator=g)) * (band_hi - band_lo)
+            y = bev_y[0] + float(torch.rand(1, generator=g)) * (bev_y[1] - bev_y[0])
+            u, v, depth = project(x, y, vehicle_z)
+            if not (0.0 <= u < img and 0.0 <= v < img and d_min <= depth <= d_max):
+                continue
+            ix = int((x - bev_x[0]) / res)
+            iy = int((y - bev_y[0]) / res)
+            if not (0 <= ix < nx and 0 <= iy < ny) or (ix, iy) in cells:
+                continue
+            cells.add((ix, iy))
+            vehicles.append((x, y))
+            break
+    if len(vehicles) < n_vehicles:
+        raise ValueError(
+            f"could only place {len(vehicles)}/{n_vehicles} vehicles in frame; "
+            "widen the focal (smaller f) or the BEV extent"
+        )
+
+    image = torch.full((3, img, img), 0.3)
+    color = torch.tensor([1.0, 0.6, 0.2])  # one vehicle class
+    bev_gt = torch.zeros(nx, ny)
+    depth_bin_labels = torch.zeros(Hf, Wf, dtype=torch.long)
+    depth_mask = torch.zeros(Hf, Wf, dtype=torch.bool)
+    vs, us = torch.meshgrid(
+        torch.arange(img, dtype=torch.float32),
+        torch.arange(img, dtype=torch.float32),
+        indexing="ij",
+    )
+    for (x, y) in vehicles:
+        u, v, depth = project(x, y, vehicle_z)
+        sigma = float(min(max(8.0 / depth, 1.0), 6.0))  # closer vehicles are larger
+        blob = torch.exp(-((us - u) ** 2 + (vs - v) ** 2) / (2.0 * sigma * sigma))
+        image = torch.maximum(image, color[:, None, None] * blob[None])
+        ix = int((x - bev_x[0]) / res)
+        iy = int((y - bev_y[0]) / res)
+        for di in (-1, 0):  # a 2-cell forward footprint, clamped to the grid
+            jx = min(max(ix + di, 0), nx - 1)
+            bev_gt[jx, iy] = 1.0
+        fi = min(int(v // stride), Hf - 1)
+        fj = min(int(u // stride), Wf - 1)
+        depth_bin_labels[fi, fj] = int(torch.argmin((bins - depth).abs()))
+        depth_mask[fi, fj] = True
+
+    out = {
+        "image": image.clamp(0.0, 1.0)[None].to(device),
+        "K": K.to(device),
+        "E": E.to(device),
+        "bev_gt": bev_gt.to(device),
+        "depth_bin_labels": depth_bin_labels.to(device),
+        "depth_mask": depth_mask.to(device),
+        "vehicles": torch.tensor(vehicles).to(device),
+        "bins": bins.to(device),
+    }
+    return out

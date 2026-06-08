@@ -133,7 +133,7 @@ BEVFormer takes the opposite approach: instead of pushing image features out int
 
 4. **Huang et al. (arXiv 2211.17111, 2022)** - "BEVPoolv2: A Cutting-edge Implementation of BEVDet Toward Deployment." Shows how the frustum tensor bottleneck is eliminated with a custom CUDA kernel. Not required for implementation, but the comparison table (15x speedup) motivates why the cumsum trick matters for production.
 
-5. **Li et al. (ECCV 2022, arXiv 2203.17054)** - "BEVFormer: Learning Bird's-Eye-View Representation from Multi-Camera Images via Spatiotemporal Transformers." The main alternative architecture. Reading the BEVFormer ablation table (which includes LSS as a baseline) gives the clearest single-paper comparison between push-out (LSS) and pull-in (attention) approaches.
+5. **Li et al. (ECCV 2022, arXiv 2203.17270)** - "BEVFormer: Learning Bird's-Eye-View Representation from Multi-Camera Images via Spatiotemporal Transformers." The main alternative architecture. Reading the BEVFormer ablation table (which includes LSS as a baseline) gives the clearest single-paper comparison between push-out (LSS) and pull-in (attention) approaches.
 
 6. **Lu et al. (CVPR 2025, arXiv 2504.01957)** - "GaussianLSS: Toward Real-world BEV Perception: Depth Uncertainty Estimation via Gaussian Splatting." Replaces discrete depth bins with continuous 3D Gaussians to address bin sparsity and unstable softmax distributions. Represents the 2025 state of the push-out family and shows the direction of active research.
 
