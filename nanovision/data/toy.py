@@ -910,3 +910,176 @@ def occupancy_toy_scene(
         "z_near": float(z_near),
         "z_far": float(z_far),
     }
+
+
+def pred_toy_scene(
+    n_intentions: int = 3,
+    reps: int = 2,
+    bev_x: tuple[float, float] = (-8.0, 8.0),
+    bev_y: tuple[float, float] = (-8.0, 8.0),
+    res: float = 1.0,
+    channels: int = 8,
+    horizon: int = 12,
+    dt: float = 0.5,
+    speed: float = 1.5,
+    turn_rate: float = 1.0 / 6.0,
+    shared_context: bool = True,
+    yaw_spread: float = 0.6,
+    seed: int = 0,
+    device: str = "cpu",
+) -> dict:
+    """A tiny BEV motion-prediction scene for the multimodal trajectory head (A11.5e).
+
+    Each agent sits on the ego BEV grid and rolls out a 6 s future under a constant-speed,
+    constant-turn-rate model. The intention (left / straight / right) bends the path laterally
+    but is NOT encoded in the BEV feature - the feature carries only the agent's position and
+    speed. The future is therefore genuinely ambiguous given the input, which is the point: a
+    single-mode regressor minimizing mean error is driven to the conditional mean of the
+    intentions and is wrong on every one, while a K-mode winner-take-all head can cover them.
+
+    Two regimes (the build's two lessons), selected by `shared_context`:
+      - True (mode-averaging demonstration): all agents share ONE BEV cell and ONE feature
+        vector; their futures fan out over `n_intentions` distinct intentions with BALANCED
+        counts. Identical input, different futures -> mode averaging.
+      - False (identifiability / RoI test): agents are spread to distinct cells with distinct
+        per-agent feature signatures and distinct initial yaws, so the head can map each input
+        to its own future and overfit to ~0, and the agent-centric rotation is load-bearing.
+
+    Conventions match the rest of the AV module: ego BEV x forward, y left, z up; grid (nx, ny)
+    with nx along x, ny along y over `bev_x`/`bev_y` at `res`. `centers` are fractional cell
+    indices (cell i center at index i), so the trajectory head's roi_align normalization
+    g = 2*(center + 0.5)/S - 1 (align_corners=False) maps an agent at metric x to its cell.
+
+    Motion model (agent-local frame, +x = heading, +y = left), constant-turn-rate:
+        x_local(t) = (v/w) sin(w t),  y_local(t) = (v/w)(1 - cos(w t))     for a left turn (w>0),
+    straight is the w->0 limit (x = v t, y = 0), right is w<0. The horizon lateral displacement
+    is (v/w)(1 - cos(w T dt)); with the defaults that is ~4.1 m, comfortably separating the
+    three intention endpoints (pairwise > 3 m) regardless of seed. `futures_local` is this local
+    rollout (the agent-centric training target); `futures_ego` rotates it by +yaw and translates
+    to the agent's ego position (for viz). The round-trip `R(-yaw)(futures_ego - start)` recovers
+    `futures_local`.
+
+    Args:
+        n_intentions: number of distinct intentions (default 3: left, straight, right).
+        reps: replicas per intention; N = n_intentions * reps agents, intentions balanced.
+        bev_x, bev_y: ego BEV extent (meters).
+        res: BEV cell size (meters), square cells; grid is (nx, ny).
+        channels: BEV feature channel count C.
+        horizon: number of future steps T.
+        dt: seconds per step (horizon * dt = prediction horizon, default 6 s).
+        speed: agent speed (m/s), constant over the rollout.
+        turn_rate: turn magnitude w (rad/s) for the non-straight intentions.
+        shared_context: see the two regimes above.
+        yaw_spread: half-range of the per-agent initial yaw spread when shared_context=False
+            (radians); ignored (all yaw 0) when shared_context=True.
+        seed: RNG seed (deterministic).
+        device: target device for returned tensors.
+
+    Returns:
+        dict with:
+            bev_feat: (C, nx, ny) BEV feature grid (~0 in free space, a feature blob per agent).
+            centers: (N, 2) fractional cell indices (x_cell, y_cell) for roi_align.
+            agents_xy: (N, 2) ego (x, y) start positions (meters).
+            agent_yaw: (N,) initial heading (radians).
+            futures_local: (N, T, 2) agent-centric future positions (the training target).
+            futures_ego: (N, T, 2) absolute ego future positions (for viz).
+            intention: (N,) long in [0, n_intentions).
+            dt, horizon: floats/ints; bev_x, bev_y, res; C: channel count.
+    """
+    g = torch.Generator().manual_seed(seed)
+    nx = int(round((bev_x[1] - bev_x[0]) / res))
+    ny = int(round((bev_y[1] - bev_y[0]) / res))
+    N = n_intentions * reps
+    T = horizon
+    C = channels
+    speed_ref = 3.0
+
+    # Balanced intention assignment: 0..n_intentions-1 repeated `reps` times.
+    intention = torch.arange(N) % n_intentions
+    # Turn rate per intention: 0 -> +w (left), 1 -> 0 (straight), 2 -> -w (right); cycles for
+    # n_intentions != 3 by spreading evenly over [+w, -w].
+    if n_intentions == 1:
+        turn_of = torch.zeros(n_intentions)
+    else:
+        turn_of = turn_rate * torch.linspace(1.0, -1.0, n_intentions)
+    omega = turn_of[intention]  # (N,)
+
+    # Start placement and yaw.
+    if shared_context:
+        # All agents at one interior cell, heading +x, identical feature.
+        cx_cell = (nx - 1) / 2.0
+        cy_cell = (ny - 1) / 2.0
+        centers = torch.stack([torch.full((N,), cx_cell), torch.full((N,), cy_cell)], dim=1)
+        agent_yaw = torch.zeros(N)
+        signatures = torch.rand(C - 2, generator=g).expand(N, C - 2)  # one shared signature
+    else:
+        # Distinct interior cells on a coarse lattice, distinct yaws and signatures.
+        cols = max(1, int(N ** 0.5))
+        rows = (N + cols - 1) // cols
+        gx = torch.linspace(nx * 0.25, nx * 0.75, cols)
+        gy = torch.linspace(ny * 0.25, ny * 0.75, rows)
+        cells = [(float(gx[i % cols]), float(gy[i // cols])) for i in range(N)]
+        centers = torch.tensor(cells)
+        agent_yaw = (torch.rand(N, generator=g) * 2.0 - 1.0) * yaw_spread
+        signatures = torch.rand(N, C - 2, generator=g)  # distinct per agent
+
+    # Agent ego start positions from their cell indices (inverse of center = (x-a)/res - 0.5).
+    agents_x = bev_x[0] + (centers[:, 0] + 0.5) * res
+    agents_y = bev_y[0] + (centers[:, 1] + 0.5) * res
+    agents_xy = torch.stack([agents_x, agents_y], dim=1)
+
+    # Constant-turn-rate rollout in the agent-local frame (+x heading, +y left).
+    t = torch.arange(1, T + 1, dtype=torch.float32) * dt  # (T,) step times
+    futures_local = torch.zeros(N, T, 2)
+    for i in range(N):
+        w = float(omega[i])
+        if abs(w) < 1e-6:
+            x_loc = speed * t
+            y_loc = torch.zeros(T)
+        else:
+            x_loc = (speed / w) * torch.sin(w * t)
+            y_loc = (speed / w) * (1.0 - torch.cos(w * t))
+        futures_local[i, :, 0] = x_loc
+        futures_local[i, :, 1] = y_loc
+
+    # Map local -> ego: rotate by +yaw, translate to the agent start.
+    cos_y, sin_y = torch.cos(agent_yaw), torch.sin(agent_yaw)
+    R = torch.stack(
+        [torch.stack([cos_y, -sin_y], dim=1), torch.stack([sin_y, cos_y], dim=1)], dim=1
+    )  # (N, 2, 2)
+    futures_ego = torch.einsum("nij,ntj->nti", R, futures_local) + agents_xy[:, None, :]
+
+    # Paint the BEV feature grid: a Gaussian blob per agent carrying its feature vector
+    # [speed_norm, presence, signature...]. Intention is deliberately NOT encoded.
+    feats = torch.zeros(N, C)
+    feats[:, 0] = speed / speed_ref
+    feats[:, 1] = 1.0
+    feats[:, 2:] = signatures
+    bev_feat = torch.zeros(C, nx, ny)
+    I, J = torch.meshgrid(
+        torch.arange(nx, dtype=torch.float32),
+        torch.arange(ny, dtype=torch.float32),
+        indexing="ij",
+    )
+    sigma = 0.6
+    for i in range(N):
+        blob = torch.exp(
+            -((I - centers[i, 0]) ** 2 + (J - centers[i, 1]) ** 2) / (2.0 * sigma * sigma)
+        )
+        bev_feat = torch.maximum(bev_feat, feats[i, :, None, None] * blob[None])
+
+    return {
+        "bev_feat": bev_feat.to(device),
+        "centers": centers.to(device),
+        "agents_xy": agents_xy.to(device),
+        "agent_yaw": agent_yaw.to(device),
+        "futures_local": futures_local.to(device),
+        "futures_ego": futures_ego.to(device),
+        "intention": intention.to(device),
+        "dt": float(dt),
+        "horizon": int(T),
+        "bev_x": bev_x,
+        "bev_y": bev_y,
+        "res": float(res),
+        "C": int(C),
+    }

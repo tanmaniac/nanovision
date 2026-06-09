@@ -45,7 +45,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A11.5b lift-splat-shoot         [Core]   deps: A11.5a,A2
 - [x] A11.5c BEVFormer attention      [Core]   deps: A11.5a,A1,A11.5b,A3.5
 - [x] A11.5d 3D occupancy             [Core]   deps: A11.5a,A9,A11.5b/c  (render-supervised)
-- [ ] A11.5e prediction → planning    [Mixed]  deps: A11.5b/c,A11.5d
+- [x] A11.5e prediction → planning    [Mixed]  deps: A11.5b/c,A11.5d  (leaf, no shim)
 
 ## Phase 4 - Action & dynamics
 - [ ] A12 world models (RSSM/Dreamer) [Core]   deps: A0,A1,A3.5
