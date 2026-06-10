@@ -204,7 +204,7 @@ Here $w = 1$ is the plain conditional, and $w > 1$ sharpens the distribution tow
 class at the cost of diversity. The guided process samples from a distribution
 proportional to $p(x\mid c)^w\,p(x)^{1-w}$, which is not a normalized density for $w \ne 1$,
 so high $w$ trades fidelity for diversity and can produce artifacts. (Diffusers names the
-knob `guidance_scale`, equal to $w + 1$ in this convention.) `classifier_free_guidance`
+knob `guidance_scale`, equal to this same $w$, with `guidance_scale = 1` the plain conditional.) `classifier_free_guidance`
 implements the combine; the samplers run a conditional and an unconditional forward pass
 per step when $w \ne 1$.
 

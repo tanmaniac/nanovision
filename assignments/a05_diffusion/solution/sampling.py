@@ -21,7 +21,7 @@ def classifier_free_guidance(eps_cond: Tensor, eps_uncond: Tensor, w: float) -> 
     2022): eps_guided = eps_uncond + w * (eps_cond - eps_uncond).
 
     w = 1 is the plain conditional (no guidance boost); w > 1 sharpens at the cost of
-    diversity; w = 0 is unconditional. (The diffusers `guidance_scale` equals w + 1.)
+    diversity; w = 0 is unconditional. (The diffusers `guidance_scale` is this same w, with guidance_scale=1 the plain conditional.)
     """
     return eps_uncond + w * (eps_cond - eps_uncond)
 

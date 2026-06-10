@@ -46,7 +46,7 @@ the chain, because the vehicle moved in between. At 30 m/s a ~50 ms offset is
 about 1.5 m of translation, which is enough to visibly slide projected points off
 moving objects at the edge of the field of view. The naive shortcut, reusing the
 lidar-time ego pose for the camera step, is exactly the bug this assignment makes
-you see. The assignment builds both the naive and the timestamp-correct chain and contrasts them
+you see. The assignment builds both the naive and the timestamp-correct chain and shows the two
 disagree by the ego motion.
 
 A naive flat-ground BEV is not enough, which is why the later assignments exist.

@@ -92,7 +92,7 @@ latent and regularizes it with KL instead of quantizing it.
 
 ## The diffusion transformer
 
-The DiT (Peebles and Xie 2023, [arXiv:2212.09748](https://arxiv.org/abs/2212.09748)) replaces
+The DiT (Peebles and Xie 2022, [arXiv:2212.09748](https://arxiv.org/abs/2212.09748)) replaces
 the U-Net denoiser with a transformer. It cuts the latent grid into patches, treats each patch
 as a token, runs a stack of transformer blocks over the tokens, and projects back to a latent
 grid. The result is a denoiser whose quality scales with compute in the way transformers do

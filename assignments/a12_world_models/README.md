@@ -400,8 +400,8 @@ training length). The reference run trained the continuous dynamics-backprop act
 cartpole-balance from 64x64 pixels on a single 12GB GPU, against a max return of about 500:
 
 - Random policy: about 214.
-- Continuous dynamics-backprop actor: greedy real-env return above 300, best around 375 in the
-  reference run, evaluated greedily across episodes. The policy is trained purely on imagined
+- Continuous dynamics-backprop actor: greedy real-env return above 300, best around 350-375 across seeds in the
+  reference runs, evaluated greedily across episodes. The policy is trained purely on imagined
   rollouts and then run in the real environment, so this is imagination-to-real transfer (the
   "Dream to Control" result).
 - Discrete REINFORCE on the same task: around 135, below the random baseline. This is the collapse

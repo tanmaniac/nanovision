@@ -158,7 +158,7 @@ to tens of nats or collapsing to 0 signals a sign error.
   unimix=0.01, n_bins=255, bin +/-20, ret_ema=0.99`; LRs model=1e-4, actor=critic=4e-5; batch 16 x
   seq 50, ~100 updates/episode, critic warmup 5 iters, action_repeat 2. Measured to work; do not
   retune.
-- Measured transfer (single 12GB GPU, ~1-2 h): greedy real return >300 (best ~350) vs random ~214
+- Measured transfer (single 12GB GPU, ~1-2 h): greedy real return >300 (best ~350-375 across seeds) vs random ~214
   vs optimal ~500; discrete REINFORCE collapses to ~135 (below random) on this near-flat reward.
   Reported in viz/README with stats; never pinned as a pytest threshold. The toy reaches "clearly
   beats random," not "optimal" - a scale/compute artifact, not the mechanism failing.
