@@ -23,10 +23,7 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
@@ -62,8 +59,7 @@ def fig_learning_curve(hist):
     ax.set_title("cartpole-balance: policy trained in imagination, evaluated in the real env")
     ax.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(_OUT / "training_curves.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "training_curves.png")
 
 
 def fig_replay_vs_recon(cfg, model, batch, dev):
@@ -89,8 +85,7 @@ def fig_replay_vs_recon(cfg, model, batch, dev):
     axes[1, 0].set_ylabel("recon", fontsize=9)
     fig.suptitle("Replay (top) vs decoder reconstruction (bottom)")
     fig.tight_layout()
-    fig.savefig(_OUT / "replay_vs_recon.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "replay_vs_recon.png")
 
 
 def fig_imagination(cfg, model, actor, h0, z0, dev):
@@ -117,8 +112,7 @@ def fig_imagination(cfg, model, actor, h0, z0, dev):
         axes[t].axis("off")
     fig.suptitle("Imagined prior-only rollout under the trained actor (left = start)")
     fig.tight_layout()
-    fig.savefig(_OUT / "imagination_filmstrip.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "imagination_filmstrip.png")
 
 
 def fig_contrast(dynbackprop_greedy, random_ret):
@@ -141,8 +135,7 @@ def fig_contrast(dynbackprop_greedy, random_ret):
     for i, v in enumerate(vals):
         ax.text(i, v + 6, f"{v:.0f}", ha="center", fontsize=9)
     fig.tight_layout()
-    fig.savefig(_OUT / "policy_transfer.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "policy_transfer.png")
 
 
 def main():
@@ -190,3 +183,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

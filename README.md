@@ -79,12 +79,16 @@ Activate the environment first (`conda activate nanovision`), then use the `make
 targets. `A` is the assignment directory id (for example `a00_harness`).
 
 ```
-make test   A=a02_vit    # run YOUR code against the tests (red until the holes are filled)
-make verify A=a02_vit    # run the solution/ reference (must be green)
-make viz    A=a02_vit    # render the result to assignments/a02_vit/out/
+make test     A=a02_vit  # run YOUR code against the tests (red until the holes are filled)
+make verify   A=a02_vit  # run the solution/ reference (must be green)
+make viz      A=a02_vit  # render the result from solution/ to assignments/a02_vit/out/
+make viz-mine A=a02_vit  # render the result from YOUR code (once the holes are filled)
 make test-all            # your code across every assignment (unfilled ones fail; expected)
 make verify-all          # every solution/ in its own process (the green bar)
 ```
+
+Both `viz` targets write PNGs to `out/` (headless by default). Add `SHOW=1` to either
+(`make viz-mine A=a02_vit SHOW=1`) to also open the figures in interactive windows.
 
 The student-versus-solution switch is the `NANOVISION_IMPL` environment variable,
 which the `make` targets set for you. Unset (the default, `make test`) imports your

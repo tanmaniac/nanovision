@@ -21,10 +21,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -101,8 +98,7 @@ def main():
     _plot_scene(ax, scene, trajs, scores, f"annealed K={cfg.n_modes}  min_ade={ade:.3f} m")
     ax.legend(loc="upper left", fontsize=8)
     fig.tight_layout()
-    fig.savefig(_OUT / "modes_annealed.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "modes_annealed.png")
 
     # Figure 2: K=1 vs hard K=6 vs annealed K=6 on the same batch.
     # Seed 2 is a seed where hard WTA collapses to 2 winning modes (see test_wta_beats_single_mode).
@@ -123,10 +119,11 @@ def main():
     axes[0].legend(loc="upper left", fontsize=8)
     fig.suptitle("Mode averaging, the dead-mode collapse, and the annealing fix")
     fig.tight_layout()
-    fig.savefig(_OUT / "compare_recipes.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "compare_recipes.png")
     print(f"wrote {_OUT / 'modes_annealed.png'} and {_OUT / 'compare_recipes.png'}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

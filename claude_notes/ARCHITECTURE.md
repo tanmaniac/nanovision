@@ -103,9 +103,13 @@ assignments/aXX_name/
 │   └── <module>.py    # the filled-in answer key for each top-level <module>.py
 ├── tests/             # pytest: shape tests, gradcheck, overfit-one-batch
 ├── viz.py             # required: renders the result to out/ (eyeball check)
-├── notebooks/         # pretrained-weights probes only (where applicable)
-└── ASSIGNMENT.md      # machine-readable spec for the builder (see TEMPLATE.md)
+└── notebooks/         # pretrained-weights probes only (where applicable)
 ```
+
+> Superseded 2026-06: assignments no longer carry a separate `ASSIGNMENT.md`. The builder
+> contract was folded into a single student-facing `README.md` (lecture notes + a lean assignment
+> section, clear theory/assignment boundary). See `claude_notes/lecture_note_template.md` for the
+> current structure; the README-vs-ASSIGNMENT split described in §5 below is historical.
 
 **The student edits the top-level files; solution/ is the answer key.** The code
 the learner writes lives at the top level of the assignment dir (`primitives.py`,

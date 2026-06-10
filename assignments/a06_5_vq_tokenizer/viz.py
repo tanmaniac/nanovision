@@ -11,10 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -71,7 +68,7 @@ def main():
         axes[0, j].imshow(x[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[0, j].axis("off")
         axes[1, j].imshow(x_hat[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[1, j].axis("off")
     axes[0, 0].set_ylabel("original"); axes[1, 0].set_ylabel("reconstruction")
-    plt.tight_layout(); plt.savefig(_OUT / "recon.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "recon.png")
 
     # Codebook usage.
     counts = torch.bincount(idx.reshape(-1), minlength=cfg.num_codes).numpy()
@@ -79,7 +76,7 @@ def main():
     plt.bar(range(cfg.num_codes), counts)
     plt.xlabel("code"); plt.ylabel("usage count")
     plt.title(f"perplexity {ppl:.1f} / {cfg.num_codes}")
-    plt.tight_layout(); plt.savefig(_OUT / "codebook.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "codebook.png")
 
     # Autoregressive samples decoded to images.
     prior = _train_prior(cfg, idx)
@@ -90,10 +87,12 @@ def main():
     fig, axes = plt.subplots(1, n, figsize=(2 * n, 2.2))
     for j in range(n):
         axes[j].imshow(samples[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[j].axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "samples.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "samples.png")
 
     print(f"wrote figures to {_OUT}; perplexity {ppl:.2f}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

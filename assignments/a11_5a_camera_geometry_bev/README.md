@@ -1,109 +1,44 @@
-# A11.5a - Camera geometry and the BEV transform
+# A11.5a - camera geometry and the BEV transform
 
-## Motivation
+Around 2020, camera perception for autonomous driving shifted from per-image, per-camera
+detection to a shared bird's-eye-view (BEV) representation built from a surround-view camera
+rig. A car needs a single metric top-down map of its surroundings to plan in, and stitching six
+monocular detections in image space (each with its own depth ambiguity, occlusions, and an
+awkward seam between adjacent cameras) never produced a clean one. The fix was to commit to a
+fixed metric grid in the vehicle frame and project image content into it. That BEV grid then
+becomes the shared substrate for everything downstream: it is where multiple cameras fuse,
+where consecutive frames fuse (ego-motion shifts the previous grid into the current ego frame),
+and where detection, segmentation, occupancy, and motion prediction all read and write.
 
-Around 2020 the dominant paradigm for camera perception in autonomous driving
-shifted from per-image, per-camera detection to a shared bird's-eye-view (BEV)
-representation built from a surround-view camera rig. That shift was practical.
-A car needs a single, metric, top-down map of its surroundings to
-plan in, and stitching together six monocular detections in image space (each
-with its own depth ambiguity, its own occlusions, and an awkward seam between
-adjacent cameras) never produced a clean one. The fix was to commit to a fixed
-metric grid in the vehicle frame and project image content into it. A surround
-rig of six cameras gives 360-degree coverage at a fraction of the cost of a
-high-line lidar, so once camera-only BEV detection became competitive, it became
-the default. The BEV grid then turned into the shared substrate for everything
-downstream: it is where multiple cameras fuse, where consecutive frames fuse
-(ego-motion just shifts the previous grid into the current ego frame), and where
-detection, segmentation, occupancy, and motion prediction all read and write.
+Build the geometry the rest of the autonomous-driving module imports: pinhole projection and
+its inverse, the four SE(3) transform primitives, a multi-camera rig that decides which camera
+sees a given 3-D point, and the flat-ground inverse-perspective-mapping (IPM) baseline that
+warps images into the BEV grid. Most of the real content is coordinate-frame plumbing (the
+nested sensor, ego, and global frames of nuScenes, the lidar-camera temporal offset, and the
+quaternion order) rather than the pinhole model itself. The reference solution and all tests run
+on synthetic cameras, so no dataset is needed.
 
-[nuScenes](https://arxiv.org/abs/1903.11027) (Caesar et al., CVPR 2020) is the
-dataset this module is built on, and most of the real content of this assignment
-is its coordinate-frame plumbing rather than the familiar pinhole model.
-nuScenes defines three nested frames: each sensor's own frame (lidar points in
-the lidar frame; the scene in each camera's OpenCV frame, +x right, +y down, +z
-forward), the ego frame (vehicle body, origin at the rear-axle midpoint, x
-forward / y left / z up), and a fixed ENU global frame that all 3-D annotations
-live in (ENU is East-North-Up: a fixed world frame with axes pointing east, north, and
-up). Two record types carry the transforms. `calibrated_sensor` stores the
-sensor-to-ego rigid transform (translation in meters plus a rotation quaternion)
-and, for cameras, the 3x3 intrinsic. `ego_pose` stores the ego-to-global rigid
-transform plus a timestamp. Both quaternions are scalar-first `(w, x, y, z)`;
-passing the components in the wrong order gives a rotation that looks plausible
-and is wrong. The field-by-field schema is in the devkit's
-[schema_nuscenes.md](https://github.com/nutonomy/nuscenes-devkit/blob/master/docs/schema_nuscenes.md),
-which is worth reading once before you touch any JSON.
+Required reading before starting:
+- Caesar et al. 2020, "nuScenes: A Multimodal Dataset for Autonomous Driving",
+  [arXiv:1903.11027](https://arxiv.org/abs/1903.11027) (coordinate frames, sensor suite,
+  and the four-step projection chain).
+- nuScenes devkit schema reference,
+  [schema_nuscenes.md](https://github.com/nutonomy/nuscenes-devkit/blob/master/docs/schema_nuscenes.md)
+  (the `calibrated_sensor` and `ego_pose` fields), worth reading once before touching any JSON.
 
-The exercise that makes this concrete is projecting a lidar point into a camera.
-The correct chain is four steps:
-
-    lidar sensor -> ego @ lidar_time -> global -> ego @ cam_time -> camera
-
-then apply K and divide by z. The non-obvious step is the temporal one. The lidar
-sweep and the camera trigger do not happen at the same instant; the offset is on
-the order of tens of milliseconds. A single ego pose cannot serve both ends of
-the chain, because the vehicle moved in between. At 30 m/s a ~50 ms offset is
-about 1.5 m of translation, which is enough to visibly slide projected points off
-moving objects at the edge of the field of view. The naive shortcut, reusing the
-lidar-time ego pose for the camera step, is exactly the bug this assignment makes
-you see. The assignment builds both the naive and the timestamp-correct chain and shows the two
-disagree by the ego motion.
-
-A naive flat-ground BEV is not enough, which is why the later assignments exist.
-Inverse perspective mapping
-(IPM) warps a camera image into a top-down image by assuming every pixel is a
-point on the flat z = 0 ground plane, which reduces the projection to a 3x3
-homography from image to ground. That assumption is exact for road markings and
-ground texture and wrong for anything above the ground. A feature at height h
-projects to the same pixel as a ground point farther from the camera, so the
-homography cannot tell them apart: elevated objects get painted into BEV cells
-beyond their true footprint, smeared toward the camera. A pedestrian's feet land
-correctly and their head lands several meters ahead of them. Recovering height
-from a single view needs either real depth, which is the
-[Lift-Splat-Shoot](https://arxiv.org/abs/2008.05711) (Philion & Fidler, ECCV
-2020) approach in A11.5b, or explicit 3-D queries, which is the
-[BEVFormer](https://arxiv.org/abs/2203.17270) (Li et al., ECCV 2022) approach in
-A11.5c. IPM is the baseline whose failure those methods are built to fix.
-
-One nuScenes-specific simplification: the core dataset images are pre-undistorted
-and stored rectified, so the stored K is an exact pinhole intrinsic with no
-radial or tangential distortion terms. (The nuImages spin-off keeps distortion;
-the core dataset does not.) No undistortion is implemented here.
-
-This assignment builds `nanovision.geometry` (`project_points`
-/ `unproject`, the four SE(3) primitives `make_transform` / `apply_transform` /
-`invert_transform` / `compose_transforms`, the `CameraRig`, and `ipm_to_bev`)
-plus the nuScenes-mini loader, and these are the shared dependency for the rest of
-the module. A11.5b (Lift-Splat-Shoot) reuses the `CameraRig` (K and ego-to-camera
-extrinsics) and the `BEVGrid`, replacing the flat-ground homography with a learned
-per-pixel depth that unprojects image features into 3-D. A11.5c (BEVFormer)
-reuses the same K and extrinsics; its spatial cross-attention computes, for each
-BEV cell, the 2-D image coordinate it projects to, which is the back half of the
-projection chain built here. A11.5d (occupancy) extends the `BEVGrid` with a z
-axis and projects voxel-center queries with the same chain, just with non-zero z.
-A11.5e (prediction) consumes the BEV feature map produced upstream and relies on
-the `BEVGrid` definition (ego-centric, fixed range and resolution) to read it
-spatially. The ego-centric BEV grid fixed here is the shared contract for that
-whole module. The volume-rendering link from the NeRF/splatting assignments
-reappears in A11.5d, where the camera-to-voxel projection is the same primitive.
-If the lidar overlay here is visually correct, the extrinsic chain is correct, and
-a whole class of downstream sign/axis-swap bugs is caught before it can propagate.
-
-## Background
+## Lecture notes
 
 ### Coordinate frames and conventions
 
-The camera frame is OpenCV-style: +x right, +y down, +z forward into the scene.
-This is the nuScenes camera convention, so the stored intrinsic K is the exact
-pinhole matrix with no distortion terms. The ego frame is the vehicle body,
-right-handed with x forward, y left, z up, origin at the rear-axle midpoint. The
-global frame is a fixed ENU map frame. SE(3) transforms are 4x4 homogeneous
-matrices applied on the left, `p' = T @ p_homogeneous`. A transform named
-`T_b_a` reads "a-to-b": it takes a point in frame a and returns it in frame b.
+nuScenes defines three nested frames. Each sensor has its own frame: lidar points live in the
+lidar frame, and the scene in each camera's OpenCV frame, +x right, +y down, +z forward into the
+scene. The ego frame is the vehicle body, right-handed with x forward, y left, z up, origin at
+the rear-axle midpoint. The global frame is a fixed ENU map frame, where ENU is East-North-Up,
+a world frame with axes pointing east, north, and up, and all 3-D annotations live in it.
 
-The two body frames differ in handedness convention, which is the source of most
-sign bugs. The ego frame has +x forward, +y left, +z up. The OpenCV camera frame
-has +x right, +y down, +z forward into the scene:
+The two body frames differ in handedness convention, which is the source of most sign bugs. The
+ego frame has +x forward, +y left, +z up. The OpenCV camera frame has +x right, +y down, +z
+forward into the scene:
 
 ```
         ego frame                       OpenCV camera frame
@@ -118,21 +53,32 @@ has +x right, +y down, +z forward into the scene:
          y left                            y down
 ```
 
-The transform stored per camera (`T_cam_world`) carries both the translation from
-the rear axle to the lens and this axis relabeling.
+SE(3) transforms are 4x4 homogeneous matrices applied on the left, $p' = T\,p$. A transform
+named $T_{b\_a}$ reads "a-to-b": it takes a point in frame $a$ and returns it in frame $b$. The
+camera extrinsic $E = T_{\text{cam}\_\text{ego}}$ is the ego-to-camera transform; it carries
+both the translation from the rear axle to the lens and the axis relabeling between the two
+frames above. Its inverse $E^{-1} = T_{\text{ego}\_\text{cam}}$ goes the other way.
 
-### Pinhole projection (one-paragraph review)
+Two record types carry these transforms. `calibrated_sensor` stores the sensor-to-ego rigid
+transform (translation in meters plus a rotation quaternion) and, for cameras, the 3x3
+intrinsic. `ego_pose` stores the ego-to-global rigid transform plus a timestamp. Both
+quaternions are scalar-first $(w, x, y, z)$; passing the components in the wrong order gives a
+rotation that looks plausible and is wrong. The cleanest path is to build the 4x4 matrix from
+each quaternion immediately and chain matrices, never working in quaternion algebra.
 
-A camera-frame point (X, Y, Z) with Z > 0 projects to a pixel by
+The core nuScenes images are pre-undistorted and stored rectified, so the stored intrinsic $K$
+is an exact pinhole matrix with no radial or tangential distortion terms. (The nuImages spin-off
+keeps distortion; the core dataset does not.) No undistortion is needed.
 
-    u = fx * X / Z + cx
-    v = fy * Y / Z + cy
+### Pinhole projection
 
-and back-projects at depth d by X = (u - cx) d / fx, Y = (v - cy) d / fy, Z = d.
-Shapes: `project_points(pts_cam (N,3), K (3,3)) -> px (N,2)`;
-`unproject(px (N,2), depth (N,) or scalar, K (3,3)) -> pts_cam (N,3)`.
-Every BEV lift depends on back-projection; the only place to get it wrong
-is the sign/order when you chain it with the extrinsics.
+A camera-frame point $(X, Y, Z)$ with $Z > 0$ projects to a pixel by
+
+$$u = f_x \frac{X}{Z} + c_x, \qquad v = f_y \frac{Y}{Z} + c_y,$$
+
+and back-projects at a known depth $d$ by
+
+$$X = (u - c_x)\frac{d}{f_x}, \qquad Y = (v - c_y)\frac{d}{f_y}, \qquad Z = d.$$
 
 The forward pass is a divide by depth followed by the intrinsic scale and offset:
 
@@ -140,36 +86,35 @@ The forward pass is a divide by depth followed by the intrinsic scale and offset
 flowchart LR
     A["pts_cam (N,3)<br/>X, Y, Z in camera frame"] -->|"divide by Z"| B["(X/Z, Y/Z)<br/>normalized image plane"]
     B -->|"u = fx·X/Z + cx<br/>v = fy·Y/Z + cy"| C["px (N,2)<br/>pixels u, v"]
-    C -. "unproject at depth d<br/>X=(u-cx)·d/fx, Y=(v-cy)·d/fy, Z=d" .-> A
+    C -. "back-project at depth d<br/>X=(u-cx)·d/fx, Y=(v-cy)·d/fy, Z=d" .-> A
 ```
 
-The dashed edge is `unproject`: it recovers the camera-frame point only because
-the depth d is supplied separately. A single pixel alone fixes a ray, not a point.
+The dashed edge recovers the camera-frame point only because the depth $d$ is supplied
+separately. A single pixel alone fixes a ray, not a point. Every BEV lift depends on this
+back-projection; the only place to get it wrong is the sign or order when chaining it with the
+extrinsics.
 
 ### The four SE(3) primitives
 
-`make_transform(R (3,3), t (3,)) -> T (4,4)` assembles `[[R, t], [0, 1]]`.
-`apply_transform(T (4,4), pts (N,3)) -> (N,3)` computes `pts @ R^T + t`.
-`invert_transform(T (4,4)) -> (4,4)` uses the SE(3) structure, `R^T` and
-`-R^T t`, not a general matrix inverse. `compose_transforms(A, B, C) -> A @ B @ C`
-so applying the result is the same as applying C, then B, then A.
+A rigid transform on points needs four operations. Assembly builds the 4x4 matrix
+$[[R, t], [0, 1]]$ from a 3x3 rotation $R$ and a 3-vector $t$. Application maps a batch of points
+through $R\,p + t$. Inversion uses the SE(3) structure rather than a general matrix inverse:
+for $T = [[R, t], [0, 1]]$ the inverse is $[[R^\top, -R^\top t], [0, 1]]$, which is exact and
+cheap. Composition multiplies a sequence left to right, so $A B C$ applied to a point is the
+same as applying $C$, then $B$, then $A$. The whole later module is built from these four.
 
 ### The four-step lidar-to-camera chain
 
-At a keyframe the lidar sweep and the image were captured at slightly different
-times. The correct projection of a lidar point into a camera is
+At a keyframe the lidar sweep and the image were captured at slightly different times. The
+correct projection of a lidar point into a camera passes through the global frame:
 
-    lidar sensor -> ego @ lidar_time -> global -> ego @ cam_time -> camera,
+$$\text{lidar sensor} \;\to\; \text{ego @ lidar time} \;\to\; \text{global} \;\to\; \text{ego @ cam time} \;\to\; \text{camera},$$
 
-then apply K and divide by z, keeping z > 0 and in-bounds points. As a transform
-composition this is `compose_transforms(T_cam_ego, invert(ego_pose_cam),
-ego_pose_lidar, lidar_to_ego)`. The naive shortcut reuses the lidar-time ego pose
-for the camera step; the error is the ego motion between the two timestamps. At
-30 m/s and a ~50 ms offset that is about 1.5 m. The temporal-offset test makes
-this exact on synthetic poses (identity sensor extrinsics, a pure +x ego shift).
-
-Each arrow below is one 4x4 SE(3) matrix; the global frame is the only frame both
-timestamps share, so the chain has to pass through it to switch ego poses:
+then apply $K$ and divide by $z$, keeping the points with $z > 0$ that land in bounds. As a
+composition this is $T_{\text{cam}\_\text{ego}}\,(T_{\text{ego}\_\text{global}}^{\text{cam}})\,(T_{\text{global}\_\text{ego}}^{\text{lidar}})\,T_{\text{ego}\_\text{lidar}}$,
+where the two ego-pose factors use the camera-time and lidar-time poses respectively. Each arrow
+is one 4x4 SE(3) matrix, and the global frame is the only frame both timestamps share, so the
+chain has to pass through it to switch ego poses:
 
 ```mermaid
 flowchart LR
@@ -180,39 +125,32 @@ flowchart LR
     C -->|"K, divide by z"| P["pixels (z>0, in bounds)"]
 ```
 
-The naive chain collapses `ego @ lidar_time` and `ego @ cam_time` into one node,
-dropping the global round-trip. On a moving vehicle that drops the ego translation
-between the two timestamps, which is the 1.5 m the test measures.
+The non-obvious step is the temporal one. A single ego pose cannot serve both ends of the chain,
+because the vehicle moved in between. The naive shortcut reuses the lidar-time ego pose for the
+camera step, collapsing `ego @ lidar time` and `ego @ cam time` into one node and dropping the
+global round-trip. On a moving vehicle that drops the ego translation between the two
+timestamps. At 30 m/s a 50 ms offset is about 1.5 m of translation, enough to visibly slide
+projected points off moving objects at the edge of the field of view.
 
-### The pyquaternion convention
+### The ego-centric BEV grid
 
-nuScenes stores rotations as scalar-first quaternions `(w, x, y, z)` in both
-`calibrated_sensor` and `ego_pose`. The chain works in SE(3) composition rather than
-quaternion algebra: build the 4x4 matrices immediately and chain them. The loader
-already does the quaternion-to-matrix step, so the work stays in 4x4 matrix form.
-
-### The ego-centric BEV grid (the module-wide contract)
-
-The BEV grid is always defined in the ego frame, centered on the vehicle. The
-`BEVGrid` dataclass fixes the contract for the whole module: x forward, y left,
-default [-50, 50] m on both axes at 0.5 m resolution, a 200x200 grid.
-`cell_centers()` returns an `(nx, ny, 2)` tensor of ego-frame (x, y) centers. LSS,
-BEVFormer, and occupancy all reuse this; occupancy adds a z axis.
+The BEV grid is always defined in the ego frame, centered on the vehicle, with x forward and y
+left. A standard choice is $[-50, 50]$ m on both axes at 0.5 m resolution, a 200x200 grid. Each
+cell has a metric ego-frame $(x, y)$ center. This grid is the shared contract for the whole
+module: LSS, BEVFormer, and occupancy all read and write it, and occupancy adds a z axis to make
+it a voxel grid.
 
 ### Flat-ground IPM and why it breaks
 
-IPM maps each BEV ground cell to a single image pixel under one assumption: every
-pixel is a point on the flat z = 0 ground plane. It is exact for road markings
-and ground texture. It is wrong for anything elevated: a feature at height h
-projects to the same pixel as a ground point farther from the camera, so elevated
-objects are painted into a BEV cell beyond their true footprint, smeared toward
-the camera. The homography cannot recover height from one view; the fix is real
-depth (LSS) or explicit 3-D queries (BEVFormer). The IPM test asserts both the
-correct ground mapping and this breakage. `ipm_to_bev` projects each cell's ground
-point into each camera and bilinearly samples the image (via `grid_sample`);
-overlapping cells are last-camera-wins.
+Inverse perspective mapping warps a camera image into a top-down image under one assumption:
+every pixel is a point on the flat $z = 0$ ground plane. That reduces the projection to a 3x3
+homography from image to ground. The assumption is exact for road markings and ground texture
+and wrong for anything above the ground. A feature at height $h$ projects to the same pixel as a
+ground point farther from the camera, so the homography cannot tell them apart: elevated objects
+are painted into BEV cells beyond their true footprint, smeared toward the camera. A pedestrian's
+feet land correctly and the head lands several meters ahead.
 
-The data flow per cell is a ground point, a projection, and a sample:
+Per cell the data flow is a ground point, a projection, and a sample:
 
 ```mermaid
 flowchart LR
@@ -221,10 +159,10 @@ flowchart LR
     S --> B["BEV cell color<br/>(C, nx, ny)"]
 ```
 
-The failure is geometric. The camera ray through a pixel hits the assumed ground
-plane at one point, but the real scene point on that ray may sit at height h. An
-elevated feature is therefore written into the ground cell where its ray crosses
-z = 0, which is farther from the camera than the object's actual footprint:
+The failure is geometric. The camera ray through a pixel hits the assumed ground plane at one
+point, but the real scene point on that ray may sit at height $h$. An elevated feature is
+therefore written into the ground cell where its ray crosses $z = 0$, which is farther from the
+camera than the object's actual footprint:
 
 ```
    camera
@@ -240,105 +178,111 @@ z = 0, which is farther from the camera than the object's actual footprint:
    footprint         past the true footprint
 ```
 
-The gap between `true footprint` and `X` grows with the object's height and its
-distance from the camera, which is why tall objects streak outward in the BEV.
+The gap between the true footprint and the IPM cell grows with the object's height and its
+distance from the camera, which is why tall objects streak outward in the BEV. Recovering height
+from a single view needs either real depth, the Lift-Splat-Shoot approach (A11.5b), or explicit
+3-D queries, the BEVFormer approach (A11.5c). IPM is the baseline whose failure those methods are
+built to fix.
 
-## What to implement
+### Where this goes in the module
 
-In `geometry.py`: `project_points` / `unproject`, the four SE(3)
-primitives (`make_transform`, `apply_transform`, `invert_transform`,
-`compose_transforms`), `CameraRig` (`world_to_cam`, `cam_to_world`,
-`world_to_pixel`), and `ipm_to_bev`. The `BEVGrid` dataclass is provided. The
-nuScenes loader is provided boilerplate; the devkit plumbing is not implemented here.
+The geometry built here is the shared dependency for the rest of the autonomous-driving module.
+Lift-Splat-Shoot reuses the camera rig (intrinsics and ego-to-camera extrinsics) and the BEV
+grid, replacing the flat-ground homography with a learned per-pixel depth that unprojects image
+features into 3-D. BEVFormer reuses the same intrinsics and extrinsics; its spatial
+cross-attention computes, for each BEV cell, the 2-D image coordinate it projects to, which is
+the back half of the projection chain built here. Occupancy extends the BEV grid with a z axis
+and projects voxel-center queries with the same chain, just at non-zero z. Prediction consumes
+the BEV feature map and relies on the grid being ego-centric with fixed range and resolution to
+read it spatially. If the lidar overlay on real data is visually correct, the extrinsic chain is
+correct, and a whole class of downstream sign and axis-swap bugs is caught before it can
+propagate.
 
-## Tasks
+## The assignment
 
-1. `project_points` / `unproject` - pinhole projection and its inverse on the
-   OpenCV camera axes.
-2. The four SE(3) primitives - 4x4 assembly, point application, the structured
-   inverse (R^T, -R^T t), and left-to-right composition.
-3. `CameraRig.world_to_cam` / `cam_to_world` / `world_to_pixel` - per-camera
-   projection with an in-front (z > 0) and in-bounds visibility mask.
-4. `ipm_to_bev` - warp images onto the ego ground plane via `grid_sample`.
+Implement the pinhole model, the SE(3) toolkit, the multi-camera rig, and the flat-ground IPM
+warp. The file docstrings give the exact signatures, shapes, and formulas (the OpenCV camera
+axes, the $T_{\text{cam}\_\text{ego}}$ extrinsic convention, the grid_sample normalization).
+Read those; this section maps each piece to the concept above. Everything is autograd-compatible
+float tensors, and the tests are float64 gradchecks on the differentiable pieces.
 
-Each maps to a `raise NotImplementedError("A11.5a Task N: ...")` in the top-level module files
-and to one test file.
+### Files to modify
 
-## How to verify
+All four tasks are in `geometry.py`, marked with `raise NotImplementedError("A11.5a Task N: ...")`.
 
-Run from the repo root with the `nanovision` env active, in this order:
+Task 1, `project_points` and `unproject`, is the pinhole model and its inverse on the OpenCV
+camera axes from the pinhole-projection section.
 
-    make test A=a11_5a_camera_geometry_bev      # your top-level code (red until filled)
+Task 2, `make_transform`, `apply_transform`, `invert_transform`, and `compose_transforms`, is
+the SE(3) toolkit from the four-primitives section, including the structured inverse
+($R^\top$, $-R^\top t$) rather than a general matrix inverse.
 
-The tests run in workflow order: projection (reference values, axis point,
-round-trip, float64 gradcheck) -> SE(3) (block layout, applied-point reference,
-inverse-is-identity, composition, gradcheck on `apply_transform`) -> rig (a
-synthetic 4-camera rig: a front point visible only in the front camera and on the
-optical axis; a cube into the expected cameras; `cam_to_world` inverts
-`world_to_cam`) -> IPM (a ground marker warps back to its expected BEV cell; an
-elevated point maps past its footprint) -> temporal offset (the timestamp-correct
-chain differs from the naive one by the 1.5 m ego motion; with no ego motion they
-agree). All of these run on synthetic cameras with no dataset.
+Task 3, `CameraRig.world_to_cam`, `cam_to_world`, and `world_to_pixel`, is the multi-camera rig.
+`world_to_pixel` projects ego points into a named camera and returns the in-front ($z > 0$) and
+in-bounds visibility mask, the back half of the projection chain.
 
-To confirm the reference passes and render the figures:
+Task 4, `ipm_to_bev`, is the flat-ground IPM warp: for each BEV cell, project its ground point
+into each camera and bilinearly sample the image with `grid_sample`, last-camera-wins on
+overlap.
 
-    make verify A=a11_5a_camera_geometry_bev    # reference solution (green)
-    make viz    A=a11_5a_camera_geometry_bev    # writes PNGs to out/
+The `BEVGrid` dataclass and the `nanovision.data.nuscenes_mini` loader (the devkit plumbing,
+image downsampling, and calibration parsing) are provided.
 
-The nuScenes loader test reports as skipped unless the dataset is present; that is
-expected, and `viz.py` falls back to a synthetic cube and a ground-checkerboard
-warp when `NUSCENES_DATAROOT` is unset. A forbidden-imports test greps the
-solution for cv2/kornia shortcuts. The reference implementation is visible in
-`solution/geometry.py`; read it if you get stuck.
+### Running and validating
 
-## Dataset step zero (optional, only for the real-data overlay)
+Activate the environment (`conda activate nanovision`), then:
 
-The geometry and all tests run without nuScenes. To render the real 6-camera lidar
-overlay and stitched BEV in `viz.py`:
+```
+make test     A=a11_5a_camera_geometry_bev   # run the tests against the top-level files (the holes)
+make verify   A=a11_5a_camera_geometry_bev   # run the same tests against the reference solution/
+make viz      A=a11_5a_camera_geometry_bev   # render the figures from the reference solution
+make viz-mine A=a11_5a_camera_geometry_bev   # render the figures from your own code (holes filled)
+```
 
-1. Create a nuScenes account and accept the license at
-   https://www.nuscenes.org/nuscenes#download.
-2. Download the `v1.0-mini` split (~4 GB) and extract it.
-3. Install the AV dependencies: `pip install nuscenes-devkit pyquaternion shapely`
-   (the `av` extra group in `pyproject.toml`).
-4. Set `NUSCENES_DATAROOT` to the directory that contains the `v1.0-mini` folder,
-   e.g. `export NUSCENES_DATAROOT=$HOME/data/nuscenes`.
+`make test` runs the suite in `assignments/a11_5a_camera_geometry_bev/tests/` against the
+top-level `geometry.py` (the file with the holes), red until the holes are filled and green once
+they are correct. `make verify` runs the identical suite against the reference `solution/` by
+setting `NANOVISION_IMPL=solution`, so it is green from the start and shows the target. The goal
+is to bring `make test` to the same green as `make verify`.
 
-With those set, `viz.py` renders the naive-vs-temporal-correct lidar overlay and
-the stitched BEV; without them it falls back to the synthetic scene.
+The tests run in workflow order: projection (reference values, an axis point, the
+unproject-project round-trip, a float64 gradcheck), SE(3) (block layout, an applied-point
+reference, inverse-is-identity, composition, a gradcheck on `apply_transform`), the rig (a
+synthetic 4-camera rig where a front point is visible only in the front camera and on the
+optical axis, a cube projects into the expected cameras, and `cam_to_world` inverts
+`world_to_cam`), IPM (a ground marker warps back to its expected BEV cell, an elevated point
+maps past its footprint), and the temporal offset (the timestamp-correct chain differs from the
+naive one by the ego motion, and with no ego motion they agree). All of these run on synthetic
+cameras with no dataset. The nuScenes loader test reports as skipped unless the dataset is
+present, which is expected, and a forbidden-imports test greps for `cv2`/`kornia` shortcuts.
 
-## Compute notes
+What you should see when you run this. Everything is CPU only and runs in seconds; there is no
+training loop or loss curve. The temporal-offset test reproduces the 1.5 m gap exactly on
+synthetic poses (identity sensor extrinsics, a pure +x ego shift of 1.5 m), and the same poses
+with no ego motion make the naive and correct chains agree. `make viz` writes PNGs to `out/`:
+with no dataset it falls back to a synthetic cube projection and a ground-checkerboard IPM warp,
+so the figures render on a fresh checkout. These are synthetic-camera artifacts; they confirm
+the geometry is self-consistent and the IPM breakage is visible, and say nothing about accuracy
+on real sensor noise or calibration error.
 
-CPU only, seconds to run. Everything is tested on synthetic cameras at float32,
-with float64 gradchecks on `project_points` and `apply_transform`. The 200x200
-BEV grid and downsampled 400x224 images fit in memory with room to spare; no GPU
-is needed for this assignment, and there is no training loop or loss curve to
-watch.
-
-## Stretch goals
-
-1. Add a per-cell coverage count to `ipm_to_bev` and blend overlapping cameras by
-   viewing-ray verticality instead of last-camera-wins.
-2. Implement the closed-form ground-plane homography H (3x3, pixel -> BEV) and
-   check it agrees with the per-cell `grid_sample` warp on ground points.
-3. On real data, pick 5 ground lidar points on a lane marking and measure the
-   naive-vs-correct pixel gap as a function of ego speed.
+To render the real 6-camera lidar overlay and stitched BEV (optional, only for the real-data
+figures), create a nuScenes account and accept the license at
+https://www.nuscenes.org/nuscenes#download, download and extract the `v1.0-mini` split (~4 GB),
+install the AV dependencies (`pip install nuscenes-devkit pyquaternion shapely`, the `av` extra
+in `pyproject.toml`), and set `NUSCENES_DATAROOT` to the directory containing the `v1.0-mini`
+folder. With those set, `viz.py` renders the naive-versus-correct lidar overlay and the stitched
+BEV.
 
 ## Further reading
 
-- Caesar et al., "nuScenes: A Multimodal Dataset for Autonomous Driving" (CVPR
-  2020), [arXiv:1903.11027](https://arxiv.org/abs/1903.11027) - coordinate frames,
-  sensor suite, and the four-step projection chain.
+- Caesar et al. 2020, nuScenes, [arXiv:1903.11027](https://arxiv.org/abs/1903.11027).
 - nuScenes devkit schema,
-  [schema_nuscenes.md](https://github.com/nutonomy/nuscenes-devkit/blob/master/docs/schema_nuscenes.md)
-  - field-by-field `calibrated_sensor` / `ego_pose` / `sample_data` reference.
-- Philion and Fidler, "Lift, Splat, Shoot" (ECCV 2020),
-  [arXiv:2008.05711](https://arxiv.org/abs/2008.05711) - the camera-rig and
-  ego-centric BEV grid abstraction every later method reuses (A11.5b).
-- Li et al., "BEVFormer" (ECCV 2022),
-  [arXiv:2203.17270](https://arxiv.org/abs/2203.17270) - 3-D BEV reference points
-  projected to 2-D image coordinates, the back half of the projection chain
+  [schema_nuscenes.md](https://github.com/nutonomy/nuscenes-devkit/blob/master/docs/schema_nuscenes.md).
+- Philion and Fidler 2020, "Lift, Splat, Shoot",
+  [arXiv:2008.05711](https://arxiv.org/abs/2008.05711), the camera-rig and ego-centric BEV grid
+  abstraction every later method reuses (A11.5b).
+- Li et al. 2022, "BEVFormer", [arXiv:2203.17270](https://arxiv.org/abs/2203.17270), 3-D BEV
+  reference points projected to 2-D image coordinates, the back half of the projection chain
   (A11.5c).
-- Harley et al., "Simple-BEV" (ICRA 2023),
-  [arXiv:2206.07959](https://arxiv.org/abs/2206.07959) - a clean description of the
-  200x200x8 ego-centric voxel grid and bilinear-sampling lift.
+- Harley et al. 2023, "Simple-BEV", [arXiv:2206.07959](https://arxiv.org/abs/2206.07959), a clean
+  description of the 200x200x8 ego-centric voxel grid and the bilinear-sampling lift.

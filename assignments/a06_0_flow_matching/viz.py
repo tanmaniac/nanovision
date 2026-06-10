@@ -14,10 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -114,7 +111,7 @@ def _image_demo(steps=2500):
     for j in range(cfg.num_classes):
         axes[j].imshow(out[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
         axes[j].set_title(f"CFM class {j}"); axes[j].axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "image_cfm.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "image_cfm.png")
 
 
 def main():
@@ -131,7 +128,7 @@ def main():
     _plot_trajectories(axes[0], indep, cfg, torch.Generator().manual_seed(1), "independent coupling")
     _plot_trajectories(axes[1], ot, cfg, torch.Generator().manual_seed(1), "OT coupling")
     _plot_trajectories(axes[2], rect, cfg, torch.Generator().manual_seed(1), "2-rectified (reflow)")
-    plt.tight_layout(); plt.savefig(_OUT / "trajectories.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "trajectories.png")
 
     # Straightness metric for the three.
     x0 = torch.randn(512, cfg.data_dim, generator=torch.Generator().manual_seed(2))
@@ -140,7 +137,7 @@ def main():
     plt.figure(figsize=(4.5, 3.2))
     plt.bar(["independent", "OT", "2-rectified"], s, color=["C0", "C2", "C3"])
     plt.ylabel("straightness (lower = straighter)"); plt.tight_layout()
-    plt.savefig(_OUT / "straightness.png", dpi=120); plt.close()
+    finish(_OUT / "straightness.png")
 
     # Few-step samples from the OT model.
     fig, axes = plt.subplots(1, 5, figsize=(15, 3))
@@ -152,7 +149,7 @@ def main():
         ax.scatter(data[:, 0], data[:, 1], s=3, color="C1", alpha=0.3)
         ax.scatter(sm[:, 0], sm[:, 1], s=3, color="C0", alpha=0.6)
         ax.set_title(f"{n}-step Euler"); ax.set_aspect("equal"); ax.axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "few_step.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "few_step.png")
 
     # Timestep distributions.
     plt.figure(figsize=(4.5, 3.2))
@@ -161,7 +158,7 @@ def main():
     plt.hist(u, bins=40, alpha=0.5, label="uniform", density=True)
     plt.hist(ln, bins=40, alpha=0.5, label="logit-normal", density=True)
     plt.xlabel("t"); plt.legend(); plt.tight_layout()
-    plt.savefig(_OUT / "timesteps.png", dpi=120); plt.close()
+    finish(_OUT / "timesteps.png")
 
     _image_demo()
     print(f"wrote figures to {_OUT}; straightness indep/OT/rect = {[round(x, 3) for x in s]}")
@@ -169,3 +166,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

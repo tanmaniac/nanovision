@@ -11,10 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -98,8 +95,7 @@ def main() -> None:
     fig.suptitle(f"video MAE, mask_ratio={cfg.mask_ratio} (tube masking)", fontsize=10)
     fig.tight_layout()
     film = out / "video_mae_reconstruction.png"
-    fig.savefig(film, dpi=120)
-    plt.close(fig)
+    finish(film)
 
     fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(losses)
@@ -108,11 +104,12 @@ def main() -> None:
     ax.set_title("video MAE overfit-one-batch")
     fig.tight_layout()
     curve = out / "video_mae_loss.png"
-    fig.savefig(curve, dpi=120)
-    plt.close(fig)
+    finish(curve)
 
     print(f"final masked-tubelet MSE {losses[-1]:.3e} - wrote {film}, {curve}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

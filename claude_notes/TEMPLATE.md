@@ -1,5 +1,9 @@
 # TEMPLATE.md - per-assignment spec format
 
+> Superseded 2026-06 and kept for historical reference. The two-file split this describes is gone:
+> `ASSIGNMENT.md` was removed and its contract folded into a single student-facing `README.md`. For
+> the current standard see `claude_notes/lecture_note_template.md` and the `lecture-notes` skill.
+
 Every assignment directory contains an `ASSIGNMENT.md` written in this format.
 It is the machine-readable contract the builder uses to generate the top-level
 module files (the holed code the student edits), `solution/`, `tests/`, and

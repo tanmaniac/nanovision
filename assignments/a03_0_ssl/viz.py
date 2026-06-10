@@ -14,10 +14,7 @@ Run with: make viz A=a03_0_ssl  (uses the reference solution).
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
@@ -96,8 +93,7 @@ def mae_reconstruction(out_path):
         ax.axis("off")
     fig.suptitle(f"A3 MAE overfit (synthetic), masked-patch MSE {loss.item():.3e}")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
     return loss.item()
 
 
@@ -141,8 +137,7 @@ def dino_collapse(out_path):
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
     return full[-1], no_center[-1], no_sharp[-1]
 
 
@@ -176,8 +171,7 @@ def pretrained_dino_attention(out_path):
     ax.axis("off")
     fig.colorbar(im, ax=ax, fraction=0.046)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
     print(f"wrote pretrained-DINO attention map to {out_path}")
     return True
 
@@ -197,3 +191,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

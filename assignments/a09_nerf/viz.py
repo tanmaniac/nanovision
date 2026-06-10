@@ -15,10 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -103,11 +100,12 @@ def main():
     for ax in axes:
         ax.axis("off")
     plt.tight_layout()
-    plt.savefig(_OUT / "heldout_and_ablation.png", dpi=120)
-    plt.close()
+    finish(_OUT / "heldout_and_ablation.png")
     print(f"wrote {_OUT/'heldout_and_ablation.png'}; "
           f"PSNR with-enc {_psnr(r_with, gt):.2f} dB, no-enc {_psnr(r_no, gt):.2f} dB")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

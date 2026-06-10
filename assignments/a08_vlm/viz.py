@@ -12,10 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -90,8 +87,7 @@ def main():
     plt.ylabel("caption cross-entropy")
     plt.title("grounding ablation")
     plt.tight_layout()
-    plt.savefig(_OUT / "grounding_ablation.png", dpi=120)
-    plt.close()
+    finish(_OUT / "grounding_ablation.png")
 
     # Images with their generated captions.
     fig, axes = plt.subplots(1, img.shape[0], figsize=(2.2 * img.shape[0], 2.6))
@@ -100,10 +96,11 @@ def main():
         axes[i].set_title(f"gen {gen[i].tolist()}\ntgt {tok[i, :3].tolist()}", fontsize=8)
         axes[i].axis("off")
     plt.tight_layout()
-    plt.savefig(_OUT / "captions.png", dpi=120)
-    plt.close()
+    finish(_OUT / "captions.png")
     print(f"wrote figures to {_OUT}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

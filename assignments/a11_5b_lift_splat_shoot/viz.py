@@ -18,10 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -98,8 +95,7 @@ def main():
         ax.set_ylabel("softmax prob")
         ax.legend(fontsize=7)
     plt.tight_layout()
-    plt.savefig(_OUT / "depth_distribution.png", dpi=120)
-    plt.close()
+    finish(_OUT / "depth_distribution.png")
 
     fig, axes = plt.subplots(1, 2, figsize=(7, 3.4))
     # BEV grid is (nx forward, ny lateral); show forward up the page.
@@ -111,10 +107,11 @@ def main():
         ax.set_xlabel("y cell (lateral)")
         ax.set_ylabel("x cell (forward)")
     plt.tight_layout()
-    plt.savefig(_OUT / "bev_occupancy.png", dpi=120)
-    plt.close()
+    finish(_OUT / "bev_occupancy.png")
     print(f"wrote {_OUT/'depth_distribution.png'} and {_OUT/'bev_occupancy.png'}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

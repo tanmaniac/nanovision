@@ -11,10 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -89,9 +86,11 @@ def main():
         axes[1, j].set_title("VAE recon"); axes[1, j].axis("off")
         axes[2, j].imshow(samples[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
         axes[2, j].set_title(f"DiT sample (class {j})"); axes[2, j].axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "latent_dit.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "latent_dit.png")
     print(f"wrote figure to {_OUT}; VAE recon {recon:.3f}, KL {kl:.3f}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

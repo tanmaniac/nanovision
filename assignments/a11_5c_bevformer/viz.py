@@ -19,10 +19,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -89,8 +86,7 @@ def main():
         ax.set_xticks([]); ax.set_yticks([])
     fig.suptitle("BEV cell reference points projected into each camera (query-pull)")
     fig.tight_layout()
-    fig.savefig(_OUT / "reference_points.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "reference_points.png")
 
     # Train a short overfit, then show predicted vs GT occupancy.
     model = BEVFormerSeg(cfg).to(dev)
@@ -118,10 +114,11 @@ def main():
     for ax in axes:
         ax.set_xlabel("ego y (lateral)"); ax.set_ylabel("ego x (forward)")
     fig.tight_layout()
-    fig.savefig(_OUT / "bev_occupancy.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "bev_occupancy.png")
     print(f"wrote {_OUT / 'reference_points.png'} and {_OUT / 'bev_occupancy.png'}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

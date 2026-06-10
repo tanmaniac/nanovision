@@ -1,27 +1,42 @@
 # A6.5 - VQ tokenizer
 
-This assignment builds a VQ-VAE: a convolutional encoder maps a 16x16 image to a 4x4 grid of continuous
-vectors, a learned codebook snaps each to its nearest discrete code, and a decoder
-reconstructs the image. The non-differentiable nearest-neighbor lookup is trained through
-with the straight-through estimator. Then a small autoregressive transformer (the one built
-in A1) models the discrete token grid as a prior, and sampling from it decodes to new images.
-This is the discrete-token route to image generation, the contrast to A7's continuous
-KL-VAE.
+A VQ-VAE turns an image into a short grid of discrete tokens from a fixed vocabulary, so an
+autoregressive transformer can generate images the same way it generates text. A convolutional
+encoder maps an image to a grid of continuous vectors, a learned codebook snaps each vector to
+its nearest discrete code, and a decoder reconstructs the image. The nearest-neighbor lookup is
+non-differentiable, so training passes the gradient around it with the straight-through
+estimator. Once images are token grids, a small causal transformer models the grid as a prior,
+and sampling from it decodes to new images. This is the discrete-token route to image
+generation, the contrast to the continuous KL-VAE used with latent diffusion.
 
-## Why discrete tokens
+Build a VQ-VAE on 16x16 shape images: a 4x4 latent grid, a 32-entry codebook, and an
+autoregressive prior over the 16 flattened tokens. Implement the vector quantizer (the
+nearest-code lookup, the straight-through estimator, and the codebook and commitment losses),
+the total VQ-VAE loss, and autoregressive sampling from the prior. The encoder, decoder, the
+transformer prior with its teacher-forced loss, and the toy data are provided. Everything runs
+on CPU in seconds to under a minute.
 
-A transformer language model works on a finite vocabulary: each position is one of a fixed
-set of tokens, and the model puts a categorical distribution over the next one. To generate
-images the same way, you first need to turn an image into a short sequence of discrete tokens
-from a fixed vocabulary. A VQ-VAE (van den Oord et al. 2017, "Neural Discrete Representation
-Learning", [arXiv:1711.00937](https://arxiv.org/abs/1711.00937)) does exactly that: it learns
-an encoder, a codebook of $K$ vectors, and a decoder, so any image becomes a grid of code
-indices in $\{0, \dots, K-1\}$ that a decoder can turn back into pixels. Once images are token
-grids, an autoregressive transformer models them exactly like text. The unified multimodal
-models (Chameleon, Janus, LlamaGen) tokenize images into discrete codes and model interleaved
-text and image tokens with a single transformer.
+Required reading before starting:
+- van den Oord, Vinyals, Kavukcuoglu 2017, "Neural Discrete Representation Learning",
+  [arXiv:1711.00937](https://arxiv.org/abs/1711.00937).
+- Esser, Rombach, Ommer 2021, "Taming Transformers for High-Resolution Image Synthesis"
+  (VQ-GAN), [arXiv:2012.09841](https://arxiv.org/abs/2012.09841).
 
-## The VQ-VAE
+## Lecture notes
+
+### Why discrete tokens
+
+A transformer language model works on a finite vocabulary: each position is one of a fixed set
+of tokens, and the model puts a categorical distribution over the next one. To generate images
+the same way, an image first has to become a short sequence of discrete tokens from a fixed
+vocabulary. A VQ-VAE (van den Oord et al. 2017) learns an encoder, a codebook of $K$ vectors,
+and a decoder, so any image becomes a grid of code indices in $\{0, \dots, K-1\}$ that a
+decoder can turn back into pixels. Once images are token grids, an autoregressive transformer
+models them exactly like text. The unified multimodal models (Chameleon, Janus, LlamaGen)
+tokenize images into discrete codes and model interleaved text and image tokens with a single
+transformer.
+
+### The VQ-VAE
 
 The encoder produces a continuous grid $z_e \in \mathbb{R}^{B\times D\times H'\times W'}$ (here
 $4\times 4$ vectors of dimension $D$). The codebook is an embedding table
@@ -41,7 +56,7 @@ flowchart LR
     ZQ --> D["decoder<br/>(B,1,16,16)"]
 ```
 
-## The straight-through estimator
+### The straight-through estimator
 
 The argmin has zero gradient almost everywhere, so backpropagating through it would stop the
 gradient before it reaches the encoder. The straight-through estimator (STE) routes the
@@ -50,32 +65,30 @@ gradient around the argmin by defining
 $$z_q^{\text{ste}} = z_e + \operatorname{sg}\!\big(z_q - z_e\big),$$
 
 where $\operatorname{sg}$ is the stop-gradient (`.detach()`). The forward value is
-$z_e + (z_q - z_e) = z_q$, the hard quantized vector the decoder sees. The backward gradient
-is
+$z_e + (z_q - z_e) = z_q$, the hard quantized vector the decoder sees. The backward gradient is
 
 $$\frac{\partial z_q^{\text{ste}}}{\partial z_e} = I + 0 = I,$$
 
-because the stop-gradient term contributes zero, so the decoder's gradient is copied straight
-to the encoder as if quantization were the identity. The estimator deliberately defines a
-gradient that finite differences would disagree with, so `test_straight_through` checks the
-autograd gradient directly rather than with a gradcheck.
+because the stop-gradient term contributes zero, so the decoder's gradient is copied straight to
+the encoder as if quantization were the identity. The estimator deliberately defines a gradient
+that finite differences would disagree with.
 
-## The losses
+### The losses
 
 The reconstruction loss trains the encoder and decoder through the STE. The codebook itself
-gets no gradient through the STE (the stop-gradient detaches the code in the
-forward-to-decoder path), so two extra terms train it and commit the encoder to it:
+gets no gradient through the STE (the stop-gradient detaches the code in the forward-to-decoder
+path), so two extra terms train it and commit the encoder to it:
 
 $$\mathcal{L} = \underbrace{\lVert x - \hat x\rVert^2}_{\text{reconstruction}} + \underbrace{\lVert \operatorname{sg}[z_e] - z_q\rVert^2}_{\text{codebook}} + \beta\underbrace{\lVert z_e - \operatorname{sg}[z_q]\rVert^2}_{\text{commitment}}.$$
 
-The codebook term moves each code toward the encoder vectors assigned to it (the
-stop-gradient on $z_e$ sends the gradient only into the code). The commitment term, weighted
-by $\beta = 0.25$ (van den Oord et al.), pulls the encoder output toward the code it picked so
-the encoder cannot grow its outputs without bound. The encoder receives gradient from two
-sources, the reconstruction (via the STE) and the commitment term; the codebook receives
-gradient only from the codebook term.
+The codebook term moves each code toward the encoder vectors assigned to it (the stop-gradient
+on $z_e$ sends the gradient only into the code). The commitment term, weighted by $\beta = 0.25$
+(van den Oord et al.), pulls the encoder output toward the code it picked so the encoder cannot
+grow its outputs without bound. The encoder receives gradient from two sources, the
+reconstruction (via the STE) and the commitment term; the codebook receives gradient only from
+the codebook term.
 
-## Codebook collapse
+### Codebook collapse
 
 The common VQ failure is collapse: a few codes capture everything and the rest go dead,
 shrinking the effective vocabulary. The diagnostic is the perplexity of the code-usage
@@ -83,27 +96,24 @@ distribution,
 
 $$\text{perplexity} = \exp\!\Big(-\sum_k p_k \log p_k\Big), \qquad p_k = \frac{\#\{\text{vectors assigned to code } k\}}{\#\text{vectors}},$$
 
-which is 1 under total collapse and $K$ under uniform usage. `codebook_perplexity` computes
-it, and `test_recon_overfit` requires it stay above a floor. Production tokenizers keep codes
+which is 1 under total collapse and $K$ under uniform usage. Production tokenizers keep codes
 alive with an exponential-moving-average codebook update (a running mean of assigned encoder
-vectors, replacing the codebook loss), dead-code reinitialization (re-seeding an unused code
-to a random encoder vector), and L2-normalized cosine-distance codes (LlamaGen, ViT-VQGAN).
-VQ-GAN (Esser et al. 2021, "Taming Transformers for High-Resolution Image Synthesis",
-[arXiv:2012.09841](https://arxiv.org/abs/2012.09841)) adds a perceptual loss and a patch
-discriminator for sharp reconstructions on natural images. The toy here uses plain pixel MSE,
-which is enough for near-binary shapes.
+vectors, replacing the codebook loss), dead-code reinitialization (re-seeding an unused code to
+a random encoder vector), and L2-normalized cosine-distance codes (LlamaGen, ViT-VQGAN). VQ-GAN
+(Esser et al. 2021) adds a perceptual loss and a patch discriminator for sharp reconstructions
+on natural images. A toy on near-binary shapes is fine with plain pixel MSE.
 
-## The autoregressive prior
+### The autoregressive prior
 
 After the tokenizer is trained, each image is a $4\times 4$ grid of code indices. Flattened
 row-major, that is a length-16 sequence over a $K$-code vocabulary, which a causal transformer
-models by predicting each token from the ones before it. A learned beginning-of-sequence
-token (the BOS, an extra index $K$) provides the input for position 0, which otherwise has no
-predecessor. Training is teacher-forced next-token cross-entropy: input
-$[\text{BOS}, t_0, \dots, t_{14}]$, targets $[t_0, \dots, t_{15}]$, the same loss built in
-A1's char-LM (`ar_nll`, provided). Sampling (`ar_sample`) starts from $[\text{BOS}]$ and draws
-each token from the predicted categorical distribution in turn, then reshapes to the grid and
-decodes through the codebook and decoder to a new image.
+models by predicting each token from the ones before it. A learned beginning-of-sequence token
+(the BOS, an extra index $K$, so the vocabulary is $K+1$) provides the input for position 0,
+which otherwise has no predecessor. Training is teacher-forced next-token cross-entropy: input
+$[\text{BOS}, t_0, \dots, t_{14}]$, targets $[t_0, \dots, t_{15}]$, the same next-token loss as
+a character-level language model. Sampling starts from $[\text{BOS}]$ and draws each token from
+the predicted categorical distribution in turn, then reshapes to the grid and decodes through
+the codebook and decoder to a new image.
 
 ```mermaid
 flowchart LR
@@ -115,34 +125,95 @@ flowchart LR
     G --> DEC["codebook + decoder<br/>-> image"]
 ```
 
-## What to implement
+## The assignment
 
-- `quantize.py`: `VectorQuantizer.forward` (nearest-code lookup, the straight-through
-  estimator, the codebook and commitment losses). This is the shared
-  `nanovision.quantize.VectorQuantizer`.
-- `vqvae.py`: `vq_vae_loss` (reconstruction MSE plus the vq loss).
-- `prior.py`: `ar_sample` (autoregressive token sampling).
+Implement the quantizer, the total loss, and autoregressive sampling. Each file's docstrings
+give the exact steps, shapes, the channel-last flatten convention, and the BOS index
+convention. Read those in the files; this section says which file maps to which concept above.
 
-The encoder/decoder, the VQVAE wiring, the `TokenPrior` and its `ar_nll` loss, the codebook
-perplexity helper, and the toy data are provided.
+### Files to modify
 
-Verify with `make verify A=a06_5_vq_tokenizer`; render the figures with
-`make viz A=a06_5_vq_tokenizer`.
+`quantize.py` is the vector quantizer, the shared `nanovision.quantize.VectorQuantizer`.
+Implement `VectorQuantizer.forward`: the nearest-code lookup (the squared-distance argmin from
+the VQ-VAE section), the straight-through estimator, and the codebook and commitment losses.
+The `codebook_perplexity` collapse diagnostic is provided.
+
+`vqvae.py` is the VQ-VAE wiring. Implement `vq_vae_loss`, the reconstruction MSE plus the
+quantizer's vq loss. The encoder, decoder, and the `VQVAE` module are provided.
+
+`prior.py` is the autoregressive prior. Implement `ar_sample`, the autoregressive token
+sampling from the prior described in the prior section. The `TokenPrior` transformer and its
+teacher-forced `ar_nll` loss are provided.
+
+The config, the toy shape-image data (`nanovision.data.toy.diffusion_image_batch`), and
+`viz.py` are provided.
+
+### Running and validating
+
+Activate the environment (`conda activate nanovision`), then:
+
+```
+make test     A=a06_5_vq_tokenizer   # run the tests against the top-level files (the ones with holes)
+make verify   A=a06_5_vq_tokenizer   # run the same tests against the reference solution/
+make viz      A=a06_5_vq_tokenizer   # render the figures from the reference solution
+make viz-mine A=a06_5_vq_tokenizer   # render the figures from your own code (once the holes are filled)
+```
+
+`make test` is the command to run while working on the assignment. It runs the test suite in
+`assignments/a06_5_vq_tokenizer/tests/` against the top-level files (the ones with the holes),
+and goes from red (the holes raise `NotImplementedError`) to green as the holes are filled in.
+`make verify` runs the identical suite against the reference answer key in `solution/`: it sets
+`NANOVISION_IMPL=solution`, which makes the tests import the reference implementation instead of
+the top-level files. `make verify` is green from the start, so it shows the target and confirms
+the tests and the environment work before anything changes. The goal is to bring `make test` to
+the same green as `make verify`.
+
+The suite checks the quantizer indices against a brute-force nearest neighbor, that the
+straight-through value equals the hard codebook lookup, and that the vq loss equals the codebook
+plus $0.25\times$ commitment reference. A dedicated test asserts the straight-through gradient
+directly: $z_e.\text{grad}$ is all ones after backprop through $z_q^{\text{ste}}$, the identity
+gradient the STE defines. There is no `gradcheck` test here, because the STE makes the autograd
+gradient differ from finite differences on purpose, so a finite-difference check would (by
+design) disagree. The remaining tests overfit the VQ-VAE on one batch (reconstruction MSE and a
+perplexity floor that rules out collapse), overfit the prior, check the sample shapes and
+determinism, and confirm no prebuilt VQ library is imported.
+
+`make viz` renders from the reference solution, so it works on a fresh checkout before any holes
+are filled and shows the target figures. `make viz-mine` runs the same script against the
+top-level code, the way to eyeball whether a finished implementation behaves. Both write PNG
+figures to `out/` rather than opening a window: the plots use matplotlib's headless Agg backend,
+so the commands behave the same over SSH, in WSL, and in CI with no display attached, and the
+figures are reproducible artifacts to open directly or view inline in VSCode. Add `SHOW=1` (for
+example `make viz-mine A=a06_5_vq_tokenizer SHOW=1`) to also open the figures in interactive
+windows when a display is available. The figures are `recon.png` (originals next to their
+VQ-VAE reconstructions), `codebook.png` (the code-usage histogram and the perplexity), and
+`samples.png` (images decoded from token grids sampled by the prior).
+
+What you should see when you run this. The VQ-VAE overfit drives the reconstruction MSE below
+0.05 on the 8-image batch and keeps perplexity above 3, so the codebook does not collapse to a
+handful of codes (it lands near 4 of the 32). The prior overfit drives the next-token
+cross-entropy down from its untrained $\ln K \approx 3.47$ toward a floor near $\ln(B)/L \approx
+0.13$: position 0 sees the identical $[\text{BOS}]$ context for every grid in the batch, so its
+cross-entropy cannot beat the entropy of the $B$ distinct first tokens. The decoded prior
+samples are recognizable shapes. These are toy artifacts on 16x16 images that confirm the
+mechanism runs end to end; they say nothing about tokenizer quality at scale, where a perceptual
+loss and a discriminator (VQ-GAN), a much larger codebook, and EMA codebook updates are standard.
 
 ## Where this goes next
 
-- The unified discrete multimodal models tokenize images this way and model text + image
+- The unified discrete multimodal models tokenize images this way and model text and image
   tokens with one autoregressive transformer: Chameleon (Chameleon Team 2024,
   [arXiv:2405.09818](https://arxiv.org/abs/2405.09818)) and LlamaGen (Sun et al. 2024,
   [arXiv:2406.06525](https://arxiv.org/abs/2406.06525)) are the reference points.
-- A7 (latent DiT) takes the other route: a continuous KL-VAE instead of a discrete codebook,
-  with flow-matching diffusion in the latent space rather than an autoregressive prior. That
-  is the discrete-vs-continuous and autoregressive-vs-diffusion split.
+- Latent diffusion with a transformer (A7) takes the other route: a continuous KL-VAE instead
+  of a discrete codebook, with flow-matching diffusion in the latent space rather than an
+  autoregressive prior. That is the discrete-versus-continuous and
+  autoregressive-versus-diffusion split.
 
 ## References
 
 - van den Oord, Vinyals, Kavukcuoglu 2017, VQ-VAE,
   [arXiv:1711.00937](https://arxiv.org/abs/1711.00937).
 - Esser, Rombach, Ommer 2021, VQ-GAN, [arXiv:2012.09841](https://arxiv.org/abs/2012.09841).
-- Chameleon Team 2024, [arXiv:2405.09818](https://arxiv.org/abs/2405.09818).
+- Chameleon Team 2024, Chameleon, [arXiv:2405.09818](https://arxiv.org/abs/2405.09818).
 - Sun et al. 2024, LlamaGen, [arXiv:2406.06525](https://arxiv.org/abs/2406.06525).

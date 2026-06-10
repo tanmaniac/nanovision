@@ -18,10 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
@@ -99,8 +96,7 @@ def main():
             axes[r, col].set_xlabel("X"); axes[r, col].set_ylabel("Y")
     fig.suptitle("Predicted vs ground-truth occupancy (depth-supervised)")
     fig.tight_layout()
-    fig.savefig(_OUT / "occupancy_slices.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "occupancy_slices.png")
 
     # Figure 2: rendered depth vs analytic GT depth for the hit rays.
     fig, ax = plt.subplots(figsize=(4.5, 4.5))
@@ -111,10 +107,11 @@ def main():
     ax.set_xlabel("analytic GT depth (m)"); ax.set_ylabel("rendered depth (m)")
     ax.set_title("Rendered depth vs analytic ray-box depth")
     fig.tight_layout()
-    fig.savefig(_OUT / "rendered_depth.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "rendered_depth.png")
     print(f"wrote {_OUT / 'occupancy_slices.png'} and {_OUT / 'rendered_depth.png'}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

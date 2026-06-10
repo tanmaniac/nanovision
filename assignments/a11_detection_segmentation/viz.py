@@ -15,11 +15,8 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import matplotlib.patches as patches  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -107,9 +104,11 @@ def main():
     fig.suptitle("dashed white = ground truth, solid color = matched query prediction")
     fig.tight_layout()
     out = _OUT / "detection_overfit.png"
-    fig.savefig(out, dpi=130)
+    finish(out, dpi=130)
     print(f"wrote {out}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

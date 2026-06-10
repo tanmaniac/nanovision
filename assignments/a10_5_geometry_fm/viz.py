@@ -18,10 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 from dataclasses import replace  # noqa: E402
 
@@ -122,8 +119,7 @@ def main():
         ax.legend()
         fig.colorbar(sc, ax=ax, shrink=0.6, label="confidence")
     fig.tight_layout()
-    fig.savefig(_OUT / "pointmaps.png", dpi=110)
-    plt.close(fig)
+    finish(_OUT / "pointmaps.png", dpi=110)
 
     # Reprojection-consistency error map: pred view-2 points reprojected into image 2 vs the
     # patch centers image 2 actually observes.
@@ -141,8 +137,7 @@ def main():
     im = ax.imshow(err_map.numpy(), cmap="magma")
     ax.set_title("reprojection error (px), view 2")
     fig.colorbar(im, ax=ax, shrink=0.8)
-    fig.savefig(_OUT / "reprojection.png", dpi=110)
-    plt.close(fig)
+    finish(_OUT / "reprojection.png", dpi=110)
 
     # Cross-attention ablation bar chart.
     fig, ax = plt.subplots(figsize=(5, 4))
@@ -151,11 +146,12 @@ def main():
     ax.set_ylabel("normalized pointmap error")
     ax.set_title("cross-attention lowers the error floor")
     fig.tight_layout()
-    fig.savefig(_OUT / "cross_ablation.png", dpi=110)
-    plt.close(fig)
+    finish(_OUT / "cross_ablation.png", dpi=110)
 
     print(f"wrote figures to {_OUT}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

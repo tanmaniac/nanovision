@@ -1,135 +1,106 @@
 # A1 - The transformer, from scratch (LLaMA-style)
 
-## Motivation
+The transformer replaced recurrence with attention, a content-based gather over a set of tokens that
+removes the sequential bottleneck of an RNN and puts any two tokens one hop apart. This assignment
+covers scaled dot-product attention and the stable softmax, multi-head attention with self-,
+cross-, and grouped-query variants, the causal mask, rotary position embedding (RoPE), RMSNorm and
+the SwiGLU feed-forward, and the pre-norm residual block that stacks into an encoder or a decoder.
 
-Before 2017, sequence modeling meant recurrence. An RNN, and its gated successors
-the LSTM and GRU, read a sequence one token at a time and carried a hidden state
-forward. That design has two costs that came to dominate everything. First, the
-computation is inherently sequential: to compute the state at position $t$ you must
-already have the state at $t-1$, so you cannot parallelize over the time axis, and a
-length-$n$ sequence takes $n$ sequential steps regardless of how many GPUs you have.
-Second, information from an early token reaches a late token only by passing
-through every intermediate state, an $O(n)$ path. Each hop multiplies by a recurrent
-weight and squashes through a nonlinearity, so gradients along that path shrink (or
-blow up) exponentially with distance. Long-range dependencies decay. The LSTM gate
-machinery was built specifically to slow that decay, and it helped, but it did not
-remove the fundamental n-step sequential bottleneck or the long path between
-distant tokens.
+Build the 2026 LLaMA-style transformer stack from scratch and assemble it into a decoder-only
+character language model. Implement the attention core, multi-head attention, the causal mask, RoPE,
+the two LLaMA-style primitives, and the pre-norm block. The encoder and decoder stacks, the absolute
+positional encodings kept for historical contrast, and the language-model assembly are provided.
+Everything runs on CPU in seconds to a few minutes.
 
-Attention entered as a patch on top of recurrence, not as a replacement. In
-neural machine translation circa 2014, an encoder RNN compressed the whole source
-sentence into one fixed vector that the decoder RNN had to unpack; long sentences
-overflowed that single vector. Bahdanau et al. (2014,
-[arxiv.org/abs/1409.0473](https://arxiv.org/abs/1409.0473)) added a soft alignment:
-at each decoding step the decoder computes a weighted average over all encoder
-states, with weights produced by a small learned scoring network, so it can look
-directly at the relevant source words instead of relying on one summary vector.
-This was "attention" as a content-based lookup, and it clearly worked, but it still
-sat on top of two RNNs that retained the sequential bottleneck.
+Required reading before starting:
+- Vaswani et al. 2017, "Attention Is All You Need",
+  [arXiv:1706.03762](https://arxiv.org/abs/1706.03762).
+- Su et al. 2021, "RoFormer: Enhanced Transformer with Rotary Position Embedding",
+  [arXiv:2104.09864](https://arxiv.org/abs/2104.09864).
+- Touvron et al. 2023, "LLaMA: Open and Efficient Foundation Language Models",
+  [arXiv:2302.13971](https://arxiv.org/abs/2302.13971).
 
-"Attention Is All You Need" (Vaswani et al., 2017,
-[arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)) took the obvious next
-step that nobody had committed to: throw out the recurrence entirely and keep only
-the attention. Removing recurrence bought two things. With no hidden-state chain, every position is
-computed independently and in parallel, so a sequence is one big matrix multiply
-instead of n sequential steps, which makes training at scale practical on
-GPUs. And any two tokens are now one attention hop apart regardless of how far
-apart they sit in the sequence, a constant path length, so long-range dependencies
-are modeled directly rather than surviving a long gauntlet of recurrent steps. The
-result was state-of-the-art BLEU on WMT English-German and
-English-French translation at a fraction of the training cost of the recurrent and
-convolutional systems it beat. Within a few years the same architecture, scaled up
-and trained on raw text, became GPT and BERT, and the decoder-only variant became
-the backbone of the entire LLM era.
+## Lecture notes
 
-Attention is a content-based gather over a set. Each
-query position emits a query vector, every position emits a key and a value, the
-query is compared against all keys by dot product to produce a weight per position,
-and the output is the weighted sum of the values. Because it operates on a set,
-attention is permutation-equivariant (shuffle the inputs and the outputs shuffle
-the same way), so raw attention has no notion of order. Order is
-reintroduced separately by positional encoding. Running several attention
-operations in parallel on different learned projections of the input gives
-multi-head attention, where each head can specialize in a different relation
-(syntactic agreement, coreference, local n-grams) in its own subspace.
+### Why attention replaced recurrence
 
-This assignment builds the 2026 LLaMA-style stack rather than the 2017 original,
-because the field converged on a handful of refinements that are now standard, and
-each one fixes a concrete problem with the original. Pre-norm (Xiong et al., 2020,
-[arxiv.org/abs/2002.04745](https://arxiv.org/abs/2002.04745)) puts the
-normalization inside the residual branch instead of after it, which keeps a clean
-identity path through the network and makes training stable without the learning-
-rate warmup the 2017 post-norm design needed. RMSNorm (Zhang & Sennrich, 2019,
-[arxiv.org/abs/1910.07467](https://arxiv.org/abs/1910.07467)) drops the mean
-subtraction and bias of LayerNorm, rescaling only by the root-mean-square; it is
-cheaper and matches LayerNorm quality. RoPE (Su et al., 2021,
-[arxiv.org/abs/2104.09864](https://arxiv.org/abs/2104.09864)) encodes position by
-rotating query and key channels by an angle proportional to position, so the
-attention score depends only on the relative offset between two tokens; this
-generalizes to longer contexts better than the learned absolute position table of
-the original. SwiGLU (Shazeer, 2020,
-[arxiv.org/abs/2002.05202](https://arxiv.org/abs/2002.05202)) replaces the GELU MLP
-with a gated SiLU feed-forward that beats the plain MLP at equal parameter count.
-Grouped-query attention (Ainslie et al., 2023,
-[arxiv.org/abs/2305.13245](https://arxiv.org/abs/2305.13245)) lets several query
-heads share one key/value head, which shrinks the KV-cache that dominates memory at
-inference time; one shared KV head is the multi-query limit. The combination of
-these in one model is the LLaMA recipe (Touvron et al., 2023,
-[arxiv.org/abs/2302.13971](https://arxiv.org/abs/2302.13971)), which is why we call
-it LLaMA-style. The 2017 components (LayerNorm, sinusoidal/learned absolute
-encodings, GELU MLP) stay in the code as selectable options so you can run the
-historical contrast.
+Before 2017, sequence modeling meant recurrence. A recurrent network, and its gated successors the
+LSTM and GRU, read a sequence one token at a time and carried a hidden state forward. That design has
+two costs that came to dominate. The computation is inherently sequential: to compute the state at
+position $t$ the state at $t-1$ must already exist, so a length-$n$ sequence takes $n$ sequential
+steps regardless of how many GPUs are available, and the time axis cannot be parallelized.
+Information from an early token reaches a late token only by passing through every intermediate state,
+an $O(n)$ path; each hop multiplies by a recurrent weight and squashes through a nonlinearity, so
+gradients along that path shrink or blow up exponentially with distance and long-range dependencies
+decay. The LSTM's gates were built specifically to slow that decay, and they helped, but they did not
+remove the $n$-step bottleneck or the long path between distant tokens.
 
-The block implemented here is reused by direct import of `nanovision.attention` and
-`nanovision.transformer` across most of the rest of the course. A2 (ViT) applies
-this exact transformer block to image patches instead of text tokens. A4 (CLIP)
-uses it as the text tower. A7 (the diffusion transformer, DiT) stacks these blocks with
-adaLN conditioning on the diffusion timestep. A8 (VLM) feeds visual tokens into a
-decoder-only stack just like the char-LM assembled here. A11.5c (BEVFormer)
-relies on the cross-attention path to pull image features into BEV queries. A13
-(the VLA policy capstone) is again a transformer over interleaved vision, language,
-and action tokens. Get the shapes and the gradient flow right once, here, on a
-problem small enough to verify exactly, and the rest of the course imports it.
+Attention entered as a patch on top of recurrence. In neural machine translation around 2014, an
+encoder RNN compressed the whole source sentence into one fixed vector that the decoder had to
+unpack, and long sentences overflowed that vector. Bahdanau et al. (2014,
+[arXiv:1409.0473](https://arxiv.org/abs/1409.0473)) added a soft alignment: at each decoding step the
+decoder computes a weighted average over all encoder states, with weights from a small learned
+scoring network, so it can look directly at the relevant source words instead of relying on one
+summary. This was attention as content-based lookup, and it worked, but it still sat on top of two
+RNNs and kept their sequential bottleneck.
 
-## Background
+"Attention Is All You Need" (Vaswani et al. 2017) removed the recurrence entirely and kept only the
+attention. With no hidden-state chain, every position is computed independently and in parallel, so a
+sequence is one matrix multiply instead of $n$ sequential steps, which makes training at scale
+practical on GPUs. Any two tokens are one attention hop apart regardless of their distance in the
+sequence, a constant path length, so long-range dependencies are modeled directly. The result was
+state-of-the-art translation at a fraction of the training cost of the recurrent and convolutional
+systems it beat. Scaled up and trained on raw text, the same architecture became GPT and BERT, and
+the decoder-only variant became the backbone of the LLM era.
 
-Scaled dot-product attention for queries $Q \in \mathbb{R}^{n\times d}$, keys
-$K \in \mathbb{R}^{m\times d}$, values $V \in \mathbb{R}^{m\times d}$:
+### Scaled dot-product attention
 
-$$\mathrm{Attention}(Q, K, V) = \operatorname{softmax}\!\left(\frac{Q K^\top}{\sqrt{d}} + M\right) V$$
+Attention is a content-based gather over a set. Each query position emits a query vector, every
+position emits a key and a value, the query is compared against all keys by dot product to produce a
+weight per position, and the output is the weighted sum of the values. For queries
+$Q \in \mathbb{R}^{n\times d}$, keys $K \in \mathbb{R}^{m\times d}$, and values
+$V \in \mathbb{R}^{m\times d}$:
 
-The $1/\sqrt{d}$ scale keeps the logits from growing with $d$ and saturating the
-softmax. $M$ is an optional additive mask, 0 to keep a position and $-\infty$ to forbid
-it, used for causality and padding. Compute the softmax stably by subtracting the
-per-row max before exponentiating.
+$$\operatorname{Attention}(Q, K, V) = \operatorname{softmax}\!\left(\frac{QK^\top}{\sqrt{d}} + M\right)V.$$
 
-The data flow, with shapes for one head (q is (B,H,Sq,Dh), k and v are
-(B,H,Sk,Dh)):
+Each output row is a convex combination of the value rows, weighted by how well that query matches
+each key. The $1/\sqrt{d}$ factor keeps the logits from growing with $d$ and saturating the softmax,
+where a saturated softmax would put almost all weight on one position and kill the gradient to the
+others. $M$ is an optional additive mask, 0 to keep a position and $-\infty$ to forbid it, added
+before the softmax so a forbidden entry gets zero weight; it carries causality and padding.
 
 ```mermaid
 flowchart LR
-    Q["q<br/>(B,H,Sq,Dh)"] --> S["q @ kᵀ / sqrt(Dh)<br/>scores (B,H,Sq,Sk)"]
-    K["k<br/>(B,H,Sk,Dh)"] --> S
-    M["+ mask<br/>(0 / -inf)"] --> S
+    Q["q (B,H,Sq,Dh)"] --> S["q kᵀ / sqrt(Dh)<br/>scores (B,H,Sq,Sk)"]
+    K["k (B,H,Sk,Dh)"] --> S
+    M["+ mask (0 / -inf)"] --> S
     S --> SM["softmax over Sk<br/>attn (B,H,Sq,Sk)"]
-    SM --> O["attn @ v<br/>out (B,H,Sq,Dh)"]
-    V["v<br/>(B,H,Sk,Dh)"] --> O
+    SM --> O["attn v<br/>out (B,H,Sq,Dh)"]
+    V["v (B,H,Sk,Dh)"] --> O
 ```
 
-Each output row is a convex combination of the value rows, with weights set by how
-well that query matches each key. The mask is added to the scores before the
-softmax, so a -inf entry sends its weight to zero.
+The softmax has to be computed stably. Exponentiating a large logit overflows; subtracting the
+per-row maximum before exponentiating shifts every logit to be at most zero, which changes nothing
+about the result (the shift cancels in the normalization) but keeps the exponentials in range.
 
-Multi-head attention splits the model dim into $h$ heads of size $d/h$, runs attention
-per head, concatenates, and applies an output projection. Self-attention takes K
-and V from the same input as Q; cross-attention takes K and V from a separate
-input (the encoder memory). Grouped-query attention projects K and V to fewer heads
-than Q (one KV head per group) and repeats each KV head across its query group
-before attending; n_kv_heads == 1 is multi-query.
+Because attention operates on a set, it is permutation-equivariant: shuffle the inputs and the
+outputs shuffle the same way, so raw attention has no notion of order. Order is reintroduced
+separately by positional encoding.
 
-GQA with n_heads=4 and n_kv_heads=2 groups the four query heads onto two shared
-key/value heads. Each KV head is repeated (repeat_interleave) to cover its two
-query heads before the dot product:
+### Multi-head attention
+
+Multi-head attention splits the model dimension into $h$ heads of size $d/h$, runs attention per head
+on its own learned projection of the input, concatenates the per-head outputs, and applies an output
+projection. Running several attention operations in parallel lets each head specialize in a different
+relation (syntactic agreement, coreference, local n-grams) in its own subspace. Self-attention takes
+keys and values from the same input as the queries; cross-attention takes them from a separate input,
+the encoder memory.
+
+Grouped-query attention (Ainslie et al. 2023,
+[arXiv:2305.13245](https://arxiv.org/abs/2305.13245)) projects the keys and values to fewer heads
+than the queries, one key/value head per group of query heads, and repeats each key/value head across
+its group before attending. With four query heads and two key/value heads, the four queries share two
+key/value heads:
 
 ```mermaid
 flowchart TB
@@ -145,18 +116,101 @@ flowchart TB
     KV1 --> Q3
 ```
 
-n_kv_heads == n_heads is ordinary multi-head (one KV head per query head);
-n_kv_heads == 1 shares a single KV head across all query heads (multi-query). Fewer
-KV heads means a smaller KV-cache at inference, which is the memory that dominates
+When the number of key/value heads equals the number of query heads this is ordinary multi-head
+attention; one shared key/value head is the multi-query limit. Fewer key/value heads means a smaller
+key/value cache at inference, the running store of past keys and values that dominates memory during
 long-context decoding.
 
-The block is pre-norm:
+### The causal mask
 
-$$h = x + \mathrm{Attn}(\mathrm{Norm}(x)), \qquad y = h + \mathrm{FFN}(\mathrm{Norm}(h))$$
+A decoder predicts each token from the tokens before it, so during training it must not attend to
+positions ahead of the current one. The causal mask is the additive mask $M$ that forbids this. As an
+$(S, S)$ matrix it is zero on and below the diagonal and $-\infty$ strictly above it, so query $i$
+may attend to key $j$ only when $j \le i$. For $S = 5$, with `.` a kept position and `x` a forbidden
+one:
 
-Each sub-layer normalizes its input, runs the mechanism, and adds the result back
-to the un-normalized input, so an identity path runs straight down the residual
-stream and the norm only ever touches the branch:
+```text
+          key j
+        0  1  2  3  4
+query 0 .  x  x  x  x
+  i   1 .  .  x  x  x
+      2 .  .  .  x  x
+      3 .  .  .  .  x
+      4 .  .  .  .  .
+```
+
+Keeping the strict upper triangle of an all-$-\infty$ matrix produces exactly the forbidden entries;
+added to the scores, those positions get zero softmax weight, so position $i$ never sees the future.
+
+### Rotary position embedding
+
+The 2017 transformer added position with a fixed sinusoidal table or a learned absolute one. RoPE
+(Su et al. 2021) instead rotates pairs of query and key channels by an angle proportional to
+position. Each pair of channels becomes a 2D vector, rotated by an angle $m\theta$ that grows with
+the position $m$:
+
+$$q' = q\odot\cos + \operatorname{rotate-half}(q)\odot\sin,$$
+
+where rotate-half splits the last dimension into two halves $(x_1, x_2)$ and returns $(-x_2, x_1)$,
+and the cosine and sine angles come from an outer product of the positions with the inverse
+frequencies $\theta_i = \text{base}^{-i/(\text{half})}$. The head dimension must be even so the
+channels pair up.
+
+The reason it works is the dot product. A query at position $m$ and a key at position $n$, each
+rotated by their own position, have a dot product that depends only on the relative offset $m - n$.
+Absolute-position rotation produces relative-position attention scores, which generalizes to longer
+contexts better than a fixed-size learned table.
+
+```mermaid
+flowchart LR
+    Q["query pair at position m"] -->|"rotate by m·θ"| QR["q′"]
+    K["key pair at position n"] -->|"rotate by n·θ"| KR["k′"]
+    QR --> D["q′ · k′ depends on (m - n)·θ"]
+    KR --> D
+```
+
+Different channel pairs use different $\theta$, so a head encodes a range of relative-offset
+frequencies at once.
+
+### RMSNorm
+
+RMSNorm (Zhang, Sennrich 2019, [arXiv:1910.07467](https://arxiv.org/abs/1910.07467)) drops the mean
+subtraction and the bias of layer normalization, rescaling only by the root-mean-square over the last
+axis times a learned gain:
+
+$$\operatorname{rms}(x) = \sqrt{\tfrac{1}{d}\textstyle\sum_i x_i^2 + \varepsilon}, \qquad
+y = \frac{x}{\operatorname{rms}(x)}\,\gamma.$$
+
+It is cheaper than layer norm and matches its quality. Dropping the mean subtraction rests on the
+observation that the rescaling, not the recentering, is what stabilizes training, so the recentering
+can go.
+
+### SwiGLU
+
+SwiGLU (Shazeer 2020, [arXiv:2002.05202](https://arxiv.org/abs/2002.05202)) replaces the GELU MLP
+with a gated feed-forward. Two linear maps run in parallel on the input; one is passed through SiLU
+and multiplies the other elementwise as a gate, and a third linear projects back down:
+
+$$\operatorname{SwiGLU}(x) = \big(\operatorname{silu}(W_{\text{gate}}\,x)\odot(W_{\text{up}}\,x)\big)W_{\text{down}},
+\qquad \operatorname{silu}(z) = z\,\sigma(z).$$
+
+The three linear layers are bias-free. The inner width is set to about $8/3$ of the model dimension,
+rounded to a multiple of 8, so the parameter count matches a $4\times$ GELU MLP; the gating splits
+the usual single up-projection into two, and the $8/3$ factor keeps the total the same. SwiGLU beats
+the plain MLP at equal parameter count.
+
+### The pre-norm block
+
+The transformer block stacks two sub-layers, attention and the feed-forward, each wrapped in a
+residual connection. The 2017 original normalized after each sub-layer (post-norm), which needed a
+learning-rate warmup to train stably. The modern block normalizes inside the residual branch instead
+(pre-norm, Xiong et al. 2020, [arXiv:2002.04745](https://arxiv.org/abs/2002.04745)):
+
+$$h = x + \operatorname{Attn}(\operatorname{Norm}(x)), \qquad y = h + \operatorname{FFN}(\operatorname{Norm}(h)).$$
+
+Each sub-layer normalizes its input, runs the mechanism, and adds the result back to the
+un-normalized input, so a clean identity path runs straight down the residual stream and the norm only
+ever touches the branch. That identity path is what makes deep stacks train without warmup.
 
 ```mermaid
 flowchart TB
@@ -171,173 +225,128 @@ flowchart TB
     ADD2 --> Y["y (B,S,dim)"]
 ```
 
-With cross-attention enabled, a cross-attention sub-layer (attending to kv) sits
-between the self-attention and FFN sub-layers, each with its own pre-norm and
-residual.
+With cross-attention enabled, a third sub-layer attending to the encoder memory sits between the
+self-attention and the feed-forward, each with its own pre-norm and residual.
 
-RMSNorm rescales by the root-mean-square over the last axis with a learned gain and
-no mean subtraction or bias:
+### The LLaMA recipe
 
-$$\mathrm{rms}(x) = \sqrt{\tfrac{1}{d}\textstyle\sum_i x_i^2 + \epsilon}, \qquad y = \frac{x}{\mathrm{rms}(x)}\,\gamma$$
+This assignment builds the 2026 LLaMA-style stack rather than the 2017 original, because the field
+converged on a handful of refinements that each fix a concrete problem with the original: pre-norm
+for stable training without warmup, RMSNorm for a cheaper norm, RoPE for relative position that
+extrapolates to longer contexts, SwiGLU for a stronger feed-forward at equal parameters, and
+grouped-query attention for a smaller inference cache. The combination is the LLaMA recipe (Touvron
+et al. 2023). The 2017 components (layer norm, sinusoidal and learned absolute encodings, the GELU
+MLP) stay in the code as selectable options for the historical contrast.
 
-The causal mask is the additive mask M for a decoder: query i may attend to key j
-only when j <= i. As an (S,S) matrix for S=5, with `.` a kept position (0) and `x`
-a forbidden one (-inf), it is lower-triangular including the diagonal:
+Shapes through the stack: tensors are $(\text{batch}, \text{seq}, \text{dim})$ at module boundaries,
+$(\text{batch}, \text{heads}, \text{seq}, \text{head dim})$ inside attention, and the attention
+weights are $(\text{batch}, \text{heads}, \text{seq}_q, \text{seq}_k)$.
 
-```text
-          key j
-        0  1  2  3  4
-query 0 .  x  x  x  x
-  i   1 .  .  x  x  x
-      2 .  .  .  x  x
-      3 .  .  .  .  x
-      4 .  .  .  .  .
+## The assignment
+
+Implement seven mechanism bodies and let the provided language-model assembly tie them together. Each
+task maps to one `NotImplementedError` in a top-level file and to one test. The docstrings in each
+file give the exact signatures, shapes, and step-by-step recipes; read those in the files rather than
+here.
+
+### Files to modify
+
+`attention.py` holds the attention core. Implement `scaled_dot_product_attention` (the gather and the
+stable softmax from the attention section) and `MultiHeadAttention.forward` (the head split and
+merge, the self-versus-cross choice, and the grouped-query head repeat from the multi-head section).
+
+`transformer.py` holds the block and the positional schemes. Implement `build_causal_mask` (the
+additive mask from the causal-mask section), `apply_rope` (the rotation from the RoPE section), and
+`TransformerBlock.forward` (the pre-norm residual sub-layers from the pre-norm section, two for an
+encoder block and three with cross-attention). The encoder and decoder stacks, the provided
+RoPE-attention wrapper that calls `apply_rope`, and the sinusoidal and learned absolute encodings are
+given.
+
+`primitives.py` holds the two LLaMA-style primitives. Implement `RMSNorm.forward` (the RMSNorm
+section) and `SwiGLU.forward` (the SwiGLU section). Layer norm, GELU, and the MLP come from the
+harness assignment through `nanovision.primitives`.
+
+The character language model in `charlm.py` is a token embedding, a stack of causal RoPE/RMSNorm/
+SwiGLU blocks, a final norm, and a projection to vocabulary logits. It is provided; once the seven
+holes are filled it overfits a single batch as the end-to-end integration check.
+
+### Running and validating
+
+Activate the environment (`conda activate nanovision`), then run from the repo root:
+
+```
+make test   A=a01_transformer   # run the tests against the top-level files (the ones with holes)
+make verify A=a01_transformer   # run the same tests against the reference solution/
+make viz    A=a01_transformer   # render the figures from the reference solution
 ```
 
-`torch.triu(full(-inf), diagonal=1)` produces exactly the `x` entries (strictly
-above the diagonal); added to the scores, those positions get zero softmax weight,
-so position i never sees the future.
+`make test` is the command to run while working. It runs the suite in
+`assignments/a01_transformer/tests/` against the top-level files and goes from red (the holes raise
+`NotImplementedError`) to green as they are filled. `make verify` runs the identical suite against
+the reference in `solution/`: it sets `NANOVISION_IMPL=solution`, so it imports the reference instead
+of the top-level files and is green from the start, showing the target. The goal is to bring `make
+test` to the same green as `make verify`. The reference is visible in `solution/attention.py`,
+`solution/transformer.py`, and `solution/primitives.py`; read it if stuck.
 
-RoPE rotates pairs of channels of Q and K by an angle proportional to position, so
-the dot product of a rotated query and key depends only on their relative offset:
+The tests run in the order that doubles as the workflow:
 
-$$q' = q\odot\cos + \text{rotate-half}(q)\odot\sin$$
+- `tests/test_shapes.py` checks the output shapes for all seven holes.
+- `tests/test_gradcheck.py` runs the float64 gradient check on attention, multi-head attention
+  (including grouped-query), RMSNorm, and SwiGLU.
+- `tests/test_attention_reference.py` uses one-hot keys so attention selects a single value, and
+  checks the output against the exact expected value.
+- `tests/test_causal.py` checks that causal attention zeros the upper triangle and matches an
+  explicit-mask reference.
+- `tests/test_overfit.py` drives the assembled character language model to cross-entropy below 0.05
+  in 500 steps on CPU.
+- `tests/test_forbidden_imports.py` checks that the top-level files, the solution, and the shared-
+  library shims use no `nn.MultiheadAttention`, `nn.Transformer*`, or
+  `F.scaled_dot_product_attention` in actual code; the point is to build the mechanism, so mentions
+  in comments and docstrings are allowed.
 
-where rotate_half splits the last dim in two halves $(x_1, x_2)$ and returns $(-x_2, x_1)$,
-and the cos/sin angles come from inv_freq = base^(-arange(half)/half) outer-product
-position. head_dim must be even.
+`make viz` renders from the reference solution and writes `out/causal_attention.png` (a causal
+attention heatmap showing the lower-triangular weight pattern) and `out/charlm_loss.png` (the
+overfit loss curve). It writes PNGs rather than opening windows: the plots use matplotlib's headless
+Agg backend, so the command behaves the same over SSH, in WSL, and in CI with no display. `make
+viz-mine A=a01_transformer` renders the same figures from the top-level code, for checking a finished
+implementation; it needs the holes filled. Add `SHOW=1` to either to also open interactive windows
+when a display is available.
 
-RoPE turns each pair of channels into a 2D vector and rotates it by an angle
-$m\theta$ that grows with the position $m$. A query at position $m$ and a key at position $n$,
-each rotated by their own position, have a dot product that depends only on $m - n$,
-which is how absolute-position rotation encodes relative position:
+What you should see when you run this. The overfit test uses dimension 64, 4 heads, depth 2, sequence
+length 32, batch 8, Adam at learning rate $3\times10^{-3}$, 500 steps, and reaches cross-entropy
+about 0.013, comfortably under the 0.05 threshold, so the loss curve drops steeply and flattens near
+zero. A flat curve usually means a wrong mechanism, most often the causal mask or a misplaced
+residual, not a tuning problem. The gradient check runs at float64 with dropout off, and RoPE
+requires an even head dimension. These are toy artifacts on a tiny model and a single batch; they
+confirm the mechanism runs end to end and say nothing about quality at scale.
 
-```mermaid
-flowchart LR
-    Q["query channel pair<br/>at position m"] -->|"rotate by m·θ"| QR["q′"]
-    K["key channel pair<br/>at position n"] -->|"rotate by n·θ"| KR["k′"]
-    QR --> D["q′ · k′<br/>depends on (m - n)·θ"]
-    KR --> D
-```
+## Additional reference material
 
-Different channel pairs use different $\theta$ (from inv_freq), so the head encodes a range
-of relative-offset frequencies at once.
+The block built here is imported by direct reference to `nanovision.attention` and
+`nanovision.transformer` across most of the rest of the course. The vision transformer (A2) applies
+this exact block to image patches instead of text tokens. CLIP (A4) uses it as the text tower. The
+diffusion transformer (A7) stacks these blocks with conditioning on the diffusion timestep. The
+vision-language model (A8) feeds visual tokens into a decoder-only stack like the language model
+assembled here. BEVFormer (A11.5c) uses the cross-attention path to pull image features into
+bird's-eye-view queries. The vision-language-action policy (A13) is again a transformer over
+interleaved vision, language, and action tokens.
 
-SwiGLU is a gated SiLU feed-forward:
+Full reference list:
 
-$$\mathrm{SwiGLU}(x) = \big(\operatorname{silu}(W_{\text{gate}}\,x)\odot(W_{\text{up}}\,x)\big)\,W_{\text{down}}, \qquad \operatorname{silu}(z) = z\,\sigma(z)$$
-
-The three linear layers are bias-free. The inner width is set to about $8/3$ of dim
-(then rounded to a multiple of 8) so the parameter count matches a 4x GELU MLP.
-
-Shapes: tensors are (batch, seq, dim) at module boundaries, (batch, heads, seq,
-head_dim) inside attention, and attention weights are (batch, heads, seq_q, seq_k).
-
-## What to implement
-
-Seven holes:
-
-- `scaled_dot_product_attention` and `MultiHeadAttention.forward` in
-  `attention.py`.
-- `build_causal_mask`, `apply_rope`, and `TransformerBlock.forward` in
-  `transformer.py`.
-- `RMSNorm.forward` and `SwiGLU.forward` in `primitives.py`.
-
-The encoder/decoder stacks, the RoPE attention wrapper, the sinusoidal and learned
-absolute positional encodings, and the char-LM assembly are provided. Only the
-seven mechanism bodies are left to implement.
-
-## Tasks
-
-Each task maps 1:1 to a `raise NotImplementedError(...)` in the top-level module files and 1:1 to a
-test.
-
-1. `scaled_dot_product_attention` (`attention.py`): given q,k,v of shape
-   (B,H,Sq,Dh)/(B,H,Sk,Dh) and an optional additive mask, return (out, attn) with
-   out (B,H,Sq,Dh) and attn (B,H,Sq,Sk). Subtract the row max before exp. The core
-   gather and the stable softmax.
-2. `MultiHeadAttention.forward` (`attention.py`): project x (and kv if
-   cross-attention) to Q,K,V; split heads; repeat_interleave KV heads for GQA; call
-   Task 1; merge heads; output projection. Self-vs-cross is just where K,V come
-   from; GQA shares KV across query groups.
-3. `build_causal_mask` (`transformer.py`): additive (S,S) mask, -inf above
-   the diagonal (use torch.triu(..., diagonal=1)). Why a decoder cannot see the
-   future.
-4. `apply_rope` (`transformer.py`): rotate q,k by position. Relative
-   position as rotation; the modern positional scheme.
-5. `RMSNorm.forward` (`primitives.py`): rescale by RMS times a learned
-   gain. The LLaMA-style norm and why mean subtraction is dropped.
-6. `SwiGLU.forward` (`primitives.py`): gated SiLU feed-forward. The gated
-   FFN used across the modern stack.
-7. `TransformerBlock.forward` (`transformer.py`): the two (or three, with
-   cross-attention) pre-norm residual sub-layers. Residual + norm placement; the
-   block is the unit reused everywhere.
-
-## How to verify
-
-From the repo root with the `nanovision` env active:
-
-    make test A=a01_transformer     # your top-level code (red until the holes are filled)
-
-The tests run in this order, which is also the intended workflow:
-
-1. `tests/test_shapes.py` - output shapes for Tasks 1-7 (shape).
-2. `tests/test_gradcheck.py` - float64 `check_gradients` on SDPA, MHA (including
-   GQA), RMSNorm, SwiGLU (gradcheck).
-3. `tests/test_attention_reference.py` - one-hot keys so attention selects a single
-   value; exact expected output (reference-value).
-4. `tests/test_causal.py` - causal attention zeroes the upper triangle and matches
-   an explicit-mask reference (reference-value).
-5. `tests/test_overfit.py` - the assembled char-LM overfits one batch to
-   cross-entropy < 0.05 in 500 steps on CPU (overfit-one-batch).
-6. `tests/test_forbidden_imports.py` - the top-level files, the solution, and the
-   `nanovision/` shims use no `nn.MultiheadAttention` / `nn.Transformer*` /
-   `F.scaled_dot_product_attention` in actual code (mentions in comments and
-   docstrings are allowed).
-
-To confirm the reference passes and render the figures:
-
-    make verify A=a01_transformer   # reference solution (should be green)
-    make viz    A=a01_transformer   # writes out/causal_attention.png, out/charlm_loss.png
-
-The reference implementation is visible in `solution/attention.py`,
-`solution/transformer.py`, and `solution/primitives.py`; read it if you get
-stuck.
-
-## Compute notes
-
-CPU only, seconds to a few minutes; no GPU needed. The overfit test uses dim 64, 4
-heads, depth 2, seq 32, batch 8, Adam lr 3e-3, 500 steps, and reaches cross-entropy
-about 0.013, comfortably under the 0.05 threshold. A flat loss curve usually means
-a wrong mechanism (most often the causal mask or a misplaced residual), not a
-tuning problem. gradcheck runs at float64 with dropout off; RoPE requires an even
-head_dim.
-
-## Stretch goals
-
-1. KV-cache for autoregressive generation; measure the speedup.
-2. Pre-norm vs post-norm: train both and plot the stability difference.
-3. Swap RoPE for sinusoidal on the copy/sort task and compare.
-4. Multi-query vs grouped-query vs full multi-head: parameter count and quality.
-
-## Further reading
-
-- Bahdanau et al., "Neural Machine Translation by Jointly Learning to Align and
-  Translate" (2014, [arxiv.org/abs/1409.0473](https://arxiv.org/abs/1409.0473)) -
-  attention as soft alignment on top of an RNN encoder-decoder.
-- Vaswani et al., "Attention Is All You Need" (2017,
-  [arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)) - the original
-  recurrence-free transformer.
-- Su et al., "RoFormer" (2021,
-  [arxiv.org/abs/2104.09864](https://arxiv.org/abs/2104.09864)) - rotary position
+- Bahdanau et al. 2014, "Neural Machine Translation by Jointly Learning to Align and Translate",
+  [arXiv:1409.0473](https://arxiv.org/abs/1409.0473). Attention as soft alignment on top of an RNN
+  encoder-decoder.
+- Vaswani et al. 2017, "Attention Is All You Need",
+  [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). The original recurrence-free transformer.
+- Su et al. 2021, "RoFormer", [arXiv:2104.09864](https://arxiv.org/abs/2104.09864). Rotary position
   embedding.
-- Zhang & Sennrich, "Root Mean Square Layer Normalization" (2019,
-  [arxiv.org/abs/1910.07467](https://arxiv.org/abs/1910.07467)) - RMSNorm.
-- Shazeer, "GLU Variants Improve Transformer" (2020,
-  [arxiv.org/abs/2002.05202](https://arxiv.org/abs/2002.05202)) - SwiGLU.
-- Ainslie et al., "GQA" (2023,
-  [arxiv.org/abs/2305.13245](https://arxiv.org/abs/2305.13245)) - grouped-query
-  attention.
-- Touvron et al., "LLaMA" (2023,
-  [arxiv.org/abs/2302.13971](https://arxiv.org/abs/2302.13971)) - the stack this
+- Zhang, Sennrich 2019, "Root Mean Square Layer Normalization",
+  [arXiv:1910.07467](https://arxiv.org/abs/1910.07467). RMSNorm.
+- Shazeer 2020, "GLU Variants Improve Transformer",
+  [arXiv:2002.05202](https://arxiv.org/abs/2002.05202). SwiGLU.
+- Xiong et al. 2020, "On Layer Normalization in the Transformer Architecture",
+  [arXiv:2002.04745](https://arxiv.org/abs/2002.04745). Pre-norm versus post-norm.
+- Ainslie et al. 2023, "GQA: Training Generalized Multi-Query Transformer Models",
+  [arXiv:2305.13245](https://arxiv.org/abs/2305.13245). Grouped-query attention.
+- Touvron et al. 2023, "LLaMA", [arXiv:2302.13971](https://arxiv.org/abs/2302.13971). The stack this
   assignment builds.

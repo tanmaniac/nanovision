@@ -11,7 +11,7 @@ Two assertions:
   1. With cross-attention on, the normalized pointmap error falls below a measured threshold.
   2. Disabling cross-attention (zeroing the cross memory) raises the pointmap-error floor.
 
-Thresholds are set from measurement (see compute_notes in ASSIGNMENT.md); this is a bounded
+Thresholds are set from measurement (see the README's validation section); this is a bounded
 training run on CPU, ~2500 Adam steps on 8 tiny pairs.
 """
 

@@ -4,7 +4,7 @@ End-to-end signal: with random_masking, append_mask_tokens, and mae_loss all
 correct, the full encode -> decode -> masked-MSE pipeline memorizes a single fixed
 batch of synthetic images. The mask pattern is held fixed across steps (the loop
 re-seeds before each forward) so this is a clean memorization signal: the masked-
-patch MSE drops well below 0.05 (see solution_notes in ASSIGNMENT).
+patch MSE drops well below 0.05 (see the README's validation section).
 """
 
 import torch

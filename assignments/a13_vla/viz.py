@@ -26,10 +26,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
@@ -99,8 +96,7 @@ def panel_reacher_rollouts(cfg, dev, demos):
         axes[r, 0].set_ylabel(label)
     fig.suptitle("Reacher controlled from 64x64 pixels: flow vs BC action head reaching the target")
     fig.tight_layout()
-    fig.savefig(_OUT / "reacher_rollouts.png", dpi=110)
-    plt.close(fig)
+    finish(_OUT / "reacher_rollouts.png", dpi=110)
 
 
 def panel_chunk_ablation(cfg, dev, demos, Hs=(1, 4, 8), seeds=(0, 1)):
@@ -126,8 +122,7 @@ def panel_chunk_ablation(cfg, dev, demos, Hs=(1, 4, 8), seeds=(0, 1)):
     ax.set_title("Chunk-size ablation: BC from pixels vs random (per-seed spread)")
     ax.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(_OUT / "chunk_ablation.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "chunk_ablation.png")
     print("chunk ablation (BC from pixels) H=", list(Hs), "success:", [round(m, 3) for m in means],
           "std:", [round(s, 3) for s in stds], "random floor:", round(rand, 3))
     return means, stds, rand
@@ -166,8 +161,7 @@ def panel_multimodal(cfg, dev):
     ax.legend(fontsize=8)
     ax.set_aspect("equal")
     fig.tight_layout()
-    fig.savefig(_OUT / "multimodal.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "multimodal.png")
     print(f"point-mass multimodal: BC averaged |action|={np.linalg.norm(bc_a):.4f}  "
           f"flow sample spread std={samples.std(0).mean():.4f}")
 
@@ -197,8 +191,7 @@ def panel_flow_path(cfg, dev, demos):
     ax.set_title("Flow-matching ODE path: noise transported to the torque chunk")
     ax.legend(fontsize=7)
     fig.tight_layout()
-    fig.savefig(_OUT / "flow_path.png", dpi=120)
-    plt.close(fig)
+    finish(_OUT / "flow_path.png")
 
 
 def main():
@@ -221,3 +214,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

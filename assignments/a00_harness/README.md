@@ -1,271 +1,242 @@
 # A0 - Harness and primitives
 
-## Motivation
+This course is organized around one rule: prove a mechanism is correct on a tiny problem before
+running it in real training. This assignment builds the two correctness checks that make that rule
+operational, and builds them alongside the three primitives every transformer block is made of:
+layer normalization, the GELU activation, and the position-wise MLP. The first check is a gradient
+test that compares autograd against a finite-difference estimate at double precision; the second is
+overfit-one-batch, which trains a model on a single fixed batch until the loss reaches zero. The
+primitives come first because they are the smallest pieces the rest of the course reuses.
 
-This course is organized around one rule: prove a mechanism is correct on a tiny
-problem before ever running it in real training. A0 builds the tools that make that rule
-operational, and it builds them on the three primitives every transformer block is
-made of. This first assignment is about the course's method as much as about
-LayerNorm and GELU.
+Build the harness and the three primitives from low-level operations. Implement the exact GELU,
+layer normalization from mean and variance, the two-layer MLP, and one optimization step of a
+generic training loop. The gradient checker, the determinism helpers, the toy datasets, and the
+loss-curve plotting are provided. Everything runs on CPU in seconds.
 
-The method exists because of how training failures actually present themselves. When a
-forward pass has a subtle bug - a normalization over the wrong
-axis, a transposed weight, a broadcast that silently does the wrong thing - the
-program does not crash. It produces tensors of the right shape and a loss that goes
-down a little and then plateaus. All that is left is a loss curve, a single scalar
-per step, from which to infer which of dozens of lines is wrong. Each
-hypothesis costs a training run. This is the most expensive way to debug code that
-exists, and it is the default workflow people fall into. The course refuses it: we
-make correctness observable directly, at the level of the operation, before any
-optimizer touches a parameter.
+Required reading before starting:
+- Ba, Kiros, Hinton 2016, "Layer Normalization",
+  [arXiv:1607.06450](https://arxiv.org/abs/1607.06450).
+- Hendrycks, Gimpel 2016, "Gaussian Error Linear Units (GELUs)",
+  [arXiv:1606.08415](https://arxiv.org/abs/1606.08415).
 
-Two checks carry that weight, and both are built here.
+## Lecture notes
 
-The first is `check_gradients`, a thin wrapper over
+### Why verify before training
+
+Training failures rarely announce themselves. A forward pass with a subtle bug - a normalization
+over the wrong axis, a transposed weight, a broadcast that silently does the wrong thing - does not
+crash. It produces tensors of the right shape and a loss that drops a little and then plateaus. The
+only evidence left is a loss curve, one scalar per step, from which to infer which of dozens of
+lines is wrong, and each hypothesis costs a training run. That is the most expensive way to debug
+that exists. The alternative is to make correctness observable at the level of the operation, before
+any optimizer touches a parameter. Two checks carry that load.
+
+The first is a gradient check, a thin wrapper over
 [`torch.autograd.gradcheck`](https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html).
-It casts a tiny instance of your module to float64, then compares the gradients
-autograd computes against a numerical estimate obtained by perturbing each input by
-a small `eps` and measuring the change in the output (a finite difference). If the
-two agree to tight tolerance, your `forward` is differentiably correct: the
-function you wrote is the function whose derivative autograd is propagating, with no
-silent reshape or wrong-axis reduction in between. The float64 part matters. The
-finite-difference estimate has truncation error that shrinks with `eps` and
-floating-point error that grows as `eps` shrinks; in float32 those two error
-sources leave no `eps` where the estimate is sharp, and the check is too loose to
-catch real bugs. In float64 there is a wide window where the numerical gradient is
-accurate to many digits, so agreement is close to a proof that your hand-written
-forward is correct, and that holds without writing a single line of backward
-pass. The mechanism forward is implemented, and gradcheck certifies the gradient
-for free.
+It casts a small instance of a module to float64, then compares the gradients autograd computes
+against a numerical estimate obtained by perturbing each input by a small $\varepsilon$ and measuring
+the change in the output, a finite difference. If the two agree to tight tolerance, the forward is
+differentiably correct: the function written is the function whose derivative autograd is
+propagating, with no silent reshape or wrong-axis reduction in between. Agreement is close to a proof
+that the hand-written forward is correct, and it holds without writing a single line of backward
+pass.
 
-The second is overfit-one-batch, driven by `Trainer.overfit_one_batch`. It takes
-one fixed batch and trains on it, and only it, until the loss reaches approximately
-zero. A model with enough capacity to represent the batch *must* be able to
-memorize it; if it cannot, something in the model-plus-training-loop wiring is
-broken. This is the canonical first signal in the course that an end-to-end system
-is correct, and it is diagnostic in a specific way. A loss that falls smoothly to
-~0 means the forward pass, the loss, the backward pass, and the optimizer step are
-all connected and the gradients point downhill. A loss that stays flat from step
-one usually means the optimization step itself is broken (a missing
-`zero_grad`, `backward`, or `optimizer.step`), so no parameter is actually moving.
-A loss that drops a bit and then stalls points at the model: insufficient capacity,
-a dead activation, a detached tensor cutting the graph. Because the batch is fixed
-and noiseless, generalization is not a confound; the only thing being tested is
-whether the machine can fit data it has full capacity to fit. Throughout the
-course, when an assignment says "a flat curve here is expected, not a bug" (the
-12GB ceiling means some topics never get a real training run), overfit-one-batch
-tells you the difference between a flat curve from a correct-but-underpowered run
-and a flat curve from a wiring mistake.
+Float64 is what makes the check sharp. The finite-difference estimate has two error sources:
+truncation error that shrinks as $\varepsilon$ shrinks, and floating-point error that grows as
+$\varepsilon$ shrinks. In float32 those two leave no value of $\varepsilon$ where the estimate is
+accurate, and the check is too loose to catch real bugs. In float64 there is a wide window where the
+numerical gradient is accurate to many digits, so the comparison is tight enough to expose a wrong
+reduction axis or a dropped term.
 
-The primitives built alongside these tools are the right first mechanisms
-because every transformer block in the rest of the course is exactly these three
-plus attention. LayerNorm normalizes each sample's activations across the feature
-dimension to zero mean and unit variance, then rescales by a learned gain and
-shift. It lets deep stacks train: without it, the scale of activations
-drifts layer to layer and gradients explode or vanish. Ba, Kiros and Hinton
-introduced it in
-[Layer Normalization](https://arxiv.org/abs/1607.06450) (2016) specifically because
-batch normalization's per-batch statistics are awkward for recurrent and
-sequence models; layer norm computes its statistics per sample, over the features,
-so it is independent of batch size and identical at train and test time. That
-property makes the pre-norm residual block - normalize, sublayer, add -
-the standard structure you will build in A1 and reuse everywhere after.
+The second check is overfit-one-batch. Take one fixed batch and train on it, and only it, until the
+loss reaches approximately zero. A model with enough capacity to represent that batch must be able to
+memorize it; if it cannot, something in the model-plus-loop wiring is broken. The signal is
+diagnostic in a specific way. A loss that falls smoothly to zero means the forward pass, the loss,
+the backward pass, and the optimizer step are all connected and the gradients point downhill. A loss
+that stays flat from step one usually means the optimization step itself is broken, a missing
+gradient reset, backward call, or optimizer update, so no parameter actually moves. A loss that drops
+a bit and then stalls points at the model: insufficient capacity, a dead activation, a detached
+tensor cutting the graph. Because the batch is fixed and noiseless, generalization is not a confound;
+the only thing tested is whether the machine can fit data it has full capacity to fit.
 
-GELU is the activation. Hendrycks and Gimpel proposed it in
-[Gaussian Error Linear Units (GELUs)](https://arxiv.org/abs/1606.08415) (2016) as a
-smooth gate: instead of ReLU's hard cutoff at zero, GELU multiplies each input by
-the probability that a standard Gaussian is below it, $x\,\Phi(x)$, which weights an
-input by how large it is rather than thresholding it. The smoothness gives nonzero
-gradient on both sides of the origin, and the exact form uses the error function,
-$x \cdot \tfrac{1}{2}\big(1 + \operatorname{erf}(x/\sqrt{2})\big)$. The paper also gives a tanh approximation that
-predates fast vectorized `erf`; we implement the exact form because `torch.erf` is
-fast and exact, and because matching the exact definition keeps the primitive
-unambiguous. GELU is the activation inside the transformer's MLP.
-
-The MLP is that per-token computation: two linear layers with the activation
-between them, applied independently to every position. Attention moves information
-between tokens; the MLP is where each token is transformed on its own, and it holds
-the majority of a transformer's parameters. Building it here as a reusable
-`nn.Module` means A1 can drop it into the block without rewriting it.
-
-A1 imports `LayerNorm`, `gelu`, and `MLP` from
-`nanovision.primitives` to assemble the transformer block (it also adds `RMSNorm`
-and `SwiGLU` to the same module for the LLaMA-style default). Every assignment from
-A1 onward verifies its new mechanism with `check_gradients` and proves its
-model-plus-loop with `overfit_one_batch`, both built here. The `Trainer`, the
-determinism helpers, and the loss-curve viz are reused unchanged for the rest of
-the course. These are the instruments, built before the experiments.
-
-The method is a fixed sequence of cheap-to-expensive checks. Each gate catches a
-different class of bug before the next one runs, so you never spend a real training
-run finding something a shape assertion would have caught:
+The two checks form a fixed sequence of cheap-to-expensive gates. A shape check runs first and
+catches axis and broadcast mistakes for almost no cost. The gradient check runs next and certifies
+the forward is differentiably correct. Overfit-one-batch runs last and proves the whole loop.
 
 ```mermaid
 flowchart LR
-    A["shape check<br/>(test_shapes.py)"] -->|"output shape and<br/>stats correct"| B["gradcheck<br/>(test_gradcheck.py)"]
-    B -->|"autograd grad matches<br/>finite difference at fp64"| C["overfit one batch<br/>(test_overfit.py)"]
-    C -->|"loss to ~0 on a<br/>fixed noiseless batch"| D["real run"]
-    A -.->|"wrong axis or<br/>broadcast"| X["fix forward"]
-    B -.->|"silent reshape or<br/>wrong-axis reduction"| X
-    C -.->|"flat curve = wiring;<br/>stall = model/loss"| X
+    A["shape check"] -->|"output shape and stats correct"| B["gradient check"]
+    B -->|"autograd matches finite difference at fp64"| C["overfit one batch"]
+    C -->|"loss to ~0 on a fixed noiseless batch"| D["real run"]
+    A -.->|"wrong axis or broadcast"| X["fix forward"]
+    B -.->|"silent reshape or wrong-axis reduction"| X
+    C -.->|"flat curve = wiring; stall = model/loss"| X
     X -.-> A
 ```
 
-## Background
+### Layer normalization
 
-LayerNorm over the last dimension. Given `x` of shape `(..., dim)`, take the mean
-and biased variance over the last axis (keeping the dimension for broadcasting):
+Layer normalization (Ba, Kiros, Hinton 2016) normalizes each sample's activations across the feature
+dimension to zero mean and unit variance, then rescales by a learned gain and shift. For an input $x$
+with feature dimension $d$, taking the mean and biased variance over the last axis:
 
-    mean = x.mean(-1, keepdim=True)              # (..., 1)
-    var  = x.var(-1, keepdim=True, unbiased=False)  # (..., 1), divides by dim
-    y    = (x - mean) / sqrt(var + eps) * weight + bias
+$$\mu = \frac{1}{d}\sum_i x_i, \qquad \sigma^2 = \frac{1}{d}\sum_i (x_i - \mu)^2, \qquad
+y = \frac{x - \mu}{\sqrt{\sigma^2 + \varepsilon}}\,\gamma + \beta.$$
 
-`weight` and `bias` are learned parameters of shape `(dim,)`, initialized to ones
-and zeros, so a freshly constructed LayerNorm outputs zero mean and unit standard
-deviation over the last axis. `eps` (default `1e-5`) guards the divide. Output
-shape equals input shape. Use `unbiased=False`; the biased variance (dividing by
-`dim`, not `dim-1`) is the standard layer-norm convention.
+The gain $\gamma$ and shift $\beta$ are learned parameters of length $d$, initialized to ones and
+zeros, so a freshly constructed layer norm outputs zero mean and unit standard deviation over the
+last axis. The small constant $\varepsilon$ guards the divide. The variance is biased, dividing by
+$d$ rather than $d-1$, which is the standard convention for this normalization.
 
-Exact GELU, elementwise, same shape in and out:
+It lets deep stacks train. Without it, the scale of activations drifts from layer to layer and
+gradients explode or vanish; normalizing each layer's input holds the scale steady. Ba, Kiros, and
+Hinton introduced it because batch normalization computes statistics per batch, which is awkward for
+recurrent and sequence models where the batch dimension is not the natural one to normalize over.
+Layer norm computes its statistics per sample over the features, so it is independent of batch size
+and identical at training and test time. That property is what makes the pre-norm residual block, the
+standard structure later in the course, work the same way regardless of batch.
 
-$$\mathrm{GELU}(x) = x \cdot \tfrac{1}{2}\big(1 + \operatorname{erf}(x/\sqrt{2})\big)$$
+### GELU
 
-`erf` is `torch.erf`, and `sqrt(2)` is `math.sqrt(2.0)`. Note $\mathrm{GELU}(0) = 0$.
+GELU (Hendrycks, Gimpel 2016) is a smooth activation. Where ReLU applies a hard cutoff at zero, GELU
+multiplies each input by the probability that a standard Gaussian draw falls below it, $x\,\Phi(x)$,
+which weights an input by how large it is rather than thresholding it. Writing $\Phi$ as the standard
+normal cumulative distribution function gives the exact form through the error function:
 
-The MLP, with `x` of shape `(..., dim)`:
+$$\operatorname{GELU}(x) = x\,\Phi(x) = x\cdot\tfrac{1}{2}\big(1 + \operatorname{erf}(x/\sqrt{2})\big).$$
 
-    fc1: Linear(dim, hidden)      # (..., hidden)
-    act: gelu                     # (..., hidden)
-    drop: Dropout(p)              # (..., hidden)
-    fc2: Linear(hidden, dim)      # (..., dim)
+The smoothness gives a nonzero gradient on both sides of the origin, unlike ReLU's flat left half,
+and $\operatorname{GELU}(0) = 0$. The original paper also gives a tanh approximation that predates
+fast vectorized error functions; the exact form is the one to implement, because the error function
+is now fast and exact and matching the exact definition keeps the primitive unambiguous. GELU is the
+activation inside the transformer's MLP.
 
-so `forward(x) = fc2(drop(act(fc1(x))))`. Output shape equals input shape. With
-`dropout=0.0` (the A0 default) the dropout layer is the identity. The width goes up
-to `hidden` in the middle and back down to `dim`, and every step is elementwise or
-position-wise, so the leading `...` dimensions pass through untouched:
+### The MLP
 
-```mermaid
-flowchart LR
-    X["x<br/>(..., dim)"] --> F1["fc1<br/>Linear(dim, hidden)"]
-    F1 --> H1["(..., hidden)"]
-    H1 --> ACT["act = gelu<br/>elementwise"]
-    ACT --> H2["(..., hidden)"]
-    H2 --> DR["drop<br/>Dropout(p)"]
-    DR --> H3["(..., hidden)"]
-    H3 --> F2["fc2<br/>Linear(hidden, dim)"]
-    F2 --> Y["out<br/>(..., dim)"]
-```
+The MLP is the per-token computation in a transformer block: two linear layers with the activation
+between them, applied independently to every position. For an input of feature dimension $d$ and
+inner width $h$, the first linear maps $d \to h$, the activation runs elementwise, an optional
+dropout follows, and the second linear maps $h \to d$:
 
-The optimization step is the standard rhythm. Given a batch `(inputs, targets)`:
+$$\operatorname{MLP}(x) = W_2\,\operatorname{drop}\big(\operatorname{act}(W_1 x + b_1)\big) + b_2.$$
 
-    model.train()
-    optimizer.zero_grad()              # clear last step's grads
-    pred = model(inputs)               # forward
-    loss = loss_fn(pred, targets)      # scalar
-    loss.backward()                    # autograd fills .grad
-    optimizer.step()                   # update parameters
-    return loss.item()                 # python float for logging
-
-`overfit_one_batch` calls `step` on the same batch for a fixed number of steps and
-records the loss each time; a correct setup drives it to ~0. The order inside `step`
-makes it correct: `zero_grad` clears the previous step's gradients before
-`backward` accumulates new ones, and `optimizer.step` reads those gradients before
-the next `zero_grad` wipes them. Drop or reorder any one of these and the loss stays
-flat.
+Every step is elementwise or position-wise, so any leading batch and sequence dimensions pass through
+untouched. Attention moves information between tokens; the MLP is where each token is transformed on
+its own, and it holds the majority of a transformer's parameters.
 
 ```mermaid
 flowchart LR
-    Z["optimizer.zero_grad()<br/>clear last step's .grad"] --> F["pred = model(inputs)<br/>forward"]
-    F --> L["loss = loss_fn(pred, targets)<br/>scalar"]
-    L --> B["loss.backward()<br/>autograd fills .grad"]
-    B --> S["optimizer.step()<br/>update parameters"]
-    S --> R["return loss.item()<br/>python float"]
-    S -.->|"next call on<br/>same batch"| Z
+    X["x (..., d)"] --> F1["Linear d -> h"]
+    F1 --> ACT["act (gelu), elementwise"]
+    ACT --> DR["dropout"]
+    DR --> F2["Linear h -> d"]
+    F2 --> Y["out (..., d)"]
 ```
 
-## What to implement
+### The optimization step
 
-`gelu`, `LayerNorm.forward`, and `MLP.forward` in `primitives.py`, and
-`Trainer.step` in `trainer.py`. Four small holes. Everything else - the
-gradcheck and shape helpers, determinism, the toy datasets, the rest of the
-`Trainer`, and the viz - is provided.
+One step of gradient descent on a batch $(x, t)$ has a fixed rhythm: clear the previous step's
+gradients, run the forward pass, compute the scalar loss, backpropagate to fill the gradients, then
+let the optimizer update the parameters.
 
-## Tasks
+```mermaid
+flowchart LR
+    Z["zero gradients"] --> F["pred = model(x)"]
+    F --> L["loss = loss_fn(pred, t)"]
+    L --> B["loss.backward()"]
+    B --> S["optimizer.step()"]
+    S -.->|"next call on same batch"| Z
+```
 
-1. **gelu** (`primitives.py`, `gelu`) - return the exact erf GELU of `x`,
-   same shape in and out. Teaches the activation as a smooth gate, and that
-   `gelu(0) == 0`.
-2. **LayerNorm.forward** (`primitives.py`, `LayerNorm`) - normalize over
-   the last dim using mean and biased variance, then scale and shift by the learned
-   `weight` and `bias`. Teaches normalization built from primitive ops rather than
-   `nn.LayerNorm`.
-3. **MLP.forward** (`primitives.py`, `MLP`) - the two-layer position-wise
-   feed-forward, `fc2(drop(act(fc1(x))))`. Teaches the block's per-token
-   computation.
-4. **Trainer.step** (`trainer.py`, `Trainer.step`) - one optimization step
-   returning the scalar loss. Teaches the zero-grad / forward / backward / step
-   rhythm that `overfit_one_batch` and `fit` drive.
+The order is what makes it correct. The gradient reset clears the previous step's gradients before
+the backward pass accumulates new ones; the optimizer reads those gradients before the next reset
+wipes them. Drop or reorder any one of these and the loss stays flat, which is exactly the
+wiring-failure signature overfit-one-batch detects. Adam (Kingma, Ba 2014) is the optimizer used here
+and in most later assignments: an adaptive method that scales each parameter's step by a running
+estimate of its gradient magnitude.
 
-Each task maps to one `raise NotImplementedError(...)` in the top-level module files and to one
-test.
+## The assignment
 
-## How to verify
+Implement the three primitives and one optimization step. Each task maps to one
+`NotImplementedError` in a top-level file and to one test. The gradient checker, the shape helper,
+the determinism helpers, the toy datasets, the rest of the trainer, and the plotting are provided.
+The docstrings in each file give the exact formulas, shapes, and conventions; read those in the
+files rather than here.
 
-Run from the repo root with the `nanovision` conda env active, in this order. The
-test order is the workflow: shapes first (cheapest, catches axis and broadcast
-mistakes), then gradcheck (certifies the forward is differentiably correct), then
-overfit (proves the whole loop).
+### Files to modify
 
-    make test A=a00_harness      # your top-level code; red until the holes are filled
+`primitives.py` holds the three primitives. Implement `gelu` (the exact error-function GELU from the
+GELU section), `LayerNorm.forward` (the normalize-then-scale from the layer-normalization section,
+built from mean and biased-variance operations rather than `nn.LayerNorm`), and `MLP.forward` (the
+two-layer position-wise feed-forward from the MLP section).
 
-That runs, in order:
+`trainer.py` holds the training loop. Implement `Trainer.step`, the single optimization step from the
+optimization-step section. The provided `overfit_one_batch` and `fit` both call `step`, so a correct
+step is what lets either of them drive a loss down.
 
-- `tests/test_shapes.py` - output shapes for Tasks 1-3, plus that a fresh
-  LayerNorm produces zero mean and unit std over the last dim, and `gelu(0) == 0`.
-- `tests/test_gradcheck.py` - `check_gradients` at float64 on `LayerNorm` and
-  `MLP`, plus a smoke test of `assert_shapes`.
-- `tests/test_overfit.py` - `Trainer.overfit_one_batch` drives a noiseless
-  linear-regression batch to MSE < 1e-4 in 500 steps.
+### Running and validating
 
-To confirm the reference passes and render the loss curve:
+Activate the environment (`conda activate nanovision`), then run from the repo root:
 
-    make verify A=a00_harness    # reference solution; should be green
-    make viz    A=a00_harness    # writes out/loss_curve.png
+```
+make test   A=a00_harness   # run the tests against the top-level files (the ones with holes)
+make verify A=a00_harness   # run the same tests against the reference solution/
+make viz    A=a00_harness   # render the loss curve from the reference solution
+```
 
-The reference is visible in `solution/primitives.py` and `solution/trainer.py`;
-read it if you get stuck.
+`make test` is the command to run while working. It runs the suite in
+`assignments/a00_harness/tests/` against the top-level files, and goes from red (the holes raise
+`NotImplementedError`) to green as they are filled. `make verify` runs the identical suite against
+the reference in `solution/`: it sets `NANOVISION_IMPL=solution`, which makes the tests import the
+reference instead of the top-level files, so it is green from the start and shows the target. The
+goal is to bring `make test` to the same green as `make verify`. The reference is visible in
+`solution/primitives.py` and `solution/trainer.py`; read it if stuck.
 
-## Compute notes
+The tests run in the cheap-to-expensive order from the notes:
 
-CPU only, seconds to run; no GPU needed. The overfit test uses Adam with lr=0.1 for
-500 steps on a noiseless linear-regression batch produced by
-`nanovision.data.toy.linreg_batch` (n=64, d=8), which is exactly representable by a
-`Linear(8, 1)`, and expects final MSE < 1e-4. With `set_seed(0)` the reference run
-starts near MSE 14.5 and reaches about 2e-13 by step 500, so the loss-curve plot
-(log y-axis) drops almost straight down. A curve that stays flat from the start
-means the step is wired wrong (missing `zero_grad`, `backward`, or `step`), not a
-tuning problem; a curve that drops then stalls well above zero on this batch points
-at the model or loss, not the optimizer.
+- `tests/test_shapes.py` checks the output shapes for the three primitives, that a fresh layer norm
+  produces zero mean and unit standard deviation over the last axis, and that $\operatorname{GELU}(0)
+  = 0$.
+- `tests/test_gradcheck.py` runs the float64 gradient check on `LayerNorm` and `MLP`, plus a smoke
+  test of the shape helper.
+- `tests/test_overfit.py` drives a noiseless linear-regression batch to mean-squared error below
+  $10^{-4}$ in 500 steps through `Trainer.overfit_one_batch`.
 
-## Stretch goals
+`make viz` overfits the same linear-regression batch and writes `out/loss_curve.png`. It uses the
+reference solution, so it works on a fresh checkout before any hole is filled. It writes a PNG rather
+than opening a window: the plot uses matplotlib's headless Agg backend, so the command behaves the
+same over SSH, in WSL, and in CI with no display attached. `make viz-mine A=a00_harness` runs the
+same script against the top-level code instead, for checking a finished implementation, and needs
+the holes filled. Add `SHOW=1` to either to also open an interactive window when a display is
+available.
 
-1. Preview A1: implement `RMSNorm` (rescale by the root-mean-square over the last
-   axis times a learned gain, no bias) as a small `nn.Module` and confirm
-   `check_gradients` passes. A1 builds it for real in its own `primitives.py`.
-2. Have `Trainer.fit` log a validation loss when given a `val_loader`.
-3. Animate the linreg fit (prediction vs. iteration) from the CSV log the `Trainer`
-   writes.
+What you should see when you run this. The overfit test uses Adam at learning rate 0.1 for 500 steps
+on a noiseless linear-regression batch ($n=64$, $d=8$) that a single `Linear(8, 1)` represents
+exactly. With the seed fixed, the reference run starts near a mean-squared error of 14.5 and reaches
+about $2\times10^{-13}$ by step 500, so the loss curve on a log axis drops almost straight down. A
+curve that stays flat from the start means the step is wired wrong (a missing gradient reset,
+backward, or optimizer update), not a tuning problem; a curve that drops then stalls well above zero
+on this batch points at the model or loss, not the optimizer.
 
-## Further reading
+## Additional reference material
 
-- Ba, Kiros and Hinton,
-  [Layer Normalization](https://arxiv.org/abs/1607.06450) (2016) - per-sample
-  normalization over features, independent of batch size, identical at train and
-  test; the norm in the pre-norm residual block.
-- Hendrycks and Gimpel,
-  [Gaussian Error Linear Units (GELUs)](https://arxiv.org/abs/1606.08415) (2016) -
-  the smooth $x\,\Phi(x)$ activation; introduces both the exact-erf form and the tanh
-  approximation.
-- Kingma and Ba,
-  [Adam: A Method for Stochastic Optimization](https://arxiv.org/abs/1412.6980)
-  (2014) - the adaptive optimizer the overfit test and most later assignments use.
+Where this goes next:
+
+- The transformer block (A1) imports `LayerNorm`, `gelu`, and `MLP` from `nanovision.primitives` to
+  assemble the pre-norm residual block, and adds RMSNorm and the SwiGLU feed-forward to the same
+  module for the LLaMA-style default.
+- Every assignment from A1 onward verifies its new mechanism with the gradient check and proves its
+  model-plus-loop with overfit-one-batch, both built here. The trainer, the determinism helpers, and
+  the loss-curve plotting are reused unchanged.
+
+Full reference list:
+
+- Ba, Kiros, Hinton 2016, "Layer Normalization",
+  [arXiv:1607.06450](https://arxiv.org/abs/1607.06450). Per-sample normalization over features,
+  independent of batch size, identical at train and test.
+- Hendrycks, Gimpel 2016, "Gaussian Error Linear Units (GELUs)",
+  [arXiv:1606.08415](https://arxiv.org/abs/1606.08415). The smooth $x\,\Phi(x)$ activation; both the
+  exact error-function form and the tanh approximation.
+- Kingma, Ba 2014, "Adam: A Method for Stochastic Optimization",
+  [arXiv:1412.6980](https://arxiv.org/abs/1412.6980). The adaptive optimizer the overfit test and most
+  later assignments use.

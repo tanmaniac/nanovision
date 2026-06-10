@@ -6,10 +6,7 @@ Run with: make viz A=a01_transformer  (uses the reference solution).
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt, plot_loss_curve  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
@@ -23,7 +20,6 @@ from nanovision.data.toy import char_lm_batch  # noqa: E402
 from nanovision.determinism import set_seed  # noqa: E402
 from nanovision.trainer import Trainer  # noqa: E402
 from nanovision.transformer import build_causal_mask  # noqa: E402
-from nanovision.viz import plot_loss_curve  # noqa: E402
 
 
 def attention_heatmap(out_path):
@@ -39,8 +35,7 @@ def attention_heatmap(out_path):
     ax.set_ylabel("query position")
     fig.colorbar(im, fraction=0.046)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
 
 
 def overfit_curve(out_path):
@@ -66,3 +61,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

@@ -3,7 +3,7 @@
 Stage 2 trains the projector, embedding, head, and decoder on 4 fixed (image, caption) pairs.
 The caption cross-entropy falls to near zero within ~300 steps, and greedy generate
 reproduces each caption's class + attr + EOS tokens exactly. Measured final loss ~7e-4
-(see ASSIGNMENT.md compute_notes).
+(see the README's validation section).
 """
 
 import torch

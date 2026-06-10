@@ -16,10 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -154,13 +151,13 @@ def main():
         (axes[1, 1], held_pred, "held-out: render"),
     ]:
         ax.imshow(im.detach().cpu().numpy()); ax.set_title(title); ax.axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "splat_fit.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "splat_fit.png")
 
     steps, psnrs = zip(*heldout_psnr)
     plt.figure(figsize=(4.5, 3.2))
     plt.plot(steps, psnrs)
     plt.xlabel("step"); plt.ylabel("held-out PSNR (dB)"); plt.tight_layout()
-    plt.savefig(_OUT / "psnr_curve.png", dpi=120); plt.close()
+    finish(_OUT / "psnr_curve.png")
 
     # Inference-time comparison on the same view.
     t_splat = _splat_inference_time(model, cfg, K, poses[-1], dev)
@@ -169,7 +166,7 @@ def main():
     plt.figure(figsize=(4.5, 3.2))
     plt.bar(["NeRF (ray march)", "splat"], [t_nerf * 1e3, t_splat * 1e3], color=["C0", "C1"])
     plt.ylabel("ms / view"); plt.title(f"splat is {ratio:.1f}x faster here")
-    plt.tight_layout(); plt.savefig(_OUT / "speed.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "speed.png")
 
     print(f"device {dev}; held-out PSNR final {psnrs[-1]:.1f} dB; "
           f"splat {t_splat*1e3:.2f} ms vs NeRF {t_nerf*1e3:.2f} ms per {cfg.H}x{cfg.W} view "
@@ -178,3 +175,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

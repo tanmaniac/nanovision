@@ -13,10 +13,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -80,8 +77,7 @@ def main() -> None:
     fig.suptitle("image-text cosine similarity (diagonal = matched pairs)", fontsize=11)
     fig.tight_layout()
     sim_path = out / "similarity_matrix.png"
-    fig.savefig(sim_path, dpi=120)
-    plt.close(fig)
+    finish(sim_path)
 
     # Alignment vs batch size for both losses (a demonstration, see the caption).
     ns = [2, 4, 8, 16]
@@ -106,11 +102,12 @@ def main() -> None:
     ax.set_title("overfit alignment vs N (both align; gap needs scale)", fontsize=9)
     fig.tight_layout()
     curve_path = out / "alignment_vs_batch.png"
-    fig.savefig(curve_path, dpi=120)
-    plt.close(fig)
+    finish(curve_path)
 
     print(f"wrote {sim_path}, {curve_path}")
 
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

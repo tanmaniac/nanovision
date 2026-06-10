@@ -13,10 +13,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 from nanovision.determinism import set_seed  # noqa: E402
@@ -87,8 +84,7 @@ def synthetic_scene():
     fig.suptitle("Synthetic cube projected into the 6-camera rig")
     fig.tight_layout()
     p1 = OUT / "synthetic_cube_projection.png"
-    fig.savefig(p1, dpi=120)
-    plt.close(fig)
+    finish(p1)
 
     # 2. Warp a ground checkerboard from a tilted camera into the BEV grid.
     from math import radians
@@ -116,8 +112,7 @@ def synthetic_scene():
     a1.axis("off")
     fig.tight_layout()
     p2 = OUT / "synthetic_ipm_bev.png"
-    fig.savefig(p2, dpi=120)
-    plt.close(fig)
+    finish(p2)
     print(f"synthetic fallback wrote {p1} and {p2}")
 
 
@@ -164,8 +159,7 @@ def real_scene(dataroot):
     fig.suptitle("lidar overlay: naive (blue) vs temporal-correct (red)")
     fig.tight_layout()
     p1 = OUT / "nuscenes_lidar_overlay.png"
-    fig.savefig(p1, dpi=120)
-    plt.close(fig)
+    finish(p1)
 
     bev = ipm_to_bev(s["images"], s["rig"], s["bev_grid"], ground_z=0.0)
     fig, ax = plt.subplots(figsize=(7, 7))
@@ -174,8 +168,7 @@ def real_scene(dataroot):
     ax.axis("off")
     fig.tight_layout()
     p2 = OUT / "nuscenes_bev.png"
-    fig.savefig(p2, dpi=120)
-    plt.close(fig)
+    finish(p2)
     print(f"real-scene wrote {p1} and {p2}")
 
 
@@ -198,3 +191,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()

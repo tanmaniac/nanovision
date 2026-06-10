@@ -13,10 +13,7 @@ Run with: make viz A=a02_vit  (uses the reference solution).
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt, plot_loss_curve  # noqa: E402  (sets the matplotlib backend)
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
@@ -32,7 +29,6 @@ from vit import ViT  # noqa: E402
 from nanovision.attention import scaled_dot_product_attention  # noqa: E402
 from nanovision.determinism import set_seed  # noqa: E402
 from nanovision.trainer import Trainer  # noqa: E402
-from nanovision.viz import plot_loss_curve  # noqa: E402
 
 OUT = Path(__file__).parent / "out"
 
@@ -123,8 +119,7 @@ def attention_map(out_path):
     axs[1].axis("off")
     fig.colorbar(im, ax=axs[1], fraction=0.046)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
 
 
 def dinov2_register_comparison(out_path):
@@ -164,8 +159,7 @@ def dinov2_register_comparison(out_path):
         ax.axis("off")
         fig.colorbar(im, ax=ax, fraction=0.046)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    finish(out_path)
     print(f"wrote DINOv2 register comparison to {out_path}")
     return True
 
@@ -183,3 +177,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    if SHOW:
+        plt.show()
