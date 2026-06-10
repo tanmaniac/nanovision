@@ -18,10 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+from nanovision.viz import SHOW, finish, plt  # noqa: E402  (sets the matplotlib backend)
 import torch  # noqa: E402
 
 _here = Path(__file__).parent
@@ -48,7 +45,7 @@ def _schedules(T=1000):
     plt.plot(lin.numpy(), label="linear")
     plt.plot(cos.numpy(), label="cosine")
     plt.xlabel("t"); plt.ylabel(r"$\bar\alpha_t$"); plt.legend(); plt.tight_layout()
-    plt.savefig(_OUT / "schedules.png", dpi=120); plt.close()
+    finish(_OUT / "schedules.png")
 
 
 def _noising(T=1000):
@@ -61,7 +58,7 @@ def _noising(T=1000):
         x_t = q_sample(x0, torch.tensor([ti]), eps, abar)
         ax.imshow(x_t[0, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
         ax.set_title(f"t={ti}"); ax.axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "noising.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "noising.png")
 
 
 def _conditioning(T=1000):
@@ -81,7 +78,7 @@ def _conditioning(T=1000):
     plt.semilogy(x0_inv.numpy(), label="x0 inversion")
     plt.semilogy(v_inv.numpy(), label="v (bounded)")
     plt.xlabel("t"); plt.ylabel("error amplification"); plt.legend(); plt.tight_layout()
-    plt.savefig(_OUT / "conditioning.png", dpi=120); plt.close()
+    finish(_OUT / "conditioning.png")
 
 
 def _train_and_sample(steps=3000):
@@ -120,7 +117,7 @@ def _train_and_sample(steps=3000):
             for j in range(cfg.num_classes):
                 axes[i + 1, j].imshow(grid[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
                 axes[i + 1, j].set_title(f"DDIM w={w}"); axes[i + 1, j].axis("off")
-    plt.tight_layout(); plt.savefig(_OUT / "samples.png", dpi=120); plt.close()
+    plt.tight_layout(); finish(_OUT / "samples.png")
 
 
 if __name__ == "__main__":
@@ -129,3 +126,5 @@ if __name__ == "__main__":
     _conditioning()
     _train_and_sample()
     print(f"wrote figures to {_OUT}")
+    if SHOW:
+        plt.show()

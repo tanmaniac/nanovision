@@ -38,7 +38,13 @@ verify:
 
 viz:
 	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make viz A=a00_harness" && exit 1)
-	NANOVISION_IMPL=solution $(PYTHON) -m assignments.$(A).viz
+	NANOVISION_IMPL=solution $(if $(SHOW),NANOVISION_VIZ_SHOW=1 )$(PYTHON) -m assignments.$(A).viz
+
+# Render the figures from YOUR top-level code (run once the holes are filled). Add SHOW=1 to
+# open interactive windows in addition to writing the PNGs, e.g. make viz-mine A=a05_diffusion SHOW=1
+viz-mine:
+	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make viz-mine A=a00_harness" && exit 1)
+	$(if $(SHOW),NANOVISION_VIZ_SHOW=1 )$(PYTHON) -m assignments.$(A).viz
 
 # Student top-level code across all assignments. Does NOT stop on failure: unfilled
 # assignments are expected to fail, so this just shows each assignment's status.

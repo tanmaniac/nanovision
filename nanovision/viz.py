@@ -3,12 +3,28 @@ attention-map, BEV-grid, and splat-render helpers to this module.
 """
 
 import csv
+import os
 from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # headless: write PNGs, never open a window
+# Headless by default: write PNGs, never open a window. Set NANOVISION_VIZ_SHOW=1
+# (e.g. `make viz SHOW=1`) to use an interactive backend and open windows too.
+SHOW = os.environ.get("NANOVISION_VIZ_SHOW") == "1"
+if not SHOW:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+
+
+def finish(out_path, *, dpi: int = 120):
+    """Save the current figure to out_path (always), and in SHOW mode keep it open so a
+    final `plt.show()` can display it. In headless mode close it to free memory."""
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_path, dpi=dpi)
+    if not SHOW:
+        plt.close()
+    return out_path
 
 
 def plot_loss_curve(losses, out_path, title: str = "loss", logy: bool = True):
@@ -30,7 +46,8 @@ def plot_loss_curve(losses, out_path, title: str = "loss", logy: bool = True):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(out_path, dpi=120)
-    plt.close(fig)
+    if not SHOW:
+        plt.close(fig)
     return out_path
 
 
