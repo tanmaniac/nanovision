@@ -10,9 +10,9 @@ This assignment builds the core of that renderer on a small synthetic scene: the
 positional encoding that fixes the MLP's spectral bias, the discretized volume renderer that
 turns per-sample densities and colors into a pixel color, and ray generation from camera
 intrinsics and extrinsics. The radiance-field MLP and the toy scene are provided. The scene is
-one colored solid sphere imaged at 16x16 from a ring of cameras, so every test runs on CPU in
-seconds, and its ground-truth pixels come from a closed-form integral, not from the renderer
-being built here.
+one colored solid sphere imaged at 16x16 from a ring of cameras, so the tests run on CPU without
+a GPU; most finish in seconds, though the float64 gradient check is slower (a few minutes). Its
+ground-truth pixels come from a closed-form integral, not from the renderer being built here.
 
 NeRF is the vehicle for the volume rendering integral, not a method to deploy at the end of the
 course. The reason to build it is the integral, its discretization, and front-to-back alpha
