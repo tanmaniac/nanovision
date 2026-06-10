@@ -262,12 +262,14 @@ with the gradient flowing $R \to V, r \to (h_{t+1}, z_{t+1}) \to a_t \to (\mu_\t
 return to the action rather than a correlation between the action and its return.
 
 DreamerV3 uses REINFORCE for discrete actions and the reparameterized dynamics-backprop gradient for
-continuous actions. cartpole-balance is exactly the case that separates them: the reward is near-flat
-in the action over a short horizon (a balanced pole earns about 1 per step regardless of a small
-force difference), so REINFORCE chases critic noise and the policy collapses, while dynamics backprop
-gets a usable analytic gradient. The measured contrast on this build is in the results below: discrete
-REINFORCE drove the greedy return to about 135 (below the random baseline of about 214), and the
-continuous dynamics-backprop actor reached a greedy return above 300.
+continuous actions, because the score-function estimator's variance is too high for continuous
+control. cartpole-balance is exactly the case that separates the two: the reward is near-flat in the
+action over a short horizon (a balanced pole earns about 1 per step regardless of a small force
+difference), so the score-function gradient is mostly noise while dynamics backprop gets a usable
+analytic gradient. When you run both actors on this toy you should expect to see that difference
+plainly: the discrete REINFORCE actor stays around 135 (below the random baseline of about 214) while
+the continuous dynamics-backprop actor climbs above 300. The measured numbers are in the results
+section below.
 
 The continuous actor is a Tanh-Normal policy. The actor MLP outputs $(\mu, \log\sigma)$ for the 1-D
 force; an action is $a = \tanh(\mu + \sigma\,\varepsilon)$, so $a$ is bounded in $(-1, 1)$ and the
@@ -393,15 +395,17 @@ error in the dynamics or representation term.
 
 ### Measured transfer
 
-The reference run trained the continuous dynamics-backprop actor on dm_control cartpole-balance from
-64x64 pixels on a single 12GB GPU. The numbers, against a max return of about 500:
+When you run the training yourself, expect numbers in the range below (they vary with seed and
+training length). The reference run trained the continuous dynamics-backprop actor on dm_control
+cartpole-balance from 64x64 pixels on a single 12GB GPU, against a max return of about 500:
 
 - Random policy: about 214.
-- Continuous dynamics-backprop actor (this build): greedy real-env return above 300, best about 350,
-  evaluated greedily across episodes. The policy is trained purely on imagined rollouts and then run
-  in the real environment, so this is imagination-to-real transfer (the "Dream to Control" result).
-- Discrete REINFORCE on the same task: about 135, below the random baseline. This is the collapse
-  that motivates the continuous dynamics-backprop gradient.
+- Continuous dynamics-backprop actor: greedy real-env return above 300, best around 375 in the
+  reference run, evaluated greedily across episodes. The policy is trained purely on imagined
+  rollouts and then run in the real environment, so this is imagination-to-real transfer (the
+  "Dream to Control" result).
+- Discrete REINFORCE on the same task: around 135, below the random baseline. This is the collapse
+  the dynamics-backprop section predicts on a near-flat continuous-control reward.
 - Optimal: about 500.
 
 The toy reaches "clearly beats random and balances the pole," not "optimal." That gap is a scale and

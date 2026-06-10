@@ -79,10 +79,12 @@ visible in the conditioning ($p(a \mid c)$ unimodal), the mean is the correct ex
 matches the flow head; the lesson there is compounding error and chunking, not a generative win.
 With the goal hidden from the conditioning while it still varies across episodes ($p(a \mid c)$
 multimodal across the four goals), BC averages the modes and aims nowhere, while the flow head
-samples a goal direction. The measured result on the goal-hidden mode: from the center state, the BC
-regressor's predicted action has magnitude ~0.002 (it collapses to the origin, the average of four
-opposing directions), while the flow-head samples spread out with per-component standard deviation
-~0.021, clustering on the four diagonal goal directions.
+samples a goal direction. This mode-averaging of a unimodal regressor on a multimodal target is the
+standard motivation for a generative action head. When you run the goal-hidden panel you should
+expect to see it directly: from the center state the BC regressor's predicted action collapses
+toward the origin (the reference run measured magnitude ~0.002, the average of four opposing
+directions), while the flow-head samples spread out (reference per-component standard deviation
+~0.021), clustering on the four diagonal goal directions.
 
 ![Goal hidden: the BC regressor collapses to the origin while flow samples spread to the four goal
 directions](assets/multimodal.png)
@@ -266,8 +268,10 @@ never leaves ~2 means the target or the conditioning is wrong, not that training
 
 ### Measured results
 
-Behavior cloning rollout success rises with chunk size (mean over seeds 0-2, against the
-straight-line expert ceiling at 1.0):
+Action chunking reduces compounding error, the result ACT reported and the reason chunked policies
+became standard. When you run the ablation you should expect behavior-cloning rollout success to rise
+with chunk size. The reference run measured (mean over seeds 0-2, against the straight-line expert
+ceiling at 1.0):
 
 | chunk size $H$ | rollout success |
 | --- | --- |
