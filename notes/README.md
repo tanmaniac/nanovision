@@ -1,7 +1,7 @@
 # Reading-only notes
 
 Markdown notes for topics that are studied but not built (they don't fit a 12GB
-GPU, or the payoff is conceptual). See `BUILD_ORDER.md` for where each attaches.
+GPU, or the payoff is conceptual). See `claude_notes/BUILD_ORDER.md` for where each attaches.
 
 - `video_generation.md` — flow matching (A6) in a spatiotemporal VAE latent (A7).
 - `vla_data_engines.md` — VLA data/scaling (Open X-Embodiment, DROID, FAST).

@@ -3,7 +3,7 @@
 Status: plan for expert review, then delegated build. Leaf assignment, last in the course (no
 `nanovision` shim). Build target is a conditional flow-matching (CFM) action head in the pi0 line
 (Black et al., 2024), with single-step behavior cloning and a DDPM head as labeled contrast.
-Research note: `docs/research/a13_vla.md`.
+Research note: `research/a13_vla.md`.
 
 ## 1. What the student builds and why
 

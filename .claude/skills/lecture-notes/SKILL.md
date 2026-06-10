@@ -6,7 +6,7 @@ description: Generate or revise a nanovision assignment's README.md as comprehen
 # Lecture notes for a nanovision assignment
 
 The README.md of each assignment is comprehensive lecture notes, not a terse
-handout. ARCHITECTURE.md §5 is the authoritative depth spec. ASSIGNMENT.md is a
+handout. claude_notes/ARCHITECTURE.md §5 is the authoritative depth spec. ASSIGNMENT.md is a
 separate, concise builder contract and must not re-narrate the README's prose.
 
 ## Why a subagent
@@ -21,7 +21,7 @@ assignment, so several can run in parallel on disjoint files.
 Launch an Opus subagent (general-purpose, web search available, run in background)
 with a prompt that:
 
-1. Points it at `ARCHITECTURE.md` §5 (the depth spec) and `TEMPLATE.md`.
+1. Points it at `claude_notes/ARCHITECTURE.md` §5 (the depth spec) and `claude_notes/TEMPLATE.md`.
 2. Names the assignment dir and tells it to read the current `README.md`,
    `ASSIGNMENT.md`, the `starter/` holes, and the canonical `nanovision/` modules
    so the notes match the actual code and shapes.

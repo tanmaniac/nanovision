@@ -7,7 +7,7 @@ authoritative sources below before writing anything; do not guess the convention
 
 ## Read these first (they are the ground truth, not this summary)
 
-1. The assignment plan you were given: `docs/<assignment>_plan.md`. It is self-contained and
+1. The assignment plan you were given: `claude_notes/<assignment>_plan.md`. It is self-contained and
    carries the expert-reviewed design, every hole, every test with its pass condition, and the
    measured thresholds. Build exactly what it specifies. Corrections from the expert review are
    already folded in - do not re-litigate them.

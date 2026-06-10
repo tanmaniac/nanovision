@@ -17,7 +17,7 @@ an eps-vs-v comparison, the Tweedie score-eps identity as an explicit exercise, 
 (ancestral) and DDIM (deterministic, sub-sampled) samplers, and classifier-free
 guidance. Min-SNR loss weighting is a one-line option in the loss.
 
-The research note `docs/research/a05_diffusion.md` is the authority on scope. Its main
+The research note `research/a05_diffusion.md` is the authority on scope. Its main
 corrections to the original draft, already folded in here:
 - v-prediction is the required objective, not a stretch (Salimans & Ho 2022; the
   production default since SD 2.x).

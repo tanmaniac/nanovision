@@ -29,7 +29,7 @@ and the rectified-flow reflow procedure. The diffusion-flow equivalence is taugh
 exact score-velocity relation. The image-scale CFM (reusing A5's U-Net with the objective
 swapped) is a viz demonstration, not a graded test.
 
-The research note `docs/research/a06_flow_matching.md` is the authority. Its corrections to
+The research note `research/a06_flow_matching.md` is the authority. Its corrections to
 the original draft, folded in here:
 - OT coupling is first-class, not optional (Tong et al. 2023, OT-CFM). Implement and
   compare against independent coupling.

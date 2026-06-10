@@ -6,7 +6,7 @@ the LSS contrast this assignment is written against) and `assignments/a01_transf
 attention primitives this reuses - read how `nanovision.attention` / `nanovision.transformer`
 are imported).
 
-Source: `docs/research/a115c_bevformer.md`. Read it. The core is the query-PULL view transform:
+Source: `research/a115c_bevformer.md`. Read it. The core is the query-PULL view transform:
 BEV cells reach back into image space and bilinear-sample the features they need, the opposite of
 LSS's depth-PUSH. The teaching order the note settles on (section 3 "Suggested reordering"):
 (1) build 3D pillar reference points, (2) project them and bilinear-sample - this alone already

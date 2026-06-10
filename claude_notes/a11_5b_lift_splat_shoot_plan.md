@@ -5,7 +5,7 @@ Assignment dir: `assignments/a11_5b_lift_splat_shoot`. Module name (owned mechan
 geometry + nuScenes substrate, `conftest.py`, forbidden-imports test) and
 `assignments/a09_nerf` (rendering-style mechanism + gradcheck tests + GPU-aware viz).
 
-Source: `docs/research/a115b_lift_splat_shoot.md` (the expert research note). Read it; the four
+Source: `research/a115b_lift_splat_shoot.md` (the expert research note). Read it; the four
 mechanisms (A depth+lift, B frustum, C cumsum splat, D BEV seg head) and the BEVDepth depth
 supervision come straight from it.
 

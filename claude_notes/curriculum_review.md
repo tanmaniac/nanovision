@@ -5,12 +5,12 @@ ran 19 research agents in parallel (one per concept, plus one whole-curriculum
 audit), each grounding its findings in 2026 sources via web search. Each agent
 identified the key concepts a student must learn, the from-scratch mechanism worth
 building on a tiny problem, and an opinionated critique of the draft scope. The
-per-topic reports are in `docs/research/`; this file is the synthesis.
+per-topic reports are in `research/`; this file is the synthesis.
 
 A caveat on sources: the per-topic reports were written by a smaller model and
 some cite specific arXiv IDs or dates that should be spot-checked before they go
 into a learner-facing handout. The method names and the conceptual corrections
-below are reliable; treat the exact citation strings in `docs/research/*.md` as
+below are reliable; treat the exact citation strings in `research/*.md` as
 leads to verify, not as verified references.
 
 ## Verdict
@@ -53,7 +53,7 @@ assignments well past the first deliverable (A0, A1, A11.5a).
 ## Per-assignment findings
 
 For each: whether the build core stands, the key concepts to learn, and the top
-changes. Detail and sources are in the matching `docs/research/` file.
+changes. Detail and sources are in the matching `research/` file.
 
 ### A1 transformer (`a01_transformer.md`)
 Core stands. Key concepts: attention as content-addressable lookup with the
@@ -265,4 +265,4 @@ Decisions taken: adopt the consensus variants wholesale, add all four content
 items (geometry foundation models, VQ tokenizer, video/temporal, ConvNeXt into
 A2), keep the AV sub-module at five, keep A5/A6 separate. These are propagated into
 `BUILD_ORDER.md`, `ARCHITECTURE.md`, and `BUILD_CHECKLIST.md`; the resulting
-22-assignment plan is `docs/revised_curriculum.md`.
+22-assignment plan is `revised_curriculum.md`.

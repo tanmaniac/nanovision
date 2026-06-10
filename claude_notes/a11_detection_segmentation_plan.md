@@ -1,6 +1,6 @@
 # A11 - detection and segmentation (DETR set prediction): build plan
 
-Status: draft for expert review. Build subagent reads this file plus `docs/agent_build_guide.md`
+Status: draft for expert review. Build subagent reads this file plus `agent_build_guide.md`
 and mirrors `assignments/a06_0_flow_matching` for layout.
 
 ## What this assignment teaches

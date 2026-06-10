@@ -6,7 +6,7 @@ compositing kernel this REUSES via `nanovision.volume`, and the closed-form-GT t
 `assignments/a11_5c_bevformer` (same module, BEV-feature input convention, conftest, forbidden-
 imports test, toy-scene style).
 
-Source: `docs/research/a115d_occupancy.md`. Read it. The spine the note settles on (sections 1,
+Source: `research/a115d_occupancy.md`. Read it. The spine the note settles on (sections 1,
 2, 3): occupancy prediction is NeRF volume rendering run backward - build a voxel occupancy field
 and supervise it by rendering back to 2D with the SAME alpha-compositing kernel from the NeRF
 assignment (RenderOcc/OccNeRF), because nuScenes-mini has NO Occ3D 3D-occupancy labels (a real

@@ -1,7 +1,7 @@
 # A7 - latent diffusion and a tiny DiT: build plan
 
 Status: draft for expert review. Build subagent must read this whole file plus
-`docs/agent_build_guide.md` and mirror the exemplar `assignments/a06_0_flow_matching`.
+`agent_build_guide.md` and mirror the exemplar `assignments/a06_0_flow_matching`.
 
 ## What this assignment teaches
 
@@ -31,7 +31,7 @@ were taught earlier or are scaffolding.
 ## Convention (read this - it is the most dangerous trap)
 
 A7 uses the SAME flow-matching convention as the flow-matching assignment, NOT the convention
-in the research note `docs/research/a07_latent_dit.md`. They are opposite and silently mixing
+in the research note `research/a07_latent_dit.md`. They are opposite and silently mixing
 them flips a sign.
 
 - t = 0 is noise $x_0 \sim \mathcal{N}(0, I)$; t = 1 is data $x_1$ (here, the VAE latent).

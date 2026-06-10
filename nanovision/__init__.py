@@ -10,7 +10,7 @@ by default, or solution/ for the reference). The few genuinely provided modules
 
 Kept intentionally light: submodules are imported explicitly
 (``from nanovision.attention import MultiHeadAttention``) so an assignment pulls in
-only the parts it needs. See ARCHITECTURE.md section 3 for the import-path contract.
+only the parts it needs. See claude_notes/ARCHITECTURE.md section 3 for the import-path contract.
 """
 
 __version__ = "0.1.0"

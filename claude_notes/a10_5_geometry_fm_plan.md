@@ -3,7 +3,7 @@
 Status: draft for expert review. NOTE: there is NO pre-written research note for this assignment
 (unlike A1-A10). The expert review must validate the whole mechanism against the real DUSt3R /
 MASt3R literature, not just check this plan against a note. Build subagent reads this file plus
-`docs/agent_build_guide.md` and mirrors `assignments/a06_0_flow_matching` for layout.
+`agent_build_guide.md` and mirrors `assignments/a06_0_flow_matching` for layout.
 
 ## What this assignment teaches
 

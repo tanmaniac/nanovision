@@ -1,7 +1,7 @@
 # A10 - 3D Gaussian splatting: build plan
 
 Status: draft for expert review. Build subagent reads this whole file plus
-`docs/agent_build_guide.md` and mirrors the exemplar `assignments/a06_0_flow_matching` for layout.
+`agent_build_guide.md` and mirrors the exemplar `assignments/a06_0_flow_matching` for layout.
 
 ## What this assignment teaches
 

@@ -316,7 +316,7 @@ stays consistent down the chain.
 ## 6. Course structure (22 assignments, 6 modules)
 
 See `BUILD_ORDER.md` for the dependency-ordered build plan and per-assignment
-one-line scope, and `docs/curriculum_review.md` for the validation that shaped it.
+one-line scope, and `curriculum_review.md` for the validation that shaped it.
 The modules:
 
 - **Module 0 - Foundations:** A0 harness, A1 transformer-from-scratch

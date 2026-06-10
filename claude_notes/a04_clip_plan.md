@@ -14,7 +14,7 @@ mechanisms are the two contrastive losses and the zero-shot classification proce
 Primary objective is the SigLIP sigmoid loss (it is what trains on a 12GB budget and
 is the 2024-2026 production default in PaliGemma / pi0); softmax InfoNCE is built too,
 as the historical predecessor and to make the batch-size problem concrete. Per the
-research note (docs/research/a04_clip.md), implementing both and comparing them at
+research note (research/a04_clip.md), implementing both and comparing them at
 small N is the clearest way to teach why InfoNCE needed batch size ~32k and SigLIP
 does not.
 

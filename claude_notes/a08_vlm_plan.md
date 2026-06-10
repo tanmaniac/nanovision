@@ -1,7 +1,7 @@
 # A8 - vision-language model (LLaVA-style): build plan
 
 Status: draft for expert review. Build subagent reads this whole file plus
-`docs/agent_build_guide.md` and mirrors the exemplar `assignments/a06_0_flow_matching` for
+`agent_build_guide.md` and mirrors the exemplar `assignments/a06_0_flow_matching` for
 layout. A8 is assignment-LOCAL except it imports the shared ViT and transformer (already
 shimmed - see "Reused, already in place").
 

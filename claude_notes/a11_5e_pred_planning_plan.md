@@ -6,7 +6,7 @@ trained with a winner-take-all loss. Survey the rest of the end-to-end stack
 (UniAD -> VAD -> DriveTransformer) and the open-loop-metric critique in the README.
 Full planning is read, not built.
 
-Source research note: `docs/research/a115e_pred_planning.md`. Dependency line in
+Source research note: `research/a115e_pred_planning.md`. Dependency line in
 `BUILD_ORDER.md`: deps A11.5b/c, A11.5d. This is a leaf - nothing imports from it, so no
 new `nanovision.*` shim.
 

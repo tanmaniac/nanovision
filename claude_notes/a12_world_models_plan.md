@@ -2,7 +2,7 @@
 
 Status: plan for expert review, then delegated build. Leaf assignment (no `nanovision` shim;
 see "Shared-library decision"). Build target is DreamerV3 (Hafner et al., Nature 2025;
-arXiv:2301.04104). Research note: `docs/research/a12_world_models.md`.
+arXiv:2301.04104). Research note: `research/a12_world_models.md`.
 
 ## 1. What the student builds and why
 

@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Pretrained-weight libraries: allowed ONLY in clearly marked probe notebooks,
-# never in assignment mechanism code (see ARCHITECTURE.md section 4).
+# never in assignment mechanism code (see claude_notes/ARCHITECTURE.md section 4).
 probe = ["timm>=1.0", "open_clip_torch>=2.24", "transformers>=4.40"]
 # Autonomous-driving libraries (A11.5*).
 av = ["nuscenes-devkit>=1.1", "pyquaternion>=0.9", "shapely>=2.0"]

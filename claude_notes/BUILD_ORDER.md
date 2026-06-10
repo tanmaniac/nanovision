@@ -5,8 +5,8 @@ each one depends on. Build strictly top-to-bottom; never build an assignment
 before its dependencies exist, because later assignments import earlier
 primitives from the shared `nanovision/` package.
 
-This plan reflects the curriculum validation in `docs/curriculum_review.md` and
-the decisions recorded in `docs/revised_curriculum.md`: each assignment builds the
+This plan reflects the curriculum validation in `curriculum_review.md` and
+the decisions recorded in `revised_curriculum.md`: each assignment builds the
 2026-consensus variant as its core with the original taught as historical
 contrast, four content items were added (geometry foundation models, a VQ
 tokenizer, a video/temporal half-assignment, and a ConvNeXt block folded into
