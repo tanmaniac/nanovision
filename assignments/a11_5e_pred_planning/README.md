@@ -1,6 +1,6 @@
 # Unified perception -> prediction -> planning
 
-You build one stage of the end-to-end driving stack: a multimodal motion-prediction head that
+This assignment builds one stage of the end-to-end driving stack: a multimodal motion-prediction head that
 maps a BEV feature grid at an agent's location to K future trajectory hypotheses, trained with a
 winner-take-all loss. The dense BEV grid is pooled around the agent with a small RoI-align, K
 learned mode queries cross-attend over those features through a few decoder layers, and each mode
@@ -36,7 +36,7 @@ only the one closest to the observed future. Each hypothesis is then free to spe
 different intention without being pulled toward the others' average. This is the min-of-N, or
 winner-take-all (WTA), loss, and it is the core mechanism of this assignment.
 
-## What you build
+## What to implement
 
 ### RoI-align: a dense BEV grid to a fixed per-agent token set
 
@@ -193,7 +193,7 @@ Driving") replaces each hard hand-off with soft query passing over a shared BEV 
 queries become motion queries become occupancy queries become planning queries; every stage is a
 transformer reading the previous stage's queries, so the whole stack is one differentiable network
 and every task is trained toward the final planning objective. The RoI-align-then-mode-query-decoder
-you built is the shape of UniAD's MotionFormer in miniature.
+built here is the shape of UniAD's MotionFormer in miniature.
 
 VAD ([arXiv 2303.12077](https://arxiv.org/abs/2303.12077), "Vectorized Scene Representation for
 Efficient Autonomous Driving") drops the dense BEV occupancy grid in favor of a vectorized scene:

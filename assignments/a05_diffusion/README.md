@@ -1,6 +1,6 @@
 # A5 - Diffusion (DDPM / DDIM)
 
-You build a denoising diffusion model from scratch on a tiny set of 16x16 shape images:
+This assignment builds a denoising diffusion model from scratch on a tiny set of 16x16 shape images:
 the forward noising process and its schedules, the training objective and the three
 prediction targets it can use, the score connection that ties noise prediction to score
 matching, the DDPM and DDIM samplers, and classifier-free guidance. Everything fits and
@@ -19,8 +19,8 @@ noise scales.
 
 Denoising diffusion (Ho, Jain, Abbeel 2020, "Denoising Diffusion Probabilistic Models",
 [arXiv:2006.11239](https://arxiv.org/abs/2006.11239)) reframed generation as learning to
-reverse a fixed noising process. You gradually add Gaussian noise to an image over many
-steps until it becomes pure noise, then train a network to undo one step at a time. The
+reverse a fixed noising process. The forward process gradually adds Gaussian noise to an
+image over many steps until it becomes pure noise, then trains a network to undo one step at a time. The
 training objective reduces to a plain mean-squared error on the added noise, which is
 stable, and the model is an ordinary feed-forward network with no invertibility or
 ordering constraint. DDPM matched GAN sample quality (CIFAR-10 FID 3.17) with a simple
@@ -234,7 +234,7 @@ flowchart TD
     emb -.-> u1
 ```
 
-## What you implement
+## What to implement
 
 The holes are the diffusion math; the U-Net plumbing is provided (except the two
 diffusion-specific pieces noted). See `ASSIGNMENT.md` for the per-function contract.

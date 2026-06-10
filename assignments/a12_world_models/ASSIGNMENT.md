@@ -21,7 +21,7 @@ external_data: none          # dm_control/MuJoCo is an optional dep for the env/
 ## motivation
 
 DreamerV3 is the latent-control world model that reaches strong performance across many domains with
-one fixed hyperparameter set. You build its core: an RSSM trained as a sequence VAE, then a
+one fixed hyperparameter set. This assignment builds its core: an RSSM trained as a sequence VAE, then a
 continuous Tanh-Normal actor trained entirely on imagined latent rollouts by dynamics backprop. The
 task is dm_control cartpole-balance from 64x64 pixels; the headline is that a policy learned purely
 in imagination transfers to the real env. Full history, the pixel-space / JEPA contrast, and the

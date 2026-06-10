@@ -1,6 +1,6 @@
 # 3D occupancy prediction
 
-You build a semantic 3D occupancy predictor and supervise it the way RenderOcc and OccNeRF do:
+This assignment builds a semantic 3D occupancy predictor and supervises it the way RenderOcc and OccNeRF do:
 by rendering the voxel grid back to 2D with the same alpha-compositing kernel from the NeRF
 assignment, run backward. The grid holds a per-voxel occupancy probability and per-voxel class
 logits; rays cast into it accumulate occupancy into a rendered depth and a rendered semantic
@@ -205,7 +205,7 @@ separates hit rays (~0.97) from miss rays (~0.02) cleanly, and the test checks t
 occupancy signal. A real system uses a denser sample budget, multi-view
 consistency, and a TV or entropy regularizer to sharpen the surface.
 
-## What you implement
+## What to implement
 
 Six holes in `occupancy.py`:
 

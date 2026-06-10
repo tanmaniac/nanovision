@@ -12,7 +12,7 @@ The flow-matching objective is reused unchanged from the flow-matching assignmen
 linear interpolant, the same $u = x_1 - x_0$ velocity target, the same Euler ODE sampler.
 What changes is where the denoiser operates (a latent, not a pixel image), what backbone it
 uses (a transformer, not a U-Net), and how conditioning enters (adaptive LayerNorm). The new
-mechanisms you implement are the VAE's reparameterization, KL, and loss, and the DiT's
+mechanisms to implement are the VAE's reparameterization, KL, and loss, and the DiT's
 adaLN-Zero block plus the patchify/unpatchify that turn a latent grid into tokens and back.
 
 ## Why latent space
@@ -195,7 +195,7 @@ flowchart LR
   z1 -->|frozen VAE decoder| out["image (B,1,16,16)"]
 ```
 
-## What you implement
+## What to implement
 
 In `vae.py`:
 - `reparameterize(mu, logvar)`: $z = \mu + \exp(\tfrac12 \log\sigma^2)\,\varepsilon$ with

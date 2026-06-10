@@ -1,6 +1,6 @@
 # A12 - world models (RSSM and DreamerV3)
 
-You build the core of a latent-control world model: a recurrent state-space model (RSSM) trained
+This assignment builds the core of a latent-control world model: a recurrent state-space model (RSSM) trained
 as a sequence variational autoencoder (VAE), then an actor-critic trained entirely on trajectories
 imagined inside that model. The target is DreamerV3 ([Hafner et al., 2023, arXiv:2301.04104](https://arxiv.org/abs/2301.04104),
 "Mastering Diverse Domains through World Models"), the latent-dynamics model that reaches strong
@@ -110,7 +110,7 @@ $[h_t, e_t]$ where $e_t$ is the CNN encoding of $o_t$. The full model state ever
 conditions on is the concatenation $[h_t, z_t]$. This build uses `n_cat = n_cls = 32` (1024 latent
 dimensions) and `h_dim = 512`, the DreamerV3 sizing. The action enters the GRU input alongside
 $z_{t-1}$; for cartpole it is the single continuous force $a_{t-1} \in [-1, 1]$, passed as a $(B, 1)$
-float (the same `forward_h` one-hots an integer action if you pass one, so the cell handles both
+float (the same `forward_h` one-hots an integer action if one is passed, so the cell handles both
 discrete and continuous control).
 
 ### Categorical latents and the straight-through estimator
@@ -305,7 +305,7 @@ linear to the 1024-wide embedding; the decoder mirrors it. The recurrent eval po
 RSSM state across the real episode: reset to the zero initial state, and at each step advance $h$
 with the previous action, take the posterior from the encoded current frame, and act.
 
-## What you'll implement
+## What to implement
 
 - `nets.py`: `symlog` / `symexp`, `twohot_encode` / `twohot_decode` over symlog-space bins, and the
   straight-through `categorical_sample` with unimix.

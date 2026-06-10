@@ -68,8 +68,8 @@ al., 2023, [arxiv.org/abs/2304.07193](https://arxiv.org/abs/2304.07193)) is DINO
 iBOT's patch-level masked distillation
 ([arxiv.org/abs/2111.07832](https://arxiv.org/abs/2111.07832)) plus a feature-spreading
 regularizer plus curated data, and it is the frozen backbone a large fraction of
-2023-2026 dense-prediction systems sit on top of, including the register-token ViT you
-already built in A2. The line forward from here: A4 (CLIP) is the third SSL family,
+2023-2026 dense-prediction systems sit on top of, including the register-token ViT built
+earlier in A2. The line forward from here: A4 (CLIP) is the third SSL family,
 language supervision instead of a hand-designed pretext, and seeing MAE and DINO first
 makes clear what CLIP buys by paying for paired text. A8 (VLM) feeds a frozen self-
 supervised ViT's patch tokens into a language model, so the quality of those tokens is
@@ -201,9 +201,9 @@ With $K = 128$, $\log K = \ln 128 = 4.85$. Remove centering and the teacher coll
 onto a single prototype, entropy near 0. Remove sharpening (use a large teacher
 temperature) and the teacher goes uniform, entropy near $\log K$. Keep both and entropy
 sits in the middle. The two collapses are different degeneracies, which is why one
-anti-collapse trick is not enough and you need both.
+anti-collapse trick is not enough and both are needed.
 
-## What you'll implement
+## What to implement
 
 Six holes, three in `mae.py` and three in `dino.py`:
 
@@ -216,7 +216,7 @@ Six holes, three in `mae.py` and three in `dino.py`:
 
 The ViT backbone, patchify/unpatchify helpers, the MAE module wiring, the DINO
 student/teacher construction, the multi-crop augmentation, the projection head, and the
-training-step wiring are all provided in `backbone.py` and the module classes. You write
+training-step wiring are all provided in `backbone.py` and the module classes. Left to implement are
 only the six mechanism bodies.
 
 ## Tasks
@@ -253,7 +253,7 @@ only the six mechanism bodies.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a03_0_ssl      # your top-level code (red until you fill the holes)
+    make test A=a03_0_ssl      # your top-level code (red until the holes are filled)
 
 The tests run in this order, which is also the intended workflow:
 

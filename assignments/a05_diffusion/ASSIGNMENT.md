@@ -25,7 +25,7 @@ external_data: "none (synthetic shape images)"
 Diffusion learns to generate by reversing a fixed Gaussian noising process: add noise to an
 image over many steps until it is pure noise, train a network to undo one step, then sample
 from noise. The training loss is a plain MSE on the added noise, which is stable where GANs
-are not. The mechanism is the content. You build the forward schedules, the closed-form
+are not. The mechanism is the content. The holes to fill are the forward schedules, the closed-form
 q_sample, the three prediction parameterizations and the algebra between them, the score
 connection, the DDPM and DDIM samplers, and classifier-free guidance. v-prediction is the
 required objective (the production default since Stable Diffusion 2); epsilon and x0 are

@@ -102,7 +102,7 @@ masked-tubelet MSE ~7e-3 against 0.05. Per-tubelet normalization puts the untrai
 baseline near MSE 1.0. Fits 12GB trivially; the gating signal is correctness, not scale.
 
 ## solution_notes
-Token-order convention is load-bearing: TubeletEmbedding flattens temporal-outermost
+The token-order convention matters here: TubeletEmbedding flattens temporal-outermost
 (idx = t'*S' + s), and tubeletify, the spatiotemporal PE, and tube_masking all assume
 it; a transpose silently breaks the tube test. tube_masking must NOT reuse A3's
 argsort(noise) per-token body; it builds explicit [keep; drop] indices so ids_restore

@@ -60,7 +60,7 @@ expert read off the state.
 
 Naive single-step BC is brittle on fine manipulation. At inference, a small prediction error moves
 the robot into a state the demonstrations never visited, where the next prediction is worse, and the
-error compounds. Action chunking is the standard mitigation, and you implement it.
+error compounds. Action chunking is the standard mitigation, and it is implemented here.
 
 ### Action chunking
 
@@ -69,13 +69,12 @@ predict a sequence of $H$ future actions (a chunk) and execute the whole chunk b
 The decision frequency drops by a factor of $H$, the policy commits to an internally consistent
 segment instead of re-deciding under accumulated drift, and the distributional shift shrinks. ACT
 reported that chunking reduces compounding error, and chunked action heads became standard because of
-it. You measure rollout reach success for chunk sizes $H \in \{1, 4, 8\}$ on the reacher; the
+it. Rollout reach success is measured for chunk sizes $H \in \{1, 4, 8\}$ on the reacher; the
 chunk-size effect on a small, clean-demo task is discussed under [Measured results](#measured-results).
 
 ACT also introduced temporal ensembling, an inference trick that blends overlapping chunks from
 consecutive queries with exponential weighting to smooth chunk boundaries. It is optional and can
-hurt: pi0 found it detrimental on their evaluation and dropped it, executing chunks open-loop. You
-execute chunks open-loop here for the same reason.
+hurt: pi0 found it detrimental on their evaluation and dropped it, executing chunks open-loop. The chunk is executed open-loop here for the same reason.
 
 ### Why a generative action head instead of plain regression
 
@@ -108,7 +107,7 @@ moves samples along straight-line paths from a Gaussian prior to the data. The t
 plain regression on the velocity, with no noise schedule. Inference integrates an ordinary
 differential equation (ODE) with as few as 5-10 steps. pi0 used conditional flow matching as the
 action head in the first large VLA at production scale, and the 2025-2026 literature has largely
-moved to flow matching for its training simplicity and few-step inference. You build the flow head as
+moved to flow matching for its training simplicity and few-step inference. The flow head is built as
 the target and a DDPM head as the labeled contrast.
 
 ### How this capstone reuses the rest of the course
@@ -233,7 +232,7 @@ Shapes throughout: $a$, $z_0$, $z_t$, $a_t$ are $(B, H, 2)$; $t$ is $(B, 1, 1)$ 
 $(B,)$ integer for the DDPM head; the conditioning $c$ is $(B, 128)$ from the encoder (or
 $(B, \text{cond\_in})$ in general); chunks are $(B, T-H+1, H, 2)$.
 
-## What you'll implement
+## What to implement
 
 - `cfm_target` and `flow_loss` and `flow_sample` in `flow.py` - the CFM interpolant, the velocity
   regression loss, and the Euler ODE sampler.

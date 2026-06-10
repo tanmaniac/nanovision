@@ -91,7 +91,7 @@ LayerNorm, GELU, fewer normalization and activation layers, layer scale) until a
 pure-convolution network matches Swin and ViT at the same compute. ConvNeXt shows that
 the transformer's accuracy gains came largely from the macro design (separate spatial
 and channel mixing, large effective kernels, the modern training recipe) rather than
-from attention itself beating convolution, so you build the block here as the
+from attention itself beating convolution, so the block is built here as the
 controlled counterpoint to the attention stack.
 
 This is the visual backbone the rest of the course imports. A3 (self-supervised
@@ -224,7 +224,7 @@ Shapes at module boundaries: images `(B, C, H, W)`; patch tokens `(B, N, d)`; th
 encoder input and output `(B, 1+N+n_reg, d)`; the pooled representation `(B, d)`;
 the logits `(B, K)`.
 
-## What you'll implement
+## What to implement
 
 Five holes:
 
@@ -238,8 +238,8 @@ Five holes:
 The ViT module construction, the transformer encoder (imported with
 `norm="layer"`, `ffn="mlp"`, `pos="none"` for the classic ViT block), the
 CLS/PE/register parameters and their init, `config.py`, the CIFAR-10 wiring in
-`train_cifar.py`, and the plotting are provided. You write only the five mechanism
-bodies.
+`train_cifar.py`, and the plotting are provided. Only the five mechanism bodies
+are left to implement.
 
 ## Tasks
 
@@ -272,7 +272,7 @@ test.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a02_vit      # your top-level code (red until you fill the holes)
+    make test A=a02_vit      # your top-level code (red until the holes are filled)
 
 The tests run in this order, which is also the intended workflow:
 
@@ -345,7 +345,7 @@ inductive-bias deficit rather than a bug in the architecture.
   and distillation recipe that trains a competitive ViT on ImageNet-1k alone.
 - Liu et al., "A ConvNet for the 2020s" - ConvNeXt (2022,
   [arxiv.org/abs/2201.03545](https://arxiv.org/abs/2201.03545)) - a modernized CNN
-  that matches ViT at equal compute; the block you build here.
+  that matches ViT at equal compute; the block built here.
 - Darcet et al., "Vision Transformers Need Registers" (2024,
   [arxiv.org/abs/2309.16588](https://arxiv.org/abs/2309.16588)) - the high-norm
   background artifacts in self-supervised ViTs and the register-token fix.

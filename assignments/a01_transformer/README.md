@@ -80,12 +80,12 @@ it LLaMA-style. The 2017 components (LayerNorm, sinusoidal/learned absolute
 encodings, GELU MLP) stay in the code as selectable options so you can run the
 historical contrast.
 
-The block you write here is reused by direct import of `nanovision.attention` and
+The block implemented here is reused by direct import of `nanovision.attention` and
 `nanovision.transformer` across most of the rest of the course. A2 (ViT) applies
 this exact transformer block to image patches instead of text tokens. A4 (CLIP)
 uses it as the text tower. A7 (the diffusion transformer, DiT) stacks these blocks with
 adaLN conditioning on the diffusion timestep. A8 (VLM) feeds visual tokens into a
-decoder-only stack just like the char-LM you assemble here. A11.5c (BEVFormer)
+decoder-only stack just like the char-LM assembled here. A11.5c (BEVFormer)
 relies on the cross-attention path to pull image features into BEV queries. A13
 (the VLA policy capstone) is again a transformer over interleaved vision, language,
 and action tokens. Get the shapes and the gradient flow right once, here, on a
@@ -233,7 +233,7 @@ The three linear layers are bias-free. The inner width is set to about $8/3$ of 
 Shapes: tensors are (batch, seq, dim) at module boundaries, (batch, heads, seq,
 head_dim) inside attention, and attention weights are (batch, heads, seq_q, seq_k).
 
-## What you'll implement
+## What to implement
 
 Seven holes:
 
@@ -244,8 +244,8 @@ Seven holes:
 - `RMSNorm.forward` and `SwiGLU.forward` in `primitives.py`.
 
 The encoder/decoder stacks, the RoPE attention wrapper, the sinusoidal and learned
-absolute positional encodings, and the char-LM assembly are provided. You write
-only the seven mechanism bodies.
+absolute positional encodings, and the char-LM assembly are provided. Only the
+seven mechanism bodies are left to implement.
 
 ## Tasks
 
@@ -277,7 +277,7 @@ test.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a01_transformer     # your top-level code (red until you fill the holes)
+    make test A=a01_transformer     # your top-level code (red until the holes are filled)
 
 The tests run in this order, which is also the intended workflow:
 

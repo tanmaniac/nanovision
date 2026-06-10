@@ -27,7 +27,7 @@ Flow matching learns a velocity field that transports noise to data along a prob
 path, trained by plain MSE regression onto a known conditional target. It is simpler than
 score matching (no score function, no constraint on the forward process) and is the
 objective behind production text-to-image systems since mid-2024 (SD3, FLUX). The mechanism
-is the content. You build the linear path and its constant velocity, the CFM loss, minibatch
+is the content. The holes to fill are the linear path and its constant velocity, the CFM loss, minibatch
 optimal-transport coupling, logit-normal timestep sampling, Euler ODE sampling, the
 straightness metric, and (provided) reflow, all on a 2D toy where the field and trajectories
 are fully visible. The diffusion-flow equivalence ties this back to A5 through the

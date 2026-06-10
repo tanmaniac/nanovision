@@ -10,7 +10,7 @@ to the ground-truth objects, and let the matching loss do the work that anchors 
 non-maximum suppression used to do.
 
 This assignment builds the matching mechanism and the set-prediction loss on a tiny toy
-(colored squares on a black background). You implement generalized IoU, the Hungarian
+(colored squares on a black background). The holes to fill are generalized IoU, the Hungarian
 matching cost, and the loss. The ViT backbone, the query decoder, and the output heads are
 provided, because the lesson is the matcher and the loss, not the plumbing.
 
@@ -34,8 +34,8 @@ also hand-built: assign each ground-truth box to the anchors whose IoU with it e
 threshold, mark the rest as background, and accept the class imbalance (most anchors are
 background) with focal loss or hard-negative mining.
 
-DETR's claim is that both pieces, the anchors and the NMS, are scaffolding you can remove if
-you train the model to emit the set directly.
+DETR's claim is that both pieces, the anchors and the NMS, are scaffolding that can be removed by
+training the model to emit the set directly.
 
 ## Set prediction needs a permutation-invariant loss
 
@@ -63,7 +63,7 @@ predictions and leaves the rest as no-object.
 A bipartite matching pairs each element of one set with a distinct element of another to
 minimize total cost. With a square cost matrix $C[i, j]$ (cost of assigning prediction $i$ to
 target $j$), the optimal one-to-one assignment is the linear assignment problem, solved
-exactly in $O(n^3)$ by the Hungarian algorithm (Kuhn, 1955). You do not implement it; SciPy's
+exactly in $O(n^3)$ by the Hungarian algorithm (Kuhn, 1955). It is not implemented here; SciPy's
 `scipy.optimize.linear_sum_assignment` is the solver, the same one the flow-matching
 assignment used for optimal-transport coupling.
 
@@ -267,7 +267,7 @@ resource-constrained competitor that still wins on the tightest latency budgets.
 autonomous-driving perception stack, RT-DETR or a DINO variant runs as the production
 detector, Grounding DINO covers rare or long-tail classes the closed detector was never
 trained on, and SAM 2 or 3 sits in the annotation loop to cut labeling cost. The matcher and
-loss you build here are the core of all of these.
+loss built here are the core of all of these.
 
 ## What the toy proves, and what it does not
 

@@ -1,6 +1,6 @@
 # BEVFormer-style attention
 
-You build the query-pull camera-to-BEV view transform: each bird's-eye-view (BEV) cell projects a
+This assignment builds the query-pull camera-to-BEV view transform: each bird's-eye-view (BEV) cell projects a
 vertical pillar of 3D reference points back into every camera and bilinear-samples the features it
 needs, then a temporal step warps the previous BEV grid by the ego motion and fuses it. This is
 BEVFormer (Li et al., ECCV 2022, [arXiv:2203.17270](https://arxiv.org/abs/2203.17270)). The dense
@@ -11,7 +11,7 @@ and map/motion prediction (A11.5e) consume unchanged.
 
 The camera-to-BEV view transform turns a ring of perspective camera images into one ego-centric
 top-down feature grid, the representation a driving stack plans in. Lift-Splat-Shoot, the
-depth-push transform you built before this, predicts a depth distribution per pixel and pushes each
+depth-push transform built before this, predicts a depth distribution per pixel and pushes each
 image feature out into 3D, then sums the features that land in each BEV cell. The depth is a latent
 variable, so a wrong depth puts the feature in the wrong cell, and the frustum point cloud is
 memory-heavy: one point per (pixel, depth bin) per camera.
@@ -19,7 +19,7 @@ memory-heavy: one point per (pixel, depth bin) per camera.
 BEVFormer inverts the direction. Instead of pushing pixels out to where depth says they go, it
 starts from the BEV grid and pulls: each BEV cell knows its own 3D location, so it projects that
 location into the cameras and reads the features at the projected pixels. No per-pixel depth is
-predicted. The projection is exact geometry (the camera intrinsics and extrinsics you built in the
+predicted. The projection is exact geometry (the camera intrinsics and extrinsics built in the
 camera-geometry assignment), and a cell that several cameras see averages their reads. This is the
 query-pull view transform, and it sidesteps the depth-estimation step that depth-push depends on.
 
@@ -195,7 +195,7 @@ here is an overfit on one scene, not a generalization result.
 ### BEVFormer's place in 2026
 
 Frame BEVFormer as the foundational query-pull mechanism, not current state of the art. The dense
-BEV grid persists where you need a dense output: map segmentation and occupancy (A11.5d/e build on
+BEV grid persists where a dense output is needed: map segmentation and occupancy (A11.5d/e build on
 exactly this grid). For camera-only 3D object detection on nuScenes, sparse-query methods that drop
 the dense grid now lead. Sparse4D v2 (Lin et al., 2023,
 [arXiv:2305.14018](https://arxiv.org/abs/2305.14018)) carries a recurrent set of sparse instance
@@ -210,7 +210,7 @@ worth one note: it adds perspective supervision, an auxiliary 2D detection head 
 backbone, and shows that without it modern image backbones transfer poorly to BEV. If a frozen 2D
 backbone gives weak BEV results, the cause is the 3D-supervision gap, not the attention code.
 
-## What you implement
+## What to implement
 
 - `bev_reference_points`: BEV cell centers to ego-frame pillars at $n_{ref}$ heights.
 - `project_reference_points`: ego pillars to grid_sample coords and an in-frame mask, reusing the

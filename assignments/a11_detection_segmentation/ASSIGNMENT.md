@@ -30,7 +30,7 @@ DETR (Carion et al., 2020) reframes object detection as set prediction: emit a f
 unordered set of (class, box) pairs in one forward pass, with no anchor boxes and no
 non-maximum suppression (NMS). One-to-one bipartite matching between predictions and ground
 truth supplies the training target and, as a side effect, trains the model against producing
-duplicates, so NMS is not needed. The mechanism is the content. You build generalized IoU,
+duplicates, so NMS is not needed. The mechanism is the content. The holes to fill are generalized IoU,
 the Hungarian matching cost, and the set-prediction loss; the ViT backbone, query decoder,
 and heads are provided. See the README for the math and the lineage to Deformable DETR,
 DINO, RT-DETR, Mask2Former, Grounding DINO, and SAM.

@@ -1,10 +1,10 @@
 # Lift-Splat-Shoot
 
-You build the view transform that takes camera images and produces a bird's-eye-view (BEV)
+This assignment builds the view transform that takes camera images and produces a bird's-eye-view (BEV)
 feature grid by predicting a depth distribution per pixel, pushing the features out into 3D, and
 summing them into BEV pillars. This is Lift-Splat-Shoot (Philion & Fidler, ECCV 2020,
 [arXiv:2008.05711](https://arxiv.org/abs/2008.05711)). The depth-lift and the sort+cumsum pooling
-you write here are the shared infrastructure that occupancy prediction (A11.5d) reuses unchanged.
+implemented here are the shared infrastructure that occupancy prediction (A11.5d) reuses unchanged.
 
 ## Motivation
 
@@ -12,14 +12,14 @@ A self-driving stack plans in a top-down map of the world around the car: where 
 where other vehicles are, what is drivable. The cameras do not see that map. They see six
 perspective images on a ring around the roof, each a 2D projection that has thrown away depth.
 Turning those images into one ego-centric BEV grid is the camera-to-BEV view transform, and how
-you do it sets the ceiling on everything downstream.
+it is done sets the ceiling on everything downstream.
 
 The geometry-only baseline is inverse perspective mapping (the flat-ground homography from the
 camera-geometry assignment): assume every pixel lies on the ground plane at $z=0$, project each
 BEV cell to a pixel, and sample the image there. That is exact for the road surface and lane
 markings, and wrong for anything with height. A car 1.5 m tall projects to the same pixel as a
 ground point farther away, so IPM smears tall objects outward, away from their true footprint. A
-single image cannot recover height from one ground-plane assumption. You need depth.
+single image cannot recover height from one ground-plane assumption. Depth is needed.
 
 The pre-LSS options for getting depth were a separate lidar sensor, or a monocular depth network
 that produces one depth per pixel and back-projects a point cloud. A hard one-depth-per-pixel
@@ -40,7 +40,7 @@ splat collapses that cloud onto the BEV plane by summing every point that falls 
 cell ("pillar pooling"). A naive implementation does a scatter-add with one atomic write per
 point, which is slow and awkward to differentiate. LSS instead sorts the points by their pillar
 index and uses a cumulative-sum trick (section 3.2): the sum over a pillar is the difference of
-two cumsum values at the pillar's boundaries. You implement that trick here.
+two cumsum values at the pillar's boundaries. That trick is implemented here.
 
 ```mermaid
 flowchart LR
@@ -69,7 +69,7 @@ depth was often wrong even when detection looked fine, because segmentation tole
 depth but precise 3D boxes do not. Their fix is to add an explicit cross-entropy loss on the
 depth distribution, supervised by projected lidar points (the nearest depth bin to each lidar
 return). That single supervision signal was the main driver of the accuracy jump and is standard
-in production camera detectors, so you implement it here as `bevdepth_depth_loss`. BEVPoolv2
+in production camera detectors, so it is implemented here as `bevdepth_depth_loss`. BEVPoolv2
 (2022, [arXiv:2211.17111](https://arxiv.org/abs/2211.17111)) is a deployment optimization, not a
 new idea: it precomputes the frustum-to-pillar index and fuses the pooling into one CUDA kernel,
 reported around 15x faster, because the frustum tensor is the memory and latency bottleneck at
@@ -80,7 +80,7 @@ out into 3D along a depth distribution, then pools. BEVFormer (ECCV 2022,
 [arXiv:2203.17270](https://arxiv.org/abs/2203.17270)), the next assignment, pulls features in: it
 starts from BEV grid queries, projects each query to reference points in the images, and gathers
 features there with attention. Both end at a BEV feature grid; they differ in which direction the
-geometry runs. Occupancy prediction (A11.5d) reuses your exact depth-lift and frustum code with
+geometry runs. Occupancy prediction (A11.5d) reuses the exact depth-lift and frustum code with
 one change: drop the BEV collapse and keep the full 3D voxel grid, passing a 3D voxel index to
 `cumsum_pool` instead of a 2D pillar index. GaussianLSS (CVPR 2025,
 [arXiv:2504.01957](https://arxiv.org/abs/2504.01957)) is the current frontier on the depth
@@ -100,7 +100,7 @@ gap BEVDepth's supervision closes.
 
 A feature cell at feature-grid location $(i, j)$ corresponds to image pixel
 $\big((j+0.5)\cdot s,\ (i+0.5)\cdot s\big)$ for backbone stride $s$. `config.pixel_xy()` precomputes
-this grid, so the bookkeeping is provided and the geometry is the part you write.
+this grid, so the bookkeeping is provided and the geometry is the part to implement.
 
 Depth bins. The bin centers are $\texttt{arange}(d_{\min}, d_{\max}, d_{\text{step}})$, EXCLUSIVE
 of $d_{\max}$. With $d_{\min}=1$, $d_{\max}=9$, $d_{\text{step}}=1$ that is $[1, 2, \dots, 8]$, so
@@ -124,7 +124,7 @@ camera-frame point with the pinhole inverse,
 $$X = \frac{(u - c_x)\,d}{f_x},\qquad Y = \frac{(v - c_y)\,d}{f_y},\qquad Z = d,$$
 
 then map to the ego frame. The extrinsic $E$ is $T_{cam\_ego}$ (ego $\to$ camera), so ego points
-come from its inverse $T_{ego\_cam} = E^{-1}$. You reuse `unproject`, `invert_transform`, and
+come from its inverse $T_{ego\_cam} = E^{-1}$. The transform reuses `unproject`, `invert_transform`, and
 `apply_transform` from the camera-geometry assignment; `frustum_points` returns
 $(D, H_f, W_f, 3)$ ego-frame points.
 
@@ -159,7 +159,7 @@ tensor the model uses. The label is only valid when $z_{\text{cam}}$ falls in
 $[d_{\min}, d_{\max}]$, which the toy guarantees by clamping vehicle depth to the reachable range.
 With no labeled cell the loss is 0.
 
-## What you'll implement
+## What to implement
 
 In `lift_splat.py` (the holed file; the shared library re-exports these through
 `nanovision.lift_splat`):

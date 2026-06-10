@@ -1,12 +1,12 @@
 # A9 - NeRF and the volume rendering integral
 
-You build the core of a neural radiance field on a small synthetic scene: the Fourier
+This assignment builds the core of a neural radiance field on a small synthetic scene: the Fourier
 positional encoding that fixes the MLP's spectral bias, the discretized volume renderer that
 turns per-sample densities and colors into a pixel, and ray generation from camera
 intrinsics and extrinsics. The radiance-field MLP and the toy scene are provided. The scene
 is one colored solid sphere imaged at 16x16 from a ring of cameras, so every test runs on CPU
 in seconds, and its ground-truth pixels come from a closed-form integral, not from the
-renderer you are building.
+renderer being built here.
 
 NeRF is the volume-rendering vehicle here, not a method to deploy. By 2026, 3D Gaussian
 splatting renders at similar quality roughly 100x faster (Kerbl et al. 2023,
@@ -227,7 +227,7 @@ The full NeRF result (the Blender Lego scene at 800x800, ~20k training steps, ~2
 out of scope here: it wants a GPU and minutes to hours. This assignment runs the same math on a
 16x16 sphere that fits in CPU seconds.
 
-## What you implement
+## What to implement
 
 - `PositionalEncoding.forward` (`encoding.py`): the $\gamma(p)$ Fourier feature map, with
   `include_input`, no learnable parameters.

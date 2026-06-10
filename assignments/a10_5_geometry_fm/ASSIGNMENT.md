@@ -26,8 +26,8 @@ DUSt3R regresses two per-pixel pointmaps (the 3D point each pixel sees), both in
 camera's frame, from an image pair, with no intrinsics, poses, or matching as input. Depth,
 relative pose, and correspondence are read off the pointmaps afterward. This replaces the
 classic keypoint -> match -> pose -> triangulate -> bundle-adjust SfM pipeline, which is
-brittle on low-texture, wide-baseline, and few-image inputs, with one forward pass. You build
-the regression mechanism: the pointmap head, the confidence-weighted scale-normalized loss,
+brittle on low-texture, wide-baseline, and few-image inputs, with one forward pass. The regression
+mechanism is the content: the pointmap head, the confidence-weighted scale-normalized loss,
 and the depth/pointmap/reprojection utilities. See the README for the full treatment.
 
 ## background

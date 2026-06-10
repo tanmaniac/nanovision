@@ -1,6 +1,6 @@
 # A6 - Flow matching and rectified flow
 
-You build conditional flow matching from scratch on a 2D toy where the velocity field and
+This assignment builds conditional flow matching from scratch on a 2D toy where the velocity field and
 the trajectories are fully visible: the linear probability path, the CFM training
 objective, minibatch optimal-transport coupling, logit-normal timestep sampling, Euler ODE
 sampling, a straightness metric, and the rectified-flow reflow procedure. The diffusion-flow
@@ -153,7 +153,7 @@ art. The stochastic-interpolants framework (Albergo, Boffi & Vanden-Eijnden 2023
 [arXiv:2303.08797](https://arxiv.org/abs/2303.08797)) unifies diffusion and flow matching as
 special cases.
 
-## What you implement
+## What to implement
 
 The holes are the flow-matching mechanism, tested on a 2D velocity MLP (provided) where
 everything is visible. See `ASSIGNMENT.md` for the per-function contract.

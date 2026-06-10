@@ -3,23 +3,23 @@
 ## Motivation
 
 This course is organized around one rule: prove a mechanism is correct on a tiny
-problem before you ever run real training. A0 builds the tools that make that rule
+problem before ever running it in real training. A0 builds the tools that make that rule
 operational, and it builds them on the three primitives every transformer block is
 made of. This first assignment is about the course's method as much as about
 LayerNorm and GELU.
 
-The method exists because of how training failures actually present themselves. If
-you implement a forward pass with a subtle bug - a normalization over the wrong
+The method exists because of how training failures actually present themselves. When a
+forward pass has a subtle bug - a normalization over the wrong
 axis, a transposed weight, a broadcast that silently does the wrong thing - the
 program does not crash. It produces tensors of the right shape and a loss that goes
-down a little and then plateaus. You are now staring at a loss curve trying to
-infer, from a single scalar per step, which of dozens of lines is wrong. Each
+down a little and then plateaus. All that is left is a loss curve, a single scalar
+per step, from which to infer which of dozens of lines is wrong. Each
 hypothesis costs a training run. This is the most expensive way to debug code that
 exists, and it is the default workflow people fall into. The course refuses it: we
 make correctness observable directly, at the level of the operation, before any
 optimizer touches a parameter.
 
-Two checks carry that weight, and you build both here.
+Two checks carry that weight, and both are built here.
 
 The first is `check_gradients`, a thin wrapper over
 [`torch.autograd.gradcheck`](https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html).
@@ -34,12 +34,12 @@ floating-point error that grows as `eps` shrinks; in float32 those two error
 sources leave no `eps` where the estimate is sharp, and the check is too loose to
 catch real bugs. In float64 there is a wide window where the numerical gradient is
 accurate to many digits, so agreement is close to a proof that your hand-written
-forward is correct, and you got there without writing a single line of backward
-pass. You implement the mechanism forward, and gradcheck certifies the gradient
+forward is correct, and that holds without writing a single line of backward
+pass. The mechanism forward is implemented, and gradcheck certifies the gradient
 for free.
 
-The second is overfit-one-batch, driven by `Trainer.overfit_one_batch`. You take
-one fixed batch and train on it, and only it, until the loss reaches approximately
+The second is overfit-one-batch, driven by `Trainer.overfit_one_batch`. It takes
+one fixed batch and trains on it, and only it, until the loss reaches approximately
 zero. A model with enough capacity to represent the batch *must* be able to
 memorize it; if it cannot, something in the model-plus-training-loop wiring is
 broken. This is the canonical first signal in the course that an end-to-end system
@@ -57,7 +57,7 @@ course, when an assignment says "a flat curve here is expected, not a bug" (the
 tells you the difference between a flat curve from a correct-but-underpowered run
 and a flat curve from a wiring mistake.
 
-The primitives you build alongside these tools are the right first mechanisms
+The primitives built alongside these tools are the right first mechanisms
 because every transformer block in the rest of the course is exactly these three
 plus attention. LayerNorm normalizes each sample's activations across the feature
 dimension to zero mean and unit variance, then rescales by a learned gain and
@@ -94,7 +94,7 @@ and `SwiGLU` to the same module for the LLaMA-style default). Every assignment f
 A1 onward verifies its new mechanism with `check_gradients` and proves its
 model-plus-loop with `overfit_one_batch`, both built here. The `Trainer`, the
 determinism helpers, and the loss-curve viz are reused unchanged for the rest of
-the course. You are building the instruments before the experiments.
+the course. These are the instruments, built before the experiments.
 
 The method is a fixed sequence of cheap-to-expensive checks. Each gate catches a
 different class of bug before the next one runs, so you never spend a real training
@@ -183,7 +183,7 @@ flowchart LR
     S -.->|"next call on<br/>same batch"| Z
 ```
 
-## What you'll implement
+## What to implement
 
 `gelu`, `LayerNorm.forward`, and `MLP.forward` in `primitives.py`, and
 `Trainer.step` in `trainer.py`. Four small holes. Everything else - the
@@ -216,7 +216,7 @@ test order is the workflow: shapes first (cheapest, catches axis and broadcast
 mistakes), then gradcheck (certifies the forward is differentiably correct), then
 overfit (proves the whole loop).
 
-    make test A=a00_harness      # your top-level code; red until you fill the holes
+    make test A=a00_harness      # your top-level code; red until the holes are filled
 
 That runs, in order:
 

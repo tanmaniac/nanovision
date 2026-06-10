@@ -5,7 +5,7 @@
 Everything up to here treats an image as a static grid. Real perception is temporal:
 a self-driving stack reasons about motion, a world model predicts the next frame, and
 telling a person sitting down from a person standing up needs more than one frame. This
-assignment extends the ViT and the MAE you already built to video, and most of the
+assignment extends the ViT and the MAE built earlier to video, and most of the
 extension is mechanical. The ViT patch embedding becomes a tubelet embedding (a tubelet
 is a small block of pixels spanning a few frames and one spatial patch; the embedding is
 a 3D strided convolution instead of a 2D one), the masked autoencoder (MAE) reconstructs
@@ -130,7 +130,7 @@ pixels. The loss is MAE's masked-patch MSE with the patch enlarged from `p*p` to
 $$L_{\text{video}} = \frac{\sum_i \mathrm{mask}_i \cdot \operatorname*{mean}_{\text{pixels}}\big[(\mathrm{pred}_i - \mathrm{target}_i)^2\big]}{\sum_i \mathrm{mask}_i},
 \qquad \mathrm{target} = \operatorname{per\_tubelet\_normalize}(\operatorname{tubeletify}(\mathrm{clip}))$$
 
-## What you'll implement
+## What to implement
 
 Three holes, one shared and two local:
 
@@ -140,7 +140,7 @@ Three holes, one shared and two local:
 
 The tubelet helpers (`tubeletify`/`untubeletify`/`per_tubelet_normalize`), the video ViT
 encoder, the mask-token reassembly, and the `VideoMAE` module wiring are provided in
-`backbone.py` and `video_mae.py`. You write only the three mechanism bodies.
+`backbone.py` and `video_mae.py`. Only the three mechanism bodies are left to implement.
 
 ## Tasks
 
@@ -161,7 +161,7 @@ encoder, the mask-token reassembly, and the `VideoMAE` module wiring are provide
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a03_5_video      # your top-level code (red until you fill the holes)
+    make test A=a03_5_video      # your top-level code (red until the holes are filled)
 
 The tests run in this order:
 

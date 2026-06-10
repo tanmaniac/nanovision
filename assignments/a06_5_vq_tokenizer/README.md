@@ -1,6 +1,6 @@
 # A6.5 - VQ tokenizer
 
-You build a VQ-VAE: a convolutional encoder maps a 16x16 image to a 4x4 grid of continuous
+This assignment builds a VQ-VAE: a convolutional encoder maps a 16x16 image to a 4x4 grid of continuous
 vectors, a learned codebook snaps each to its nearest discrete code, and a decoder
 reconstructs the image. The non-differentiable nearest-neighbor lookup is trained through
 with the straight-through estimator. Then a small autoregressive transformer (the one built
@@ -115,7 +115,7 @@ flowchart LR
     G --> DEC["codebook + decoder<br/>-> image"]
 ```
 
-## What you implement
+## What to implement
 
 - `quantize.py`: `VectorQuantizer.forward` (nearest-code lookup, the straight-through
   estimator, the codebook and commitment losses). This is the shared

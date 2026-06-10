@@ -19,7 +19,7 @@ detection, segmentation, occupancy, and motion prediction all read and write.
 
 [nuScenes](https://arxiv.org/abs/1903.11027) (Caesar et al., CVPR 2020) is the
 dataset this module is built on, and most of the real content of this assignment
-is its coordinate-frame plumbing rather than the pinhole model you already know.
+is its coordinate-frame plumbing rather than the familiar pinhole model.
 nuScenes defines three nested frames: each sensor's own frame (lidar points in
 the lidar frame; the scene in each camera's OpenCV frame, +x right, +y down, +z
 forward), the ego frame (vehicle body, origin at the rear-axle midpoint, x
@@ -46,7 +46,7 @@ the chain, because the vehicle moved in between. At 30 m/s a ~50 ms offset is
 about 1.5 m of translation, which is enough to visibly slide projected points off
 moving objects at the edge of the field of view. The naive shortcut, reusing the
 lidar-time ego pose for the camera step, is exactly the bug this assignment makes
-you see. You build both the naive and the timestamp-correct chain and watch them
+you see. The assignment builds both the naive and the timestamp-correct chain and contrasts them
 disagree by the ego motion.
 
 A naive flat-ground BEV is not enough, which is why the later assignments exist.
@@ -68,7 +68,7 @@ A11.5c. IPM is the baseline whose failure those methods are built to fix.
 One nuScenes-specific simplification: the core dataset images are pre-undistorted
 and stored rectified, so the stored K is an exact pinhole intrinsic with no
 radial or tangential distortion terms. (The nuImages spin-off keeps distortion;
-the core dataset does not.) You do not implement any undistortion here.
+the core dataset does not.) No undistortion is implemented here.
 
 This assignment builds `nanovision.geometry` (`project_points`
 / `unproject`, the four SE(3) primitives `make_transform` / `apply_transform` /
@@ -79,7 +79,7 @@ extrinsics) and the `BEVGrid`, replacing the flat-ground homography with a learn
 per-pixel depth that unprojects image features into 3-D. A11.5c (BEVFormer)
 reuses the same K and extrinsics; its spatial cross-attention computes, for each
 BEV cell, the 2-D image coordinate it projects to, which is the back half of the
-projection chain you build here. A11.5d (occupancy) extends the `BEVGrid` with a z
+projection chain built here. A11.5d (occupancy) extends the `BEVGrid` with a z
 axis and projects voxel-center queries with the same chain, just with non-zero z.
 A11.5e (prediction) consumes the BEV feature map produced upstream and relies on
 the `BEVGrid` definition (ego-centric, fixed range and resolution) to read it
@@ -187,9 +187,9 @@ between the two timestamps, which is the 1.5 m the test measures.
 ### The pyquaternion convention
 
 nuScenes stores rotations as scalar-first quaternions `(w, x, y, z)` in both
-`calibrated_sensor` and `ego_pose`. You work in SE(3) composition rather than
+`calibrated_sensor` and `ego_pose`. The chain works in SE(3) composition rather than
 quaternion algebra: build the 4x4 matrices immediately and chain them. The loader
-already does the quaternion-to-matrix step for you; you work in 4x4 matrix form.
+already does the quaternion-to-matrix step, so the work stays in 4x4 matrix form.
 
 ### The ego-centric BEV grid (the module-wide contract)
 
@@ -243,13 +243,13 @@ z = 0, which is farther from the camera than the object's actual footprint:
 The gap between `true footprint` and `X` grows with the object's height and its
 distance from the camera, which is why tall objects streak outward in the BEV.
 
-## What you'll implement
+## What to implement
 
 In `geometry.py`: `project_points` / `unproject`, the four SE(3)
 primitives (`make_transform`, `apply_transform`, `invert_transform`,
 `compose_transforms`), `CameraRig` (`world_to_cam`, `cam_to_world`,
 `world_to_pixel`), and `ipm_to_bev`. The `BEVGrid` dataclass is provided. The
-nuScenes loader is provided boilerplate; you do not implement the devkit plumbing.
+nuScenes loader is provided boilerplate; the devkit plumbing is not implemented here.
 
 ## Tasks
 

@@ -24,7 +24,7 @@ intentions (turn left, go straight, turn right). A single trajectory regressor t
 error is pulled to the conditional mean of those futures, a path through the middle of every
 option that matches none of them. This is mode averaging. The fix is to predict K trajectory
 hypotheses and supervise only the closest one per sample, the min-of-N (winner-take-all) loss.
-You build one stage of the end-to-end driving stack: a multimodal motion-prediction head that
+This assignment builds one stage of the end-to-end driving stack: a multimodal motion-prediction head that
 maps BEV features at an agent's location to K future trajectories. The full treatment, the
 end-to-end stack (UniAD -> VAD -> DriveTransformer), and the open-loop-metric critique are in the
 README.

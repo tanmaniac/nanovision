@@ -1,6 +1,6 @@
 # A10.5 - geometry foundation models (DUSt3R-style pointmap regression)
 
-You feed two images of a scene into one network and it returns, for every pixel, the 3D
+Two images of a scene feed into one network, and it returns, for every pixel, the 3D
 coordinate of the surface that pixel sees. Both sets of 3D points come out in the same
 coordinate frame (the first camera's), so depth, relative pose, and correspondence are read
 off the output afterward. No intrinsics, no poses, and no feature matching go in. This is
@@ -248,7 +248,7 @@ In robotics and autonomous driving these models give pose-free reconstruction fr
 rig: feed the surround images and get consistent 3D geometry without a calibrated SfM run,
 which is the same shared-frame trick applied to a vehicle's cameras instead of a stereo pair.
 
-## What you implement
+## What to implement
 
 The holes are the pointmap head's forward pass, the two loss functions, and the three
 geometry utilities. The Siamese encoder, the cross-attending decoders, the toy ground-truth

@@ -1,13 +1,14 @@
 # nanovision
 
-An implement-the-mechanism course in modern computer vision. You learn the methods
-that shaped vision from 2020 to 2026 (ViT, self-supervised pretraining, CLIP,
+An implement-the-mechanism course in modern computer vision, covering the methods
+that shaped the field from 2020 to 2026 (ViT, self-supervised pretraining, CLIP,
 diffusion and flow matching, latent DiT, VLMs, NeRF and Gaussian splatting,
 detection and segmentation, autonomous-driving BEV and occupancy, world models, and
 VLA) by writing the core mechanism of each one from scratch in PyTorch.
 
-The premise is that you understand a method when you can build its load-bearing
-piece yourself, not when you can call a library. So for each topic you fill in the
+The premise is that you understand a method when you can build the piece that does
+the actual work yourself, not when you can call a library. So each topic leaves a
+hole to fill in for the
 mechanism (scaled dot-product attention, the diffusion noise schedule, the lift-splat
 projection, the Gaussian rasterizer forward, the RSSM transition) on a tiny problem
 where correctness is checkable on a CPU in seconds. Training at real scale is never
@@ -40,8 +41,8 @@ is not pip-installed.
 
 The shared `nanovision/` package is built by you as you go. Each module there is a
 thin shim that imports its symbols back from the assignment that owns them, so once
-you implement attention in the transformer assignment, every later assignment that
-does `from nanovision.attention import MultiHeadAttention` gets your code. The full
+attention is implemented in the transformer assignment, every later assignment that
+does `from nanovision.attention import MultiHeadAttention` gets that code. The full
 import-path contract is in `claude_notes/ARCHITECTURE.md`.
 
 ## How to approach the material
@@ -52,14 +53,14 @@ For each assignment:
    links; read them first so the mechanism has context.
 2. Read the assignment's `README.md`. Every per-assignment README is written as
    standalone lecture notes, not a terse handout: the historical setting, why the
-   paper mattered, the math you implement with every shape stated, and how this
+   paper mattered, the math to implement with every shape stated, and how this
    mechanism feeds later assignments. This is the primary thing you read.
 3. Implement. Fill the `raise NotImplementedError` holes, then run the tests.
 
 ## How to complete an assignment
 
-You edit the top-level files in `assignments/<id>/` (for example `vit.py`,
-`mae.py`, `attention.py`). The lines that carry the actual mechanism are replaced
+The files to edit are the top-level files in `assignments/<id>/` (for example
+`vit.py`, `mae.py`, `attention.py`). The lines that carry the actual mechanism are replaced
 with `raise NotImplementedError("...")` and a docstring stating the contract: input
 and output shapes, what to implement, and which formula. Fill those holes.
 
@@ -78,7 +79,7 @@ Activate the environment first (`conda activate nanovision`), then use the `make
 targets. `A` is the assignment directory id (for example `a00_harness`).
 
 ```
-make test   A=a02_vit    # run YOUR code against the tests (red until you fill the holes)
+make test   A=a02_vit    # run YOUR code against the tests (red until the holes are filled)
 make verify A=a02_vit    # run the solution/ reference (must be green)
 make viz    A=a02_vit    # render the result to assignments/a02_vit/out/
 make test-all            # your code across every assignment (unfilled ones fail; expected)
@@ -113,7 +114,7 @@ assignment imports primitives from earlier ones, so its dependencies must exist
 first. The dependency column lists the assignments whose code or shared-library
 symbols this one imports.
 
-| Id | Title | What you build | Depends on |
+| Id | Title | What to build | Depends on |
 |----|-------|----------------|------------|
 | a00_harness | Harness and primitives | LayerNorm, GELU, MLP, the generic `Trainer`, gradcheck and determinism helpers, toy datasets | none |
 | a01_transformer | Transformer from scratch | Scaled dot-product and multi-head attention, the LLaMA-style block (RMSNorm, RoPE, SwiGLU), encoder/decoder, GQA/MQA | a00 |

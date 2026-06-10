@@ -1,11 +1,11 @@
 # A8 - Vision-language model (LLaVA-style)
 
-You build the bridge that connects a frozen image encoder to a language model. The vision
-transformer (ViT) you built earlier produces one feature vector per image patch; a small
+This assignment builds the bridge that connects a frozen image encoder to a language model. The vision
+transformer (ViT) from the earlier assignment produces one feature vector per image patch; a small
 projector maps those vectors into the language model's embedding space; the projected visual
 tokens are prepended to the caption's text embeddings; and a decoder-only language model runs
 over the combined sequence and predicts the caption autoregressively. The image conditions
-every text prediction because the visual tokens sit in the model's context. You implement the
+every text prediction because the visual tokens sit in the model's context. The holes to fill are the
 projector, a Perceiver-style resampler as the contrast connector, the prepend operation, and
 the masked next-token loss. Everything runs on CPU in seconds on a toy of 16x16 images paired
 with three-token captions.
@@ -24,7 +24,7 @@ depend on image content. The design question is the visual-token interface: how 
 becomes tokens, how many tokens it becomes, where those tokens enter the language model, and
 how the model knows their positions.
 
-The approach you build is LLaVA (Liu et al. 2023, "Visual Instruction Tuning",
+The approach implemented here is LLaVA (Liu et al. 2023, "Visual Instruction Tuning",
 [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)). It is the simplest interface that
 works: run a frozen image encoder, project its patch features into the language model's
 embedding dimension with a small trained network, prepend the projected vectors to the text
@@ -63,7 +63,7 @@ single linear layer. LLaVA-1.5 (Liu et al. 2023, "Improved Baselines with Visual
 Tuning", [arXiv:2310.03744](https://arxiv.org/abs/2310.03744)) replaced it with a 2-layer MLP,
 $\text{Linear} \to \text{GELU} \to \text{Linear}$, and a controlled ablation in that paper
 showed the MLP improves the alignment over the single linear layer. That 2-layer MLP is the
-`MLPProjector` you implement. It is applied per patch and does not mix patches, so it produces
+`MLPProjector` implemented here. It is applied per patch and does not mix patches, so it produces
 exactly one visual token per patch: 16 patches in, 16 visual tokens out.
 
 `prepend_visual` then concatenates the visual tokens before the text embeddings along the
@@ -89,7 +89,7 @@ all of them enter the context. LLaVA and LLaVA-1.5 are the canonical examples; Q
 [arXiv:2502.13923](https://arxiv.org/abs/2502.13923)) uses an MLP patch-merger that
 concatenates a small block of neighboring patches before the projection, which cuts the token
 count by the block size while staying in this family. The token count scales with the image
-resolution, so a higher-resolution image costs more context. This is the family you implement.
+resolution, so a higher-resolution image costs more context. This is the family implemented here.
 
 The resampler family compresses a variable number of patches to a fixed number of output
 tokens with cross-attention. A fixed set of learned query vectors attends over the patch
@@ -106,7 +106,7 @@ resolution, at the price of throwing away detail when the image has more than th
 carry. Note the version split: Qwen-VL (2023) is resampler-family, while Qwen2.5-VL (2025) is
 MLP-patch-merger-family.
 
-The `PerceiverResampler` you implement is a deliberate single-layer miniature of this family.
+The `PerceiverResampler` implemented here is a deliberate single-layer miniature of this family.
 $Q$ learned query vectors (an `nn.Parameter` of shape $(1, Q, \text{dim}_l)$, expanded to the
 batch) cross-attend once over the projected patch features:
 
@@ -135,7 +135,7 @@ costs you (two representation spaces that the projector has to align).
 ## Where the visual tokens enter
 
 Prepending is one of two injection points. LLaVA prepends the visual tokens into the context
-and changes nothing else about the language model, which is what you build. Flamingo instead
+and changes nothing else about the language model, which is the approach implemented here. Flamingo instead
 leaves the text sequence alone and inserts new gated cross-attention layers between the
 language model's existing layers; those layers attend from the text to the resampled visual
 tokens, and a learned gate starts at zero so the pretrained language model is undisturbed at
@@ -270,7 +270,7 @@ token-compression methods exist as a response: InternVL2's pixel-shuffle (Chen e
 to cut tokens, and Qwen2.5-VL's patch-merger concatenates neighboring patches before projection.
 A8 mentions these but does not implement them.
 
-## What you implement
+## What to implement
 
 - `MLPProjector.forward` (`projector.py`): the 2-layer MLP, $\text{Linear} \to \text{GELU} \to
   \text{Linear}$, applied per patch, (B, N, $\text{dim}_v$) -> (B, N, $\text{dim}_l$).

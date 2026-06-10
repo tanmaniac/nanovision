@@ -61,7 +61,7 @@ CLIP ViT, and Grounding DINO (Liu et al., 2023,
 [arxiv.org/abs/2303.05499](https://arxiv.org/abs/2303.05499)) fuses text and image tokens
 inside the transformer for referring-expression detection. A4 builds the loss and the
 inference procedure; the towers are tiny stand-ins, because the objective transfers and
-the encoder is the ViT and transformer you already built.
+the encoder is the ViT and transformer built earlier.
 
 ## Background
 
@@ -136,7 +136,7 @@ re-normalize), then classify by cosine argmax:
     logits = image_features @ class_features.T                 # (B, K)
     pred   = logits.argmax(dim=-1)
 
-## What you'll implement
+## What to implement
 
 Three holes:
 
@@ -166,7 +166,7 @@ the EOS pooling, and the toy (image, caption) data are provided.
 
 From the repo root with the `nanovision` env active:
 
-    make test A=a04_clip      # your top-level code (red until you fill the holes)
+    make test A=a04_clip      # your top-level code (red until the holes are filled)
 
 The tests run in this order:
 

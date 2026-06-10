@@ -25,7 +25,7 @@ external_data: "none (synthetic image-caption pairs from nanovision.data.toy)"
 
 ## motivation
 A VLM connects a frozen image encoder to a language model by turning the image into a
-sequence of tokens that live in the LM's embedding space. You build the LLaVA bridge: take
+sequence of tokens that live in the LM's embedding space. This assignment builds the LLaVA bridge: take
 the ViT's per-patch features, project them with a 2-layer MLP into the LM embedding dim,
 prepend them to the text token embeddings, and run a decoder-only LM over the combined
 sequence to predict the caption autoregressively. The three degrees of freedom are how many

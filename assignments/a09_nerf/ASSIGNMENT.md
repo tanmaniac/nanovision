@@ -32,7 +32,7 @@ NeRF represents a scene as an MLP from a 3D position and view direction to volum
 color, and renders by marching rays through the field and alpha-compositing samples. The
 content is the volume rendering integral, its discretization, and front-to-back compositing,
 which carry over to Gaussian splatting (A10) and occupancy / neural-SDF rendering (A11.5d).
-You build the Fourier positional encoding (the fix for spectral bias), the discretized volume
+This assignment builds the Fourier positional encoding (the fix for spectral bias), the discretized volume
 renderer, and pinhole ray generation. The radiance-field MLP and the toy scene are provided.
 See the README for the math.
 
