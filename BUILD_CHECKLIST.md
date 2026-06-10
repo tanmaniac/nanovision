@@ -48,8 +48,8 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A11.5e prediction → planning    [Mixed]  deps: A11.5b/c,A11.5d  (leaf, no shim)
 
 ## Phase 4 - Action & dynamics
-- [ ] A12 world models (RSSM/Dreamer) [Core]   deps: A0,A1,A3.5
-- [ ] A13 VLA capstone                [Core]   deps: A5/A6,A8,(A12)
+- [x] A12 world models (DreamerV3)    [Core]   deps: A0,A1,A3.5  (cartpole-from-pixels, dyn-backprop actor)
+- [x] A13 VLA capstone                [Core]   deps: A5/A6,A8,(A12)  (flow-matching action head, leaf)
 
 ## Reading-only notes (Markdown, not built; in notes/)
 - [ ] note: video generation (flow matching in spatiotemporal VAE latent)
