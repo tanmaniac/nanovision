@@ -280,7 +280,9 @@ is init- and seed-sensitive; they live in the visualizations and below.
 `make viz` renders from the reference solution, so it works on a fresh checkout before any holes are
 filled and shows the target figures. `make viz-mine` runs the same script against the top-level code,
 which is the way to eyeball a finished implementation. The figures need dm_control with headless
-rendering (`MUJOCO_GL=egl`). Both write PNGs to `out/` using matplotlib's headless Agg backend, so the
+rendering (`MUJOCO_GL=egl`); dm_control is not in `environment.yml` by default because it is heavy and
+the graded tests skip it, so install it with `pip install dm_control` (or uncomment the `dm_control`
+line in `environment.yml`) before running viz. Both write PNGs to `out/` using matplotlib's headless Agg backend, so the
 commands behave the same over SSH, in WSL, and in CI with no display, and the figures are viewable
 inline in VSCode. Add `SHOW=1` (for example `make viz-mine A=a13_vla SHOW=1`) to also open interactive
 windows when a display is available. The figures are `reacher_rollouts.png` (the flow and BC policies

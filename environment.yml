@@ -1,6 +1,8 @@
 # Conda environment for nanovision.
 # Create with:  conda env create -f environment.yml
-# Then:         conda activate nanovision && pip install -e .
+# Then:         conda activate nanovision
+# There is no install step: the repo runs from its root (pytest puts it on sys.path
+# and scripts run as `python -m assignments.aXX.viz`).
 #
 # Targets a single 12GB GPU (RTX 4080, CUDA 12.x). The tiny gradcheck/shape tests
 # also run on CPU. The pip torch wheel on Linux is a CUDA 12.x build by default.
@@ -18,6 +20,8 @@ dependencies:
       - matplotlib>=3.8
       - tqdm>=4.66
       - pytest>=8.0
+      # Hungarian matcher in flow-matching (a06_0) and detection (a11):
+      - scipy>=1.11
       # probe-only (pretrained weights; notebooks only):
       - timm>=1.0
       - open_clip_torch>=2.24
@@ -26,3 +30,7 @@ dependencies:
       - nuscenes-devkit>=1.1
       - pyquaternion>=0.9
       - shapely>=2.0
+      # world models (a12) and VLA (a13): physics sim for training/viz only.
+      # Heavy and optional; the graded CPU mechanism tests skip it via importorskip.
+      # Uncomment to run those assignments' real-training and viz paths:
+      # - dm_control>=1.0

@@ -51,7 +51,8 @@ def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Ten
 
     Implement:
         1. half = Dh // 2; inv_freq = 1 / base^(arange(half)/half)
-        2. angles = outer(positions, inv_freq); cos/sin = cat([angles, angles])
+        2. positions = arange(S), S = q.shape[2];
+           angles = outer(positions, inv_freq); cos/sin = cat([angles, angles])
            cos/sin reshaped to (1, 1, S, Dh)
         3. apply q*cos + rotate_half(q)*sin (same for k)
     """

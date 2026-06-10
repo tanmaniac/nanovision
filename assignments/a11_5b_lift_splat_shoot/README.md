@@ -108,7 +108,19 @@ awkward to differentiate. LSS instead sorts the points by their pillar index and
 cumulative-sum trick: cumsum the sorted features along the point axis, and the sum over a pillar
 is the cumsum at the run's last row minus the cumsum at the previous run's last row. Keeping the
 last row of each equal-index run and differencing successive run-ends gives every pillar's sum in
-one pass. The sort is a fixed permutation given the index, so the whole operation is
+one pass.
+
+Concretely, the run boundary is where the sorted index changes. With sorted indices
+$[0, 0, 2, 2, 2]$ and per-point scalar features $[a, b, c, d, e]$, the running sum is
+$[a, a{+}b, a{+}b{+}c, a{+}b{+}c{+}d, a{+}b{+}c{+}d{+}e]$. The last row of run $0$ is position $1$
+and the last row of run $2$ is position $4$ (the rows where the next index differs, with the final
+row always a run-end). Reading the cumsum at those two rows gives $[a{+}b,\; a{+}b{+}c{+}d{+}e]$,
+and differencing successive entries (treat the first kept entry as a difference against zero, i.e.
+prepend a zero row) gives pillar sums $[a{+}b,\; c{+}d{+}e]$ for pillars $0$ and $2$. Pillar $1$ is
+empty and never appears, so the result is indexed by the distinct present pillars, then scattered
+into the dense grid.
+
+The sort is a fixed permutation given the index, so the whole operation is
 differentiable in the features; gradients flow back through the gather, with no `scatter_add` and
 no custom kernel. That is the trick the paper introduced and the optimization BEVPoolv2 later
 folded into CUDA.

@@ -76,7 +76,9 @@ near-zero loss. Getting the forward and backward right comes before any training
 ## Running tests and visualizations
 
 Activate the environment first (`conda activate nanovision`), then use the `make`
-targets. `A` is the assignment directory id (for example `a00_harness`).
+targets. `A` is the assignment directory id (for example `a00_harness`). As a smoke
+test that the environment is set up, run `make verify A=a00_harness` and confirm a
+green bar before starting any work.
 
 ```
 make test     A=a02_vit  # run YOUR code against the tests (red until the holes are filled)

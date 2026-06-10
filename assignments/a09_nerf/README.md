@@ -225,8 +225,8 @@ a ray.
 
 Implement the Fourier positional encoding, the discretized volume renderer, and pinhole ray
 generation. The radiance-field MLP, the config, the toy scene, and the visualization script are
-provided. Each file's docstrings give the exact signatures, shapes, and index conventions,
-including the schedule convention (length-$N$ arrays, the least-noised level first). Read those
+provided. Each file's docstrings give the exact signatures, shapes, and sampling conventions (the
+near-to-far ordering of samples along a ray and the camera-to-world axis convention). Read those
 in the files; this section maps each file to the concept above.
 
 ### Files to modify

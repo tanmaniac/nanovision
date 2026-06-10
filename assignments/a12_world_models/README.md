@@ -378,6 +378,9 @@ the random and optimal lines), `replay_vs_recon.png` (real frames over the symex
 `policy_transfer.png` (the dynamics-backprop-vs-REINFORCE contrast).
 
 The viz and the full training run need a CUDA GPU and a working MuJoCo GL backend (`MUJOCO_GL=egl`).
+They also need dm_control, which is not in `environment.yml` by default because it is heavy and the
+graded tests skip it; install it with `pip install dm_control` (or uncomment the `dm_control` line in
+`environment.yml`) before running viz or training.
 The full collect-fit-imagine run is a documented multi-hour job: about 400 iterations, roughly 100
 updates each, about 1-2 hours on a single 12GB GPU. It is not run in CI. A healthy world-model curve
 shows reconstruction falling fast in the first iterations (measured around 0.001 MSE) while the KL
