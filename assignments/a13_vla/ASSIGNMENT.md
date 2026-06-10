@@ -2,39 +2,41 @@
 
 ```yaml
 id: a13_vla
-title: Vision-Language-Action capstone (flow-matching action head)
+title: Vision-Language-Action capstone (flow-matching action head from pixels)
 module: 4
 type: Mixed
 estimated_learner_hours: 8
-depends_on: [a00_harness, a05_diffusion, a06_0_flow_matching]
+depends_on: [a00_harness, a05_diffusion, a06_0_flow_matching, a12_world_models]
 builds_into_shared_lib: []   # leaf assignment, last in the course; nothing imports it, so no nanovision shim
 forbidden_imports:
-  - gym / gymnasium          # the env is pure NumPy, written from scratch
+  - gym / gymnasium          # not the robot env; the dm_control reacher is used directly in env.py
   - diffusers                # the DDPM head is built from the diffusion objective, not a library
-  - robomimic / lerobot / dm_control
+  - robomimic / lerobot      # no prebuilt policy/dataset libraries
   - torchcfm / torchdiffeq   # the CFM objective and the ODE integrator are written from scratch
   - bare cross-assignment imports (from assignments...) — A13 owns its modules locally
+  # The scan is over the HEAD files only (flow.py, bc.py, ddpm.py, and their solution copies). dm_control
+  # is allowed in env.py / viz.py and isolated there; it must NOT appear in the head files.
 fits_12gb: true
-external_data: none (scripted demonstrations from the local 2D point-mass env)
+external_data: none (dm_control 'reacher' easy ships with dm_control; demos are collected locally)
 ```
 
 ## motivation
 
 The 2023-2026 vision-language-action (VLA) pattern wires a perception/language backbone to a
 dedicated action decoder: the backbone interprets the scene and instruction, the decoder generates
-continuous, temporally coherent actions. Text-token autoregression fits reasoning but not 50-100 Hz
-continuous control, so the action head is a separate generative model. You build the pi0-line head:
-conditional flow matching (CFM) over an action chunk, conditioned on robot state. Single-step
-behavior cloning is the compounding-error baseline, action chunking is the fix that the
-single-step-vs-chunk ablation measures, and a DDPM head is the diffusion-vs-flow contrast. The full
-treatment (the discretized-token vs continuous-head split, the data engines, the conditioning
-options) is in the README.
+continuous, temporally coherent actions. This capstone builds the perception-to-action path on a
+real (simulated) robot: a 2-link reacher controlled from a 64x64 camera image, with a CNN encoder
+producing the conditioning vector and the pi0-line conditional flow-matching (CFM) action head
+generating the joint-torque chunk, behavior-cloned from filtered analytic-expert demos. Single-step
+BC is the compounding-error baseline, action chunking is the ACT fix, and a DDPM head is the
+diffusion-vs-flow contrast. The full treatment is in the README.
 
 ## background
 
 The action head is the generative model from the diffusion and flow-matching topics, re-conditioned
-on state instead of a class label. CFM convention: $t=0$ is noise $z_0 \sim \mathcal{N}(0, I)$,
-$t=1$ is the demonstrated action chunk $a$. The straight path and its constant velocity target are
+on a perception embedding $c = \operatorname{Encoder}(\text{obs})$ instead of a class label. CFM
+convention: $t=0$ is noise $z_0 \sim \mathcal{N}(0, I)$, $t=1$ is the demonstrated action chunk $a$.
+The straight path and its constant velocity target are
 
 $$z_t = (1-t)\,z_0 + t\,a, \qquad v = a - z_0 \quad (\text{constant in } t).$$
 
@@ -44,8 +46,8 @@ steps. Action chunking predicts an $H$-step chunk executed open-loop. The DDPM c
 epsilon-prediction objective $a_t = \sqrt{\bar\alpha_t}\,a + \sqrt{1-\bar\alpha_t}\,\varepsilon$ and
 the ancestral reverse chain.
 
-Shapes: $a$, $z_0$, $z_t$ are $(B, H, 2)$; $t$ is $(B, 1, 1)$; $c$ is $(B, \text{cond\_in})$;
-chunks are $(B, T-H+1, H, 2)$.
+Shapes: $a$, $z_0$, $z_t$ are $(B, H, 2)$; $t$ is $(B, 1, 1)$; the obs is $(B, 3, 64, 64)$ and the
+encoder output $c$ is $(B, 128)$; chunks are $(B, T-H+1, H, 2)$.
 
 ## what_you_implement
 
@@ -66,32 +68,31 @@ chunks are $(B, T-H+1, H, 2)$.
 
 2. **Task 2 - flow_loss** (file: `flow.py`, symbol: `flow_loss`): sample
    $z_0 \sim \mathcal{N}(0, I)$ and $t \sim U(0, 1)$ of shape $(B, 1, 1)$, build $(z_t, v)$ with
-   `cfm_target`, predict $v_\theta(z_t, t, c)$, return MSE. Unweighted velocity regression. Teaches
-   the CFM objective.
+   `cfm_target`, predict $v_\theta(z_t, t, c)$, return MSE. Unweighted velocity regression.
 
 3. **Task 3 - flow_sample** (file: `flow.py`, symbol: `flow_sample`): from $z \sim \mathcal{N}(0,I)$
    of shape $(B, H, 2)$, take `n_steps` forward-Euler steps with $dt = 1/n$, $t = k\,dt$, updating
-   $z \leftarrow z + dt\,v_\theta(z, t, c)$. Return $z$. Teaches few-step ODE sampling. The likely
-   bug is starting at $t=1$ or a wrong $dt$.
+   $z \leftarrow z + dt\,v_\theta(z, t, c)$. Return $z$. The likely bug is starting at $t=1$ or a
+   wrong $dt$.
 
 4. **Task 4 - bc_loss** (file: `bc.py`, symbol: `bc_loss`): MSE between `policy(c)` and the
-   demonstrated chunk. Teaches that BC regresses the conditional mean, which is correct only when
-   $p(a|c)$ is unimodal.
+   demonstrated chunk. BC regresses the conditional mean, correct only when $p(a|c)$ is unimodal.
 
 5. **Task 5 - chunk_actions / de_chunk / receding_horizon_indices** (file: `bc.py`): overlapping
    $H$-windows $(B, T, 2) \to (B, T-H+1, H, 2)$; the inverse (full first chunk, then the last action
    of each later chunk) that reconstructs the sequence exactly; the open-loop start indices
-   $0, H, 2H, \dots$ clamped to $T-H$. Teaches action chunking and receding-horizon execution.
+   $0, H, 2H, \dots$ clamped to $T-H$.
 
 6. **Task 6 - ddpm_loss / ddpm_sample** (file: `ddpm.py`): the epsilon-prediction loss and the
-   ancestral reverse chain re-conditioned on $c$. Teaches the diffusion-vs-flow contrast (a noise
-   schedule and many reverse steps vs velocity regression and a few Euler steps).
+   ancestral reverse chain re-conditioned on $c$ (the diffusion-vs-flow contrast).
 
 ## tests
 
 Run with `/home/tanmay/miniconda3/envs/nanovision/bin/python -m pytest assignments/a13_vla/tests`.
-Default mode fails cleanly at the holes; `NANOVISION_IMPL=solution` is green. Order: cfm_target,
-flow_sample_ode, chunking, shapes, gradcheck, overfit_bc, overfit_flow, forbidden_imports.
+Default mode fails cleanly at the holes; `NANOVISION_IMPL=solution` is green. The mechanism tests run
+on CPU WITHOUT `dm_control`; only `test_env_smoke.py` needs it (and `MUJOCO_GL=egl`) and skips via
+`pytest.importorskip`. Order: cfm_target, flow_sample_ode, chunking, shapes, gradcheck, overfit_bc,
+overfit_flow, forbidden_imports, env_smoke.
 
 - `tests/test_cfm_target.py` - reference-value: $z_t$ at $t=0$ is $z_0$, at $t=1$ is $a$; $v = a-z_0$
   exactly and identical at every $t$ (t-independence); shapes.
@@ -99,8 +100,9 @@ flow_sample_ode, chunking, shapes, gradcheck, overfit_bc, overfit_flow, forbidde
   $a^\star$ exactly at any step count (1, 5, 10, 50), checking the integrator wiring.
 - `tests/test_chunking.py` - exact: `de_chunk(chunk_actions(x)) == x` for several $(T, H)$; the
   receding-horizon indices start at 0, stay in $[0, T-H]$, have no duplicates, and cover all $T$.
-- `tests/test_shapes.py` - shape: the three heads' forward and `flow_sample` give $(B, H, 2)$;
-  `chunk_actions` gives $(B, T-H+1, H, 2)$.
+- `tests/test_shapes.py` - shape: the encoder gives $(B, 128)$; the three heads' forward and
+  `flow_sample` give $(B, H, 2)$; the image-to-chunk path composes; `chunk_actions` gives
+  $(B, T-H+1, H, 2)$.
 - `tests/test_gradcheck.py` - float64 gradcheck: `cfm_target` wrt the action; the flow network wrt
   $z_t$ and $t$; `flow_loss` wrt the action with a fixed-seed generator.
 - `tests/test_overfit_flow.py` - bounded training, robust: `flow_loss` drops to a small fraction of
@@ -108,39 +110,45 @@ flow_sample_ode, chunking, shapes, gradcheck, overfit_bc, overfit_flow, forbidde
   reconstruction (measured MAE ~0.14). The loss does NOT reach zero by construction (see
   solution_notes).
 - `tests/test_overfit_bc.py` - bounded training: `bc_loss` overfits one batch to near zero.
-- `tests/test_forbidden_imports.py` - static tokenize scan over the top-level holed files and the
-  solution for robot/diffusion/flow libraries and bare cross-assignment imports. Passes in both
-  modes.
+- `tests/test_forbidden_imports.py` - static tokenize scan over the head files (flow/bc/ddpm) and
+  their solution copies for robot/diffusion/flow libraries and bare cross-assignment imports. Passes
+  in both modes. Does NOT scan env.py/viz.py, which legitimately use dm_control.
+- `tests/test_env_smoke.py` - `importorskip("dm_control")`: reset/step/render shapes ($(3,64,64)$ obs
+  in $[0,1]$, 2D torque in $[-1,1]$), the analytic expert reaches on some seeds, demo collection
+  filters to successes and pads with a validity mask.
 
-The headline ablation (chunking/flow beats single-step BC on rollout success) is NOT a unit test;
-rollout success is init- and seed-sensitive. It is in `viz.py` and the README with per-seed
-statistics against the straight-line-expert ceiling.
+The reach-success and chunk-size numbers are NOT unit tests; rollout success is init- and
+seed-sensitive. They are in `viz.py` and the README with per-seed statistics against the
+random-torque floor.
 
 ## provided_boilerplate
 
-`env.py` (the 2D point-mass reacher, the scripted expert, `collect_demos` with both
-`goal_conditioned` modes), `config.py` (`VLAConfig`, `GradcheckConfig`), `conftest.py`, `_train.py`
-(chunk-batch building, the three training loops, the rollout-success metric), `viz.py` (the five
-GPU-aware panels), the three head modules' `__init__`/`forward`/`sinusoidal_embedding`/`make_schedule`.
+`env.py` (the dm_control reacher wrapper with lazy import, the analytic IK+PD expert, filtered
+`collect_demos`, `render_obs`, `rollout_policy`, `random_reach_success`, and the point-mass
+side-demo functions), `nets.py` (the 64x64 CNN `Encoder`), `config.py` (`VLAConfig`,
+`GradcheckConfig`), `conftest.py`, `_train.py` (pixel-batch building, joint encoder+head training,
+the real-env rollout-success metric, and the point-mass side-demo trainers), `viz.py` (the reacher
+rollout / chunk-ablation / flow-path / point-mass-multimodal panels), the three head modules'
+`__init__`/`forward`/`sinusoidal_embedding`/`make_schedule`.
 
 ## compute_notes
 
-Everything runs on CPU in seconds: the tests are exact oracles plus bounded overfit loops (300-500
-steps). `viz.py` uses the GPU when present (`nanovision.determinism.default_device`); the full five
-panels train ~10 small heads and take a few minutes on an RTX 4080. v_max is 0.05 so an episode is
-~20 steps, long enough for the $H=16$ chunk; demos pad to $T=24$. A healthy `flow_loss` curve drops
-from ~2.3 to a floor near ~0.18 and stays there (the floor is real, not a stuck run).
+Mechanism tests run on CPU in seconds (overfit loops 300-1000 steps), no dm_control. Demo collection
+runs the simulator: ~130s for 200 filtered demos (~270 episodes at ~75% expert reach). Training a
+head + encoder is ~10-15s on an RTX 4080; a 48-episode rollout is ~30s; full `viz.py` is a few
+minutes. Everything under 12GB. Episodes are ~20 steps; demos pad to T~34. A healthy `flow_loss`
+drops from ~2.3 to a floor near ~0.18 and stays there (the floor is real, not a stuck run). Render
+needs `MUJOCO_GL=egl`.
 
 ## stretch_goals
 
-1. Language conditioning: pass the goal phrase ("top-right corner") through a frozen small text
-   encoder and project to $c$; train only the flow head and the projector.
-2. Temporal ensembling: blend overlapping chunks from consecutive queries with exponential weighting
-   and compare to open-loop execution (pi0 found ensembling detrimental and dropped it).
-3. The image observation path: render the state to a small image and condition the flow head on a
-   ViT/CLIP-style encoder instead of the raw 2D state.
-4. World-model-conditioned VLA: condition the action head on a learned latent from the world-models
-   assignment (the model-based flavor).
+1. Language conditioning: pass a goal phrase through a frozen text encoder, concatenate with the
+   image embedding, train only the head and projector.
+2. Temporal ensembling: blend overlapping chunks with exponential weighting vs open-loop (pi0 found
+   ensembling detrimental and dropped it).
+3. A harder reacher (`reacher` hard or added observation noise) where single-step BC drifts more and
+   the chunk-size effect should reappear.
+4. World-model-conditioned VLA: condition the head on a learned world-models latent (model-based flavor).
 
 ## further_reading
 
@@ -150,27 +158,28 @@ from ~2.3 to a floor near ~0.18 and stays there (the floor is real, not a stuck 
 - OpenVLA, [arXiv 2406.09246](https://arxiv.org/abs/2406.09246) - the open discretized-token VLA.
 - OpenVLA-OFT, [arXiv 2502.19645](https://arxiv.org/abs/2502.19645) - the same-backbone ablation
   showing the action-head design dominates the outcome.
-- Open X-Embodiment, [arXiv 2310.08864](https://arxiv.org/abs/2310.08864) - the pooled dataset.
+- Octo, [arXiv 2405.12213](https://arxiv.org/abs/2405.12213) - the diffusion-head generalist policy.
 
 ## solution_notes
 
 - `flow_loss` does NOT reach zero. The target is $a - z_0$, but near $t=1$ the input $z_t$ collapses
   onto $a$ and the network cannot recover $z_0$, leaving an irreducible residual. Measured floor at
   the test seed: final ~0.18 from start ~2.32 (ratio ~0.08). The test asserts the ratio, not a
-  near-zero floor; the overfit batch uses unit-scale actions so the residual is well above noise.
+  near-zero floor.
 - `flow_sample` reconstruction MAE is ~0.14 on the overfit batch (loose secondary bound, 0.30 cap).
-  It is the only learned-sampler assertion in pytest, kept loose on purpose.
 - `sinusoidal_embedding` must respect the input dtype (no `.float()` downcast) or the float64
   gradcheck on $t$ fails. The provided helper already does this.
-- Rollout evaluation must use `env.sample_start` (far-side starts matching the demo distribution).
-  A start sampled uniformly over the whole square lands in near-goal states the demos never visited,
-  which is out of distribution and reads as low success for reasons unrelated to the mechanism.
-- In the goal-conditioned (default) mode $p(a|c)$ is unimodal, so deterministic BC matches or beats
-  the flow head on rollout success (the flow head's sampling noise is pure downside there). Do not
-  claim a flow-over-regression win in this mode. The flow head's value is in the goal-dropped
-  (multimodal) mode: measured BC averaged-action magnitude ~0.002 (collapses to the origin) vs flow
-  sample spread ~0.021 (spreads to the four goal directions).
-- Measured viz numbers (RTX 4080, seeds 0-2): chunk ablation (BC) success H={1,4,16} =
-  {0.93, 0.97, 1.00}; flow vs DDPM rollout = {0.23, 0.27} (both noisy in the unimodal mode); flow
-  reconstruction MAE at {1,2,5,10} Euler steps = {0.067, 0.025, 0.013, 0.010}.
+- The encoder and head train jointly under one optimizer; each head gets its own encoder instance so
+  the flow-vs-BC comparison is clean. `embed_dim=128` is the heads' `cond_in` on the reacher.
+- Demo collection filters to episodes that reach (reward > 0.5), truncated at the reach step. The
+  analytic expert reaches on ~75-83% of seeds; render the frame BEFORE stepping so the recorded obs
+  is what the policy sees at that step.
+- Reacher reach-success is unimodal in the image, so deterministic BC matches the flow head from
+  pixels (measured flow 0.75, BC 0.75 at H=4, random floor ~0.06). Do not claim a flow-over-regression
+  win from pixels. The generative win is in the point-mass goal-hidden side-demo: BC averaged-action
+  magnitude ~0.001 (collapses to origin) vs flow sample spread ~0.015 (spreads to four directions).
+- Measured viz numbers (RTX 4080): pixel reach success flow/BC/random = {0.75, 0.75, 0.06}; BC chunk
+  sweep H={1,4,8} = {0.78, 0.74, 0.62} (does NOT rise with H on this short-horizon clean-demo
+  reacher; chunking's compounding-error benefit needs a harder regime - frame it as a toy measurement,
+  not a chunking-literature claim).
 ```

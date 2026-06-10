@@ -1,21 +1,24 @@
-"""Train the action heads on the point-mass reacher and visualize the VLA lessons. Provided.
+"""Train the pixel reacher policies and the point-mass side-demo, and write the panels. Provided.
 
-Run from the repo root: `python -m assignments.a13_vla.viz` (uses the GPU when present). Writes
-five panels to out/:
+Run from the repo root with headless rendering:
 
-1. Rollout trajectories for single-step BC, chunked BC, and the flow head over the four goals.
-2. Chunk-size ablation: rollout success and trajectory variance for H in {1, 4, 16}, with per-seed
-   spread, against the straight-line expert ceiling. The headline ablation lives here (measured),
-   not in a unit test.
-3. Flow vs DDPM at matched training, plus a flow inference-step sweep (1, 2, 5, 10 Euler steps)
-   against DDPM at its full step count.
-4. The flow-matching ODE path: z_t from t=0 (noise) to t=1 (action) for one conditioning.
-5. Multimodality in the goal-dropped mode: the BC regressor's single averaged action vs a scatter
-   of flow-head samples clustering on the distinct goal directions. This is where the flow head's
-   distribution modeling is load-bearing on this toy.
+    MUJOCO_GL=egl python -m assignments.a13_vla.viz
 
-GPU-aware via nanovision.determinism.default_device; tensors handed to matplotlib are moved to CPU.
-The tests never import this file.
+Writes panels to out/:
+
+1. reacher_rollouts.png - frames from a reacher episode under the flow policy and the BC policy,
+   both reading only the 64x64 camera image. Shows the finger reaching the target from pixels.
+2. chunk_ablation.png - reach success vs chunk size H for behavior cloning from pixels, with the
+   random-torque floor. The MEASURED ablation lives here, not in a unit test.
+3. multimodal.png - the retained point-mass side-demo: with the goal hidden, the BC regressor's
+   single predicted action collapses toward the origin (averaging the four goal directions) while
+   the flow head's samples spread to the four directions. This is the generative-vs-regression
+   lesson; the reacher cannot show it because the image fixes the target.
+4. flow_path.png - the flow-matching ODE path: z_t integrated from t=0 (noise) to t=1 (action) for
+   one conditioning.
+
+GPU-aware via nanovision.determinism.default_device. dm_control is used here (viz is not graded);
+the mechanism tests never import this file. Set MUJOCO_GL=egl for the reacher panels.
 """
 
 import argparse
@@ -37,10 +40,10 @@ sys.path.insert(0, str(_impl))
 
 import env as ENV  # noqa: E402
 from _train import (  # noqa: E402
-    build_batch, rollout_success, train_bc, train_ddpm, train_flow,
+    build_batch_pointmass, build_pixel_batch, pixel_action_fn,
+    pixel_rollout_success, train_bc, train_flow, train_pixel_bc, train_pixel_flow,
 )
 from config import VLAConfig  # noqa: E402
-from ddpm import ddpm_sample, make_schedule  # noqa: E402
 from flow import flow_sample  # noqa: E402
 
 from nanovision.determinism import default_device  # noqa: E402
@@ -49,192 +52,104 @@ _OUT = _here / "out"
 _OUT.mkdir(exist_ok=True)
 
 
-def _rollout_traj(head, kind, cfg, gi, p0, dev, *, max_steps=60, goal_conditioned=True):
-    """One open-loop rollout; returns the (L+1, 2) state path."""
-    abar = make_schedule(cfg.ddpm_T).to(dev) if kind == "ddpm" else None
-    p = np.asarray(p0, dtype=np.float32).copy()
-    goal = ENV.GOALS[gi]
-    path = [p.copy()]
-    steps = 0
-    while steps < max_steps:
-        c = ENV.make_condition(p, gi, goal_conditioned=goal_conditioned, repr=cfg.repr)
-        ct = torch.from_numpy(c[None]).float().to(dev)
-        with torch.no_grad():
-            if kind == "flow":
-                chunk = flow_sample(head, ct, cfg.chunk, cfg.n_flow_steps)[0].cpu().numpy()
-            elif kind == "bc":
-                chunk = head(ct)[0].cpu().numpy()
-            elif kind == "ddpm":
-                chunk = ddpm_sample(head, ct, cfg.chunk, abar)[0].cpu().numpy()
-        for h in range(cfg.chunk):
-            p = ENV.step_env(p, chunk[h], v_max=cfg.v_max)
-            path.append(p.copy())
-            steps += 1
-            if np.linalg.norm(p - goal) < cfg.eps or steps >= max_steps:
-                break
-        if np.linalg.norm(p - goal) < cfg.eps:
-            break
-    return np.stack(path, axis=0)
+def _collect_demos(cfg, n_success=200):
+    demos = ENV.collect_demos(n_success=n_success, seed0=0, max_steps=cfg.max_steps)
+    print(f"collected {demos['obs'].shape[0]} filtered demos, T={demos['T']}, "
+          f"expert reach_frac={demos['reach_frac']:.3f} over {demos['n_tried']} episodes")
+    return demos
 
 
-def panel_rollouts(cfg, dev):
-    demos = ENV.collect_demos(300, seed=0, repr=cfg.repr, goal_conditioned=True)
-    a1, c1 = build_batch(demos, 1, device=dev)
-    aH, cH = build_batch(demos, cfg.chunk, device=dev)
+def panel_reacher_rollouts(cfg, dev, demos):
+    """Render frames of one reacher episode under the flow policy and the BC policy."""
+    obs, a = build_pixel_batch(demos, cfg.chunk, device=dev)
+    enc_f, flow = train_pixel_flow(obs, a, cfg, steps=3000, device=dev, seed=0)
+    enc_b, bc = train_pixel_bc(obs, a, cfg, steps=3000, device=dev, seed=0)
 
-    cfg1 = VLAConfig(chunk=1)
-    bc1 = train_bc(a1, c1, cfg1, steps=2000, device=dev)
-    bcH = train_bc(aH, cH, cfg, steps=2000, device=dev)
-    flowH = train_flow(aH, cH, cfg, steps=5000, device=dev)
+    def run_and_grab(enc, head, kind, seed):
+        fn = pixel_action_fn(enc, head, kind, cfg, device=dev)
+        env = ENV.make_reacher(seed=seed)
+        env.reset()
+        frames = []
+        steps = 0
+        hit = False
+        while steps < cfg.max_steps and not hit:
+            frames.append(env.physics.render(96, 96, camera_id=0))
+            o = ENV.render_obs(env)[None]
+            chunk = fn(o)[0]
+            for h in range(cfg.chunk):
+                ts = env.step(np.clip(chunk[h], -1, 1))
+                steps += 1
+                if ENV.reached(ts):
+                    hit = True
+                    break
+                if steps >= cfg.max_steps:
+                    break
+        frames.append(env.physics.render(96, 96, camera_id=0))
+        return frames, hit
 
-    rng = np.random.default_rng(7)
-    starts = []
-    for _ in range(20):
-        gi = int(rng.integers(0, cfg.n_goals))
-        starts.append((gi, ENV.sample_start(gi, rng)))
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    for ax, (head, kind, cc, title) in zip(
-        axes,
-        [(bc1, "bc", cfg1, "single-step BC (H=1)"),
-         (bcH, "bc", cfg, f"chunked BC (H={cfg.chunk})"),
-         (flowH, "flow", cfg, f"flow head (H={cfg.chunk})")],
-    ):
-        for gi, p0 in starts:
-            path = _rollout_traj(head, kind, cc, gi, p0, dev)
-            ax.plot(path[:, 0], path[:, 1], lw=0.8, alpha=0.6, color="C0")
-        ax.scatter(ENV.GOALS[:, 0], ENV.GOALS[:, 1], c="tab:green", s=80, marker="*", zorder=5)
-        ax.set_title(title)
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.set_aspect("equal")
-    fig.suptitle("Open-loop rollouts: compounding drift under single-step BC vs chunked/flow")
+    rows = [("flow", enc_f, flow, "flow"), ("bc", enc_b, bc, "BC")]
+    fig, axes = plt.subplots(2, 6, figsize=(15, 5.2))
+    for r, (kind, enc, head, label) in enumerate(rows):
+        frames, hit = run_and_grab(enc, head, kind, seed=2001)
+        picks = np.linspace(0, len(frames) - 1, 6).astype(int)
+        for col, fi in enumerate(picks):
+            axes[r, col].imshow(frames[fi])
+            axes[r, col].axis("off")
+            axes[r, col].set_title(f"{label} t={fi}", fontsize=8)
+        axes[r, 0].set_ylabel(label)
+    fig.suptitle("Reacher controlled from 64x64 pixels: flow vs BC action head reaching the target")
     fig.tight_layout()
-    fig.savefig(_OUT / "rollouts.png", dpi=120)
+    fig.savefig(_OUT / "reacher_rollouts.png", dpi=110)
     plt.close(fig)
 
 
-def panel_chunk_ablation(cfg, dev, seeds=(0, 1, 2)):
-    # Ablate the deterministic BC policy across chunk sizes. BC isolates the compounding-error
-    # lesson: a single-step policy (H=1) re-decides every step and drifts off the demo manifold,
-    # while a longer chunk commits to an internally consistent segment. The flow head carries its
-    # own sampling noise, which would confound this monotone trend, so it stays in the multimodal
-    # panel where its distribution modeling is what matters.
-    demos = ENV.collect_demos(300, seed=0, repr=cfg.repr, goal_conditioned=True)
-    Hs = [1, 4, 16]
+def panel_chunk_ablation(cfg, dev, demos, Hs=(1, 4, 8), seeds=(0, 1)):
+    """Reach success vs chunk size for BC from pixels, against the random-torque floor."""
     means, stds = [], []
     for H in Hs:
         cfgH = VLAConfig(chunk=H)
+        obs, a = build_pixel_batch(demos, H, device=dev)
         rates = []
         for s in seeds:
-            a, c = build_batch(demos, H, device=dev)
-            head = train_bc(a, c, cfgH, steps=4000, seed=s, device=dev)
-            rates.append(rollout_success(head, "bc", cfgH, n=64, seed=100 + s, device=dev))
+            enc, bc = train_pixel_bc(obs, a, cfgH, steps=3000, device=dev, seed=s)
+            rates.append(pixel_rollout_success(enc, bc, "bc", cfgH, n=48, seed0=2000, device=dev))
         means.append(float(np.mean(rates)))
         stds.append(float(np.std(rates)))
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    ax.bar([str(h) for h in Hs], means, yerr=stds, capsize=5, color="C0")
-    ax.axhline(1.0, ls="--", color="tab:green", label="straight-line expert ceiling")
+    rand = ENV.random_reach_success(n=96, seed0=2000, max_steps=cfg.max_steps)
+
+    fig, ax = plt.subplots(figsize=(5.2, 3.6))
+    ax.bar([str(h) for h in Hs], means, yerr=stds, capsize=5, color="C0", label="BC from pixels")
+    ax.axhline(rand, ls="--", color="tab:red", label=f"random-torque floor ({rand:.2f})")
     ax.set_xlabel("chunk size H")
-    ax.set_ylabel("rollout success rate")
+    ax.set_ylabel("reach success rate")
     ax.set_ylim(0, 1.05)
-    ax.set_title("Chunk-size ablation (behavior cloning, per-seed spread)")
+    ax.set_title("Chunk-size ablation: BC from pixels vs random (per-seed spread)")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(_OUT / "chunk_ablation.png", dpi=120)
     plt.close(fig)
-    print("chunk ablation (BC) H={1,4,16} success:", [round(m, 3) for m in means],
-          "std:", [round(s, 3) for s in stds])
-    return means, stds
-
-
-def panel_flow_vs_ddpm(cfg, dev):
-    demos = ENV.collect_demos(300, seed=0, repr=cfg.repr, goal_conditioned=True)
-    a, c = build_batch(demos, cfg.chunk, device=dev)
-    flowH = train_flow(a, c, cfg, steps=5000, device=dev)
-    ddpmH = train_ddpm(a, c, cfg, steps=5000, device=dev)
-
-    flow_rate = rollout_success(flowH, "flow", cfg, n=64, seed=200, device=dev)
-    ddpm_rate = rollout_success(ddpmH, "ddpm", cfg, n=64, seed=200, device=dev)
-
-    # Flow inference-step sweep: reconstruction error on the training chunks vs number of Euler
-    # steps. The TRAINED sampler is only approximately step-count-invariant, so it degrades at 1-2
-    # steps; only the analytic constant-field oracle is exactly invariant (see test_flow_sample_ode).
-    flow_steps = [1, 2, 5, 10]
-    flow_mae = []
-    for ns in flow_steps:
-        with torch.no_grad():
-            samp = flow_sample(flowH, c, cfg.chunk, ns)
-        flow_mae.append((samp - a).abs().mean().item())
-
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-    axes[0].bar(["flow", "DDPM"], [flow_rate, ddpm_rate], color=["C0", "C3"])
-    axes[0].axhline(1.0, ls="--", color="tab:green")
-    axes[0].set_ylabel("rollout success rate")
-    axes[0].set_ylim(0, 1.05)
-    axes[0].set_title(f"flow vs DDPM (matched training)")
-    axes[1].plot(flow_steps, flow_mae, "o-", color="C0")
-    axes[1].set_xlabel("flow Euler steps")
-    axes[1].set_ylabel("chunk reconstruction MAE")
-    axes[1].set_title("flow few-step sweep (trained field, only approx. step-invariant)")
-    fig.tight_layout()
-    fig.savefig(_OUT / "flow_vs_ddpm.png", dpi=120)
-    plt.close(fig)
-    print(f"flow success={flow_rate:.3f} ddpm success={ddpm_rate:.3f} "
-          f"flow MAE @ steps {flow_steps} = {[round(m, 3) for m in flow_mae]}")
-
-
-def panel_flow_path(cfg, dev):
-    demos = ENV.collect_demos(300, seed=0, repr=cfg.repr, goal_conditioned=True)
-    a, c = build_batch(demos, cfg.chunk, device=dev)
-    flowH = train_flow(a, c, cfg, steps=5000, device=dev)
-
-    # Integrate one conditioning and record the z_t trajectory, plotting the first action dim.
-    ci = c[:1]
-    n_steps = cfg.n_flow_steps
-    z = torch.randn(1, cfg.chunk, cfg.act_dim, device=dev)
-    dt = 1.0 / n_steps
-    traj = [z.clone()]
-    with torch.no_grad():
-        for k in range(n_steps):
-            t = torch.full((1, 1, 1), k * dt, device=dev)
-            z = z + dt * flowH(z, t, ci)
-            traj.append(z.clone())
-    traj = torch.cat(traj, dim=0).cpu().numpy()           # (n_steps+1, chunk, 2)
-    ts = np.linspace(0, 1, n_steps + 1)
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    for h in range(cfg.chunk):
-        ax.plot(ts, traj[:, h, 0], "-o", ms=3, label=f"step {h} vx")
-    ax.set_xlabel("integration time t (0 = noise, 1 = action)")
-    ax.set_ylabel("z_t (vx component)")
-    ax.set_title("flow-matching ODE path: noise transported to the action chunk")
-    ax.legend(fontsize=7)
-    fig.tight_layout()
-    fig.savefig(_OUT / "flow_path.png", dpi=120)
-    plt.close(fig)
+    print("chunk ablation (BC from pixels) H=", list(Hs), "success:", [round(m, 3) for m in means],
+          "std:", [round(s, 3) for s in stds], "random floor:", round(rand, 3))
+    return means, stds, rand
 
 
 def panel_multimodal(cfg, dev):
-    # Goal-dropped mode: the goal is hidden from c, so from a fixed state the expert action points
-    # to one of the four goals. A regressor averages them; the flow head samples a mode.
-    demos = ENV.collect_demos(400, seed=0, repr=cfg.repr, goal_conditioned=False)
-    a, c = build_batch(demos, cfg.chunk, device=dev)
+    """Retained point-mass side-demo: regressor averages multimodal actions, flow samples a mode."""
+    demos = ENV.collect_demos_pointmass(400, seed=0, repr=cfg.repr, goal_conditioned=False)
+    a, c = build_batch_pointmass(demos, cfg.chunk, device=dev)
     bcH = train_bc(a, c, cfg, steps=3000, device=dev)
     flowH = train_flow(a, c, cfg, steps=4000, device=dev)
 
-    # Fixed query state at the center, goal hidden. The first action step is what we visualize.
     p = np.array([0.5, 0.5], dtype=np.float32)
     cq = ENV.make_condition(p, 0, goal_conditioned=False, repr=cfg.repr)
     cq = torch.from_numpy(cq[None]).float().to(dev)
     with torch.no_grad():
         bc_a = bcH(cq)[0, 0].cpu().numpy()
-        samples = []
-        for _ in range(200):
-            s = flow_sample(flowH, cq, cfg.chunk, cfg.n_flow_steps)[0, 0].cpu().numpy()
-            samples.append(s)
-    samples = np.stack(samples, axis=0)
+        samples = np.stack(
+            [flow_sample(flowH, cq, cfg.chunk, cfg.n_flow_steps)[0, 0].cpu().numpy() for _ in range(200)]
+        )
 
     fig, ax = plt.subplots(figsize=(5, 5))
-    # Expert directions from the center toward each goal (first step), for reference.
     for gi in range(cfg.n_goals):
         ea = ENV.expert_action(p, ENV.GOALS[gi], v_max=cfg.v_max)
         ax.arrow(0, 0, ea[0], ea[1], color="tab:green", alpha=0.5, width=0.001,
@@ -247,30 +162,59 @@ def panel_multimodal(cfg, dev):
     ax.axvline(0, color="k", lw=0.3)
     ax.set_xlabel("vx")
     ax.set_ylabel("vy")
-    ax.set_title("Goal hidden: regressor averages the modes, flow samples them")
+    ax.set_title("Point-mass side-demo: goal hidden, regressor averages, flow samples")
     ax.legend(fontsize=8)
     ax.set_aspect("equal")
     fig.tight_layout()
     fig.savefig(_OUT / "multimodal.png", dpi=120)
     plt.close(fig)
-    # The averaged BC action should sit near the origin (modes cancel); samples spread to corners.
-    print(f"BC averaged |action|={np.linalg.norm(bc_a):.4f}  "
+    print(f"point-mass multimodal: BC averaged |action|={np.linalg.norm(bc_a):.4f}  "
           f"flow sample spread std={samples.std(0).mean():.4f}")
+
+
+def panel_flow_path(cfg, dev, demos):
+    """The flow-matching ODE path: z_t from t=0 (noise) to t=1 (action) for one image conditioning."""
+    obs, a = build_pixel_batch(demos, cfg.chunk, device=dev)
+    enc, flowH = train_pixel_flow(obs, a, cfg, steps=3000, device=dev, seed=0)
+    with torch.no_grad():
+        ci = enc(obs[:1])
+    n_steps = cfg.n_flow_steps
+    z = torch.randn(1, cfg.chunk, cfg.act_dim, device=dev)
+    dt = 1.0 / n_steps
+    traj = [z.clone()]
+    with torch.no_grad():
+        for k in range(n_steps):
+            t = torch.full((1, 1, 1), k * dt, device=dev)
+            z = z + dt * flowH(z, t, ci)
+            traj.append(z.clone())
+    traj = torch.cat(traj, dim=0).cpu().numpy()
+    ts = np.linspace(0, 1, n_steps + 1)
+    fig, ax = plt.subplots(figsize=(5, 3.5))
+    for h in range(cfg.chunk):
+        ax.plot(ts, traj[:, h, 0], "-o", ms=3, label=f"chunk step {h}, torque 0")
+    ax.set_xlabel("integration time t (0 = noise, 1 = action)")
+    ax.set_ylabel("z_t (joint-0 torque)")
+    ax.set_title("Flow-matching ODE path: noise transported to the torque chunk")
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(_OUT / "flow_path.png", dpi=120)
+    plt.close(fig)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default=None)
+    ap.add_argument("--n_demos", type=int, default=200)
     args = ap.parse_args()
     dev = torch.device(args.device) if args.device else default_device()
     torch.manual_seed(0)
     print(f"device: {dev}")
     cfg = VLAConfig()
 
-    panel_rollouts(cfg, dev)
-    panel_chunk_ablation(cfg, dev)
-    panel_flow_vs_ddpm(cfg, dev)
-    panel_flow_path(cfg, dev)
+    demos = _collect_demos(cfg, n_success=args.n_demos)
+    panel_reacher_rollouts(cfg, dev, demos)
+    panel_chunk_ablation(cfg, dev, demos)
+    panel_flow_path(cfg, dev, demos)
     panel_multimodal(cfg, dev)
     print(f"wrote figures to {_OUT}")
 
