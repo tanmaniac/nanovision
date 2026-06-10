@@ -201,7 +201,7 @@ so position i never sees the future.
 RoPE rotates pairs of channels of Q and K by an angle proportional to position, so
 the dot product of a rotated query and key depends only on their relative offset:
 
-$$q' = q\odot\cos + \operatorname{rotate\_half}(q)\odot\sin$$
+$$q' = q\odot\cos + \text{rotate-half}(q)\odot\sin$$
 
 where rotate_half splits the last dim in two halves $(x_1, x_2)$ and returns $(-x_2, x_1)$,
 and the cos/sin angles come from inv_freq = base^(-arange(half)/half) outer-product

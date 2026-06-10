@@ -32,7 +32,7 @@ adjustment. See the README for the full treatment.
 ## background
 Scene is N Gaussians: means_w $(N,3)$, log_scales $(N,3)$, quats $(N,4)$, opacity_logits
 $(N,)$, color_logits $(N,3)$. Covariance factored as $\Sigma_{3D} = R S S^\top R^\top$,
-$S = \mathrm{diag}(\exp(\text{log\_scales}))$, $R$ from the unit-normalized quaternion (PSD by
+$S = \mathrm{diag}(\exp(\text{log}_{\text{scales}}))$, $R$ from the unit-normalized quaternion (PSD by
 construction). EWA projection (OpenCV $+z$, matching `nanovision.geometry`): with camera-space
 mean $(x,y,z)$,
 
@@ -54,13 +54,13 @@ The `GaussianModel` container, `project_gaussians` wiring, `prune_low_opacity`, 
 
 ## tasks
 1. **Task 1 - quat_to_rotmat** (file: `gaussian.py`, symbol: `quat_to_rotmat`): $(N,4) \to (N,3,3)$. Normalize $q \to q/\lVert q\rVert$, build the standard rotation from $(w,x,y,z)$. Teaches the well-defined, differentiable quaternion-to-rotation map (singular only at $q=0$).
-2. **Task 2 - build_covariance_3d** (file: `gaussian.py`, symbol: `build_covariance_3d`): $(N,4),(N,3) \to (N,3,3)$. $\Sigma = (RS)(RS)^\top$ with $S=\mathrm{diag}(\exp(\text{log\_scales}))$. Teaches the factorization that keeps the covariance PSD and differentiable.
+2. **Task 2 - build_covariance_3d** (file: `gaussian.py`, symbol: `build_covariance_3d`): $(N,4),(N,3) \to (N,3,3)$. $\Sigma = (RS)(RS)^\top$ with $S=\mathrm{diag}(\exp(\text{log}_{\text{scales}}))$. Teaches the factorization that keeps the covariance PSD and differentiable.
 3. **Task 3 - perspective_jacobian** (file: `project.py`, symbol: `perspective_jacobian`): $(N,3),(3,3) \to (N,2,3)$. The Jacobian of `project_points` at the camera-space mean. Teaches the linearization the EWA step propagates.
 4. **Task 4 - project_cov_to_2d** (file: `project.py`, symbol: `project_cov_to_2d`): $(N,3,3),(3,3),(N,2,3) \to (N,2,2)$. $J W \Sigma W^\top J^\top + 0.3 I$, $W$ world-to-camera rotation. Teaches covariance propagation through a linear map and the dilation that guards the inverse.
 5. **Task 5 - splat_render** (file: `render.py`, symbol: `splat_render`): $\to (H,W,3)$. Depth sort (gather values), one closed-form 2x2 conic inverse per Gaussian, per-pixel $\alpha$ clamped to 0.99, front-to-back compositing. Teaches the rasterizer and that the sort carries no gradient while the gathered values do.
 
 ## tests
-- `tests/test_covariance.py` - PSD + symmetry, eigenvalues = sorted $\exp(\text{log\_scales})^2$ (distinct scales), float64 gradcheck of `build_covariance_3d` and `quat_to_rotmat` (reference-value + gradcheck). Order-one quaternions only.
+- `tests/test_covariance.py` - PSD + symmetry, eigenvalues = sorted $\exp(\text{log}_{\text{scales}})^2$ (distinct scales), float64 gradcheck of `build_covariance_3d` and `quat_to_rotmat` (reference-value + gradcheck). Order-one quaternions only.
 - `tests/test_projection.py` - `perspective_jacobian` vs finite-difference of `project_points` (atol 1e-4); `project_cov_to_2d` symmetric PD; float64 gradcheck (reference-value + gradcheck).
 - `tests/test_render_forward.py` - centered blob brightest at center; shape/range; front-to-back ordering and the depth swap; zero-opacity equals bg (training-free exact checks).
 - `tests/test_render_grad.py` - float64 gradcheck through the full forward w.r.t. `means_w` and `opacity_logits` only (gradcheck).

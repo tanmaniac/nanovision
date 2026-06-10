@@ -128,7 +128,7 @@ $\partial z_{\text{ST}} / \partial \text{logits}$ equals $\partial \mathbf{p} / 
 that floors every probability so no logit can be driven to $-\infty$ and every class keeps a little
 exploration probability:
 
-$$\mathbf{p} = (1 - \text{unimix})\,\mathrm{softmax}(\text{logits}) + \frac{\text{unimix}}{\text{n\_cls}},\qquad \text{unimix} = 0.01.$$
+$$\mathbf{p} = (1 - \text{unimix})\,\mathrm{softmax}(\text{logits}) + \frac{\text{unimix}}{\text{n}_{\text{cls}}},\qquad \text{unimix} = 0.01.$$
 
 The straight-through gradient flows through this blended $\mathbf{p}$, not the raw softmax. The
 sampler exposes a greedy (argmax) path used by the gradient and shape tests so the graph is

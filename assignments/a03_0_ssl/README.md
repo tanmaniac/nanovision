@@ -141,7 +141,7 @@ whose rows are the prototype directions. The cross-view objective compares the
 teacher's distribution to the student's (the teacher branch is stop-gradient):
 
 $$p_{\text{teacher}} = \operatorname{softmax}\!\big((g_{\text{teacher}} - \text{center})/\tau_{\text{teacher}}\big), \qquad
-\log p_{\text{student}} = \operatorname{log\_softmax}(g_{\text{student}}/\tau_{\text{student}})$$
+\log p_{\text{student}} = \log\operatorname{softmax}(g_{\text{student}}/\tau_{\text{student}})$$
 
 $$H(p_{\text{teacher}}, p_{\text{student}}) = -\sum_k p_{\text{teacher}}(k)\,\log p_{\text{student}}(k)$$
 

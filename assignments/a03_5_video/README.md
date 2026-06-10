@@ -128,7 +128,7 @@ pixels. The loss is MAE's masked-patch MSE with the patch enlarged from `p*p` to
 `t*p*p`, on per-tubelet-normalized targets, averaged over masked tubelets only:
 
 $$L_{\text{video}} = \frac{\sum_i \mathrm{mask}_i \cdot \operatorname*{mean}_{\text{pixels}}\big[(\mathrm{pred}_i - \mathrm{target}_i)^2\big]}{\sum_i \mathrm{mask}_i},
-\qquad \mathrm{target} = \operatorname{per\_tubelet\_normalize}(\operatorname{tubeletify}(\mathrm{clip}))$$
+\qquad \mathrm{target} = \text{per-tubelet-normalize}(\operatorname{tubeletify}(\mathrm{clip}))$$
 
 ## What to implement
 

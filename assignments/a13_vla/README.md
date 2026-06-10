@@ -230,7 +230,7 @@ not what this plain DDPM denoiser implements.
 
 Shapes throughout: $a$, $z_0$, $z_t$, $a_t$ are $(B, H, 2)$; $t$ is $(B, 1, 1)$ for the flow head and
 $(B,)$ integer for the DDPM head; the conditioning $c$ is $(B, 128)$ from the encoder (or
-$(B, \text{cond\_in})$ in general); chunks are $(B, T-H+1, H, 2)$.
+$(B, \text{cond}_{\text{in}})$ in general); chunks are $(B, T-H+1, H, 2)$.
 
 ## What to implement
 

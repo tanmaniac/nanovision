@@ -106,13 +106,13 @@ over the heights that are in-frame, not over all $n_{ref}$ heights. A pillar tha
 at only 1 of 4 heights must not be divided by 4, or it reads a quarter of the true feature. So the
 per-camera mean divides by the count of valid heights:
 
-$$\text{per\_cam}_{c} = \frac{\sum_{h} \text{sampled}_{c,h}\, m_{c,h}}{\max(\sum_h m_{c,h},\ 1)},
+$$\text{per-cam}_{c} = \frac{\sum_{h} \text{sampled}_{c,h}\, m_{c,h}}{\max(\sum_h m_{c,h},\ 1)},
 \qquad m_{c,h} = \text{valid}_{c,h},$$
 
 then the cross-camera mean divides by the number of hit views (the paper's $|V_{hit}|$ semantics, a
 camera counts if at least one of its pillar heights is in-frame):
 
-$$\text{out} = \frac{\sum_c \text{per\_cam}_c\, \mathbb{1}[\text{hit}_c]}{\max(\sum_c
+$$\text{out} = \frac{\sum_c \text{per-cam}_c\, \mathbb{1}[\text{hit}_c]}{\max(\sum_c
 \mathbb{1}[\text{hit}_c],\ 1)}.$$
 
 A cell no camera sees keeps its input query unchanged (a `torch.where` on the no-hit mask), rather

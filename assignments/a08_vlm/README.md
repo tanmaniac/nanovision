@@ -110,7 +110,7 @@ The `PerceiverResampler` implemented here is a deliberate single-layer miniature
 $Q$ learned query vectors (an `nn.Parameter` of shape $(1, Q, \text{dim}_l)$, expanded to the
 batch) cross-attend once over the projected patch features:
 
-$$\text{out} = \text{LayerNorm}\big(\text{queries} + \text{Attn}(\text{queries},\ kv=\text{feats\_proj})\big).$$
+$$\text{out} = \text{LayerNorm}\big(\text{queries} + \text{Attn}(\text{queries},\ kv=\text{feats}_{\text{proj}})\big).$$
 
 One cross-attention, one residual, one norm. The output length is $Q$ for any patch count $N$,
 which `test_resampler_token_count` checks by feeding it 16 and 9 patches and getting $Q$
@@ -189,7 +189,7 @@ the ignore index $-100$. Write the true caption tokens into the text slice,
 `labels[:, N:N+L] = token_ids`. Re-mask the pads within that slice,
 `labels[:, N:N+L][token_ids == 0] = -100`, so padding is not supervised. Then shift and reduce:
 
-$$\mathcal{L} = \text{cross\_entropy}\big(\text{logits}[:, :-1],\ \text{labels}[:, 1:],\ \text{ignore\_index} = -100\big).$$
+$$\mathcal{L} = \text{cross-entropy}\big(\text{logits}[:, :-1],\ \text{labels}[:, 1:],\ \text{ignore-index} = -100\big).$$
 
 Indexing `labels[token_ids == 0]` directly would be a bug: `labels` has length $N+L$ and
 `token_ids` has length $L$, so the boolean mask would not line up. The visual positions stay at
@@ -276,7 +276,7 @@ A8 mentions these but does not implement them.
   \text{Linear}$, applied per patch, (B, N, $\text{dim}_v$) -> (B, N, $\text{dim}_l$).
 - `PerceiverResampler.forward` (`resampler.py`): $Q$ learned queries cross-attend once over the
   projected patch features, $\text{out} = \text{norm}(\text{queries} + \text{Attn}(\text{queries},
-  kv=\text{feats\_proj}))$, output length $Q$ for any $N$.
+  kv=\text{feats}_{\text{proj}}))$, output length $Q$ for any $N$.
 - `prepend_visual` (`vlm.py`): concatenate visual then text, (B, N, d) + (B, L, d) -> (B, N+L, d).
 - `vlm_loss` (`vlm.py`): masked next-token cross-entropy over the text positions only, via the
   fill-$(-100)$, write-text-slice, re-mask-pads, shift-and-reduce recipe above.

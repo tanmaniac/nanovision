@@ -20,11 +20,11 @@ The scene is $N$ Gaussians. Each has a world-space mean $\mu_w \in \mathbb{R}^3$
 
 ### The covariance factorization
 
-A covariance must be symmetric positive semi-definite, and gradient descent on the six free entries of a symmetric $3\times3$ matrix does not preserve that. The factorization avoids the constraint. Store a rotation $R$ (from a quaternion $q$) and a per-axis scale $S = \mathrm{diag}(\exp(\text{log\_scales}))$, and define
+A covariance must be symmetric positive semi-definite, and gradient descent on the six free entries of a symmetric $3\times3$ matrix does not preserve that. The factorization avoids the constraint. Store a rotation $R$ (from a quaternion $q$) and a per-axis scale $S = \mathrm{diag}(\exp(\text{log}_{\text{scales}}))$, and define
 
 $$\Sigma_{3D} = R S S^\top R^\top.$$
 
-Since $S S^\top$ is diagonal with non-negative entries and $R$ is orthogonal, $\Sigma_{3D}$ is symmetric positive semi-definite for any parameter value, and it is differentiable everywhere the quaternion is nonzero. Storing log-scales keeps the standard deviations positive under unconstrained updates. The eigenvalues of $\Sigma_{3D}$ are exactly the squared scales $\exp(\text{log\_scales})^2$, because a rotation does not change eigenvalues; the covariance test checks this with distinct scales so the three eigenvalues are identifiable.
+Since $S S^\top$ is diagonal with non-negative entries and $R$ is orthogonal, $\Sigma_{3D}$ is symmetric positive semi-definite for any parameter value, and it is differentiable everywhere the quaternion is nonzero. Storing log-scales keeps the standard deviations positive under unconstrained updates. The eigenvalues of $\Sigma_{3D}$ are exactly the squared scales $\exp(\text{log}_{\text{scales}})^2$, because a rotation does not change eigenvalues; the covariance test checks this with distinct scales so the three eigenvalues are identifiable.
 
 The quaternion is normalized to unit norm inside the forward pass, $\hat q = q / \lVert q \rVert$, so the parameter $q$ can drift in magnitude and the rotation stays valid. The normalization is singular at $q = 0$ (the direction is undefined), so gradcheck and the tests use order-one quaternions, identity plus small noise, never near-zero ones.
 
@@ -106,7 +106,7 @@ Provided: the `GaussianModel` parameter container with its sigmoid opacity/color
 ## Tasks
 
 1. `quat_to_rotmat(q)` (`gaussian.py`): normalize $q$ to unit norm, build the $3\times3$ rotation. $(N,4) \to (N,3,3)$.
-2. `build_covariance_3d(quats, log_scales)` (`gaussian.py`): $R = $ `quat_to_rotmat(quats)`, $S = \mathrm{diag}(\exp(\text{log\_scales}))$, return $R S S^\top R^\top$. $(N,4),(N,3) \to (N,3,3)$.
+2. `build_covariance_3d(quats, log_scales)` (`gaussian.py`): $R = $ `quat_to_rotmat(quats)`, $S = \mathrm{diag}(\exp(\text{log}_{\text{scales}}))$, return $R S S^\top R^\top$. $(N,4),(N,3) \to (N,3,3)$.
 3. `perspective_jacobian(means_cam, K)` (`project.py`): the $2\times3$ Jacobian above, per Gaussian, at the camera-space mean. $(N,3),(3,3) \to (N,2,3)$.
 4. `project_cov_to_2d(cov3d, W, J)` (`project.py`): $J W \Sigma_{3D} W^\top J^\top + 0.3 I$, with $W$ the world-to-camera rotation. $(N,3,3),(3,3),(N,2,3) \to (N,2,2)$.
 5. `splat_render(means2d, cov2d, colors, opacities, depths, H, W, bg)` (`render.py`): sort by depth, invert each conic once, evaluate the 2D Gaussian per pixel with $\alpha \le 0.99$, composite front to back with the exclusive transmittance. $\to (H,W,3)$.
@@ -121,7 +121,7 @@ NANOVISION_IMPL=solution python -m pytest assignments/a10_gaussian_splatting/tes
 
 The tests, in workflow order:
 
-1. `test_covariance.py`: $\Sigma_{3D}$ symmetric PSD; for a unit quaternion and distinct scales the sorted eigenvalues equal the sorted $\exp(\text{log\_scales})^2$; float64 gradcheck of `build_covariance_3d` and `quat_to_rotmat` ($RR^\top = I$, $\det R = 1$). Uses order-one quaternions.
+1. `test_covariance.py`: $\Sigma_{3D}$ symmetric PSD; for a unit quaternion and distinct scales the sorted eigenvalues equal the sorted $\exp(\text{log}_{\text{scales}})^2$; float64 gradcheck of `build_covariance_3d` and `quat_to_rotmat` ($RR^\top = I$, $\det R = 1$). Uses order-one quaternions.
 2. `test_projection.py`: `perspective_jacobian` matches a finite-difference Jacobian of `project_points`; `project_cov_to_2d` is symmetric with positive eigenvalues; float64 gradcheck of the EWA step.
 3. `test_render_forward.py`: one centered Gaussian is a blob brightest at the center; output is $(H,W,3)$ in $[0,1]$; two overlapping opaque Gaussians, the nearer color dominates, and swapping depths swaps the winner; all opacities zero gives the background.
 4. `test_render_grad.py`: float64 gradcheck through the full forward (means and pose to project to render) with respect to `means_w` and `opacity_logits` only.

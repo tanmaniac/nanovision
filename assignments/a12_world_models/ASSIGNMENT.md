@@ -82,7 +82,7 @@ $(B, H+1)$.
   POST-action state `states[:, 1:]`; values over all `horizon+1` states; differentiable
   `compute_lambda_returns`. NO `no_grad`. Return `returns (B, H)`, `entropies (B, H)`, `H_h`, `H_z`.
 - **Task 10 - actor_loss_dynbackprop** (file: `actor_critic.py`, symbol: `actor_loss_dynbackprop`):
-  $-(\text{returns}/\text{ret\_range}).\mathrm{mean}() - \eta\,\text{entropies}.\mathrm{mean}()$. The
+  $-(\text{returns}/\text{ret}_{\text{range}}).\mathrm{mean}() - \eta\,\text{entropies}.\mathrm{mean}()$. The
   returns are differentiable through the dynamics - no log-prob, no detach.
 
 ## tests

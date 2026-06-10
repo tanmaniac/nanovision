@@ -111,7 +111,7 @@ The classification term is the same in both paths: `cross_entropy(scores, winner
 argmin winner and raw logits (cross-entropy applies log-softmax internally, so do not pre-softmax).
 This trains the score head to point at whichever mode committed, so at inference the top-scored mode
 is the model's single committed guess. The total loss is
-$\text{regression} + \text{cls\_weight} \cdot \text{classification}$.
+$\text{regression} + \text{cls}_{\text{weight}} \cdot \text{classification}$.
 
 ### The dead-mode lesson, measured
 
