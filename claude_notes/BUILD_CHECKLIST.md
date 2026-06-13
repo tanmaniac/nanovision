@@ -51,6 +51,15 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 - [x] A12 world models (DreamerV3)    [Core]   deps: A0,A1,A3.5  (cartpole-from-pixels, dyn-backprop actor)
 - [x] A13 VLA capstone                [Core]   deps: A5/A6,A8,(A12)  (flow-matching action head, leaf)
 
+## Phase 5 - Classical SLAM / localization (C++; plan: claude_notes/a14_classical_slam_plan.md)
+- [x] A14.0 Lie groups SO(3)/SE(3)    [Core]   deps: A11.5a (conventions)  (C++/Eigen/pybind11; Rerun viz; 19 tests)
+- [ ] A14.1 KF / EKF / UKF            [Core]   deps: A14.0
+- [ ] A14.2 EKF-SLAM                  [Core]   deps: A14.1
+- [ ] A14.3 multi-view geometry       [Core]   deps: A14.0,A11.5a
+- [ ] A14.4 ICP registration          [Core]   deps: A14.0  (Open3D oracle)
+- [ ] A14.5 factor graph / BA         [Core]   deps: A14.0,A14.3  (g2o/GTSAM oracle)
+- [ ] note: IMU pre-integration / VIO, calibration, place recognition, classical<->learned bridge
+
 ## Reading-only notes (Markdown, not built; in notes/)
 - [ ] note: video generation (flow matching in spatiotemporal VAE latent)
 - [ ] note: VLA data engines / scaling (Open X-Embodiment, DROID, FAST)

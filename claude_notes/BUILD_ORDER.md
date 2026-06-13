@@ -328,6 +328,56 @@ Legend: **[Core]** = learner implements the mechanism from scratch.
 
 ---
 
+## Phase 5 - Classical SLAM / localization (C++)
+
+A later addition that fills the classical geometric SLAM canon the deep-learning course
+skips. All mechanism code is C++17 with Eigen, exposed to the pytest green-red bar via
+pybind11; visualization is Rerun (interactive plus headless `.rrd`); production libraries
+(GTSAM, Open3D, g2o) appear as labeled comparison oracles, never as the graded
+implementation. Full design, holes, tests, and conventions are in
+`claude_notes/a14_classical_slam_plan.md` (expert-reviewed). Visualization-first by request:
+each assignment ships an animated, steppable view, and every README ends with an "In
+interviews" depth section.
+
+### A14.0 - Lie groups for state estimation  **[Core]**
+- **Implements:** SO(3)/SE(3) exp/log, hat/vee, left/right Jacobians and inverses, the
+  adjoint, and box-plus/box-minus (right-perturbation convention, used module-wide).
+- **Depends on:** A11.5a (matches its frame/naming conventions; no code shared across the
+  language boundary - reimplementing SE(3) in C++ is intended practice).
+- **Verifiable result:** exp/log round-trips and the adjoint identity to ~1e-9; the
+  numerical-vs-analytic right Jacobian to ~1e-6. Viz: manifold vs naive pose interpolation
+  (the naive blend leaves SO(3); det drops from 1, the manifold path stays rigid).
+
+### A14.1 - KF / EKF / UKF  **[Core]**
+- **Implements:** linear KF (Joseph form); EKF with a nonlinear process model + Jacobian and
+  a range-bearing measurement model; UKF unscented transform; information form.
+- **Depends on:** A14.0.
+
+### A14.2 - EKF-SLAM  **[Core]**
+- **Implements:** state augmentation on landmark init, the joint O(n^2) covariance update,
+  NN + Mahalanobis-gate data association, on a 2D range-bearing world with loop closures.
+- **Depends on:** A14.1. Framed as the superseded filter that factor graphs replaced.
+
+### A14.3 - Multi-view geometry estimators  **[Core]**
+- **Implements:** triangulation (DLT + nonlinear), normalized eight-point E/F, PnP, a RANSAC
+  robust wrapper, and a composed two-view relative-pose front-end.
+- **Depends on:** A14.0, A11.5a.
+
+### A14.4 - Point-cloud registration (ICP)  **[Core]**
+- **Implements:** point-to-point (Umeyama SVD) and point-to-plane ICP, correspondence +
+  outlier rejection (the kd-tree is provided); Open3D/GICP as the comparison oracle.
+- **Depends on:** A14.0.
+
+### A14.5 - Pose-graph / bundle adjustment  **[Core]**
+- **Implements:** SE(2)/SE(3) pose-graph residuals + analytic Jacobians, Gauss-Newton/LM,
+  the Schur complement for landmark marginalization, a loop-closure edge; g2o/GTSAM oracle.
+- **Depends on:** A14.0, A14.3.
+
+### Reading-only note (a14_classical_slam/notes/)
+IMU pre-integration and VIO, time-sync and extrinsic calibration, place recognition /
+loop-closure detection, and a bridge from classical to the learned geometry models in the
+repo (A10.5 DUSt3R/VGGT, A11.5 BEV).
+
 ## Reading-only notes (NOT built; bundled as Markdown notes in the repo)
 
 - **Video generation:** flow matching (A6) in a spatiotemporal VAE latent (A7);

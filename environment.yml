@@ -12,6 +12,10 @@ channels:
 dependencies:
   - python=3.11
   - pip
+  # Classical SLAM module (a14_*): the mechanism is C++17, so it needs Eigen (header-only)
+  # plus a C++17 compiler (system g++/clang++, not a conda package). CMake + pybind11 +
+  # the Rerun SDK are in the pip list below.
+  - eigen>=3.4
   - pip:
       - torch>=2.2
       - torchvision>=0.17
@@ -34,3 +38,11 @@ dependencies:
       # Heavy and optional; the graded CPU mechanism tests skip it via importorskip.
       # Uncomment to run those assignments' real-training and viz paths:
       # - dm_control>=1.0
+      # classical SLAM module (a14_*): C++ build + bindings, and the Rerun viewer.
+      - cmake>=3.22
+      - pybind11>=2.11
+      - rerun-sdk>=0.18
+      # a14 comparison oracles (optional; tests skip cleanly when absent):
+      # the from-scratch C++ is what's graded, these are labeled side-by-sides.
+      # - gtsam>=4.2      # pose-graph / BA oracle (a14_5)
+      # - open3d>=0.18    # ICP / GICP oracle (a14_4)

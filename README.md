@@ -155,6 +155,21 @@ dataset (~4GB). The camera-geometry assignment documents the account click-throu
 and download as step zero; the loader fails with a clear message if the dataset path
 is unset.
 
+### Classical SLAM module (a14, C++)
+
+A separate module fills the classical geometric SLAM and localization canon that the
+deep-learning assignments skip (Lie groups, Kalman filtering, EKF-SLAM, multi-view
+geometry, ICP, factor-graph and bundle adjustment). Its mechanism code is C++17 with
+Eigen rather than Python, because that is what SLAM ships in and what interviews ask
+for. The `make test` / `verify` / `viz` surface is unchanged: CMake builds the C++ on
+demand, pybind11 exposes it to the same pytest green-red bar, and the visualization is
+Rerun (interactive, with a headless export for CI). Production libraries (GTSAM, Open3D,
+g2o) appear only as labeled comparison oracles. This module needs a C++17 compiler plus
+the a14 block in `environment.yml` (CMake, pybind11, Eigen, the Rerun SDK). It is
+visualization-first and each README ends with an "In interviews" section; the design is
+in `claude_notes/a14_classical_slam_plan.md`. So far `a14_0_lie_se3` (the SO(3)/SE(3)
+Lie-group layer) is built; a14_1 through a14_5 are in progress.
+
 `notes/` holds reading-only writeups for topics studied but not built (video
 generation, VLA data engines, efficient attention, state-space backbones, MM-DiT and
 REPA, video world models). `claude_notes/` holds the build plans, research notes, and
