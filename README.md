@@ -168,8 +168,9 @@ g2o) appear only as labeled comparison oracles. This module needs a C++17 compil
 the a14 block in `environment.yml` (CMake, pybind11, Eigen, the Rerun SDK). It is
 visualization-first and each README ends with an "In interviews" section; the design is
 in `claude_notes/a14_classical_slam_plan.md`. So far `a14_0_lie_se3` (the SO(3)/SE(3)
-Lie-group layer) and `a14_1_kalman` (KF, EKF, UKF, and the information form) are built;
-a14_2 through a14_5 are in progress.
+Lie-group layer), `a14_1_kalman` (KF, EKF, UKF, and the information form), and
+`a14_2_ekf_slam` (the joint robot+map filter) are built; a14_3 through a14_5 are in
+progress.
 
 `notes/` holds reading-only writeups for topics studied but not built (video
 generation, VLA data engines, efficient attention, state-space backbones, MM-DiT and

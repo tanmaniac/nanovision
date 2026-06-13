@@ -360,10 +360,17 @@ interviews" depth section.
   update and fuses two sensors additively. Viz: EKF vs UKF tracking a noisy unicycle from
   one range-bearing landmark, with 1-sigma covariance ellipses.
 
-### A14.2 - EKF-SLAM  **[Core]**
-- **Implements:** state augmentation on landmark init, the joint O(n^2) covariance update,
-  NN + Mahalanobis-gate data association, on a 2D range-bearing world with loop closures.
+### A14.2 - EKF-SLAM  **[Core]**  (built)
+- **Implements:** state augmentation on landmark init (inverse model + Jacobians), the joint
+  O(n^2) predict/update with cross-covariance fill-in, NN + Mahalanobis-gate data
+  association, on a 2D range-bearing loop. Motion/measurement primitives reused from A14.1
+  (provided in models.cpp, compiled both builds).
 - **Depends on:** A14.1. Framed as the superseded filter that factor graphs replaced.
+- **Verifiable result:** noise-free landmark init lands at truth; update never increases the
+  joint covariance determinant and never decreases the information matrix (Loewner); the
+  gate matches a real observation and rejects a spurious one; short-trajectory robot NEES
+  stays below its chi-square bound (not optimistic). Viz: the loop, robot+landmark 3-sigma
+  ellipses, and NEES rising over the loop then dropping on loop closure.
 
 ### A14.3 - Multi-view geometry estimators  **[Core]**
 - **Implements:** triangulation (DLT + nonlinear), normalized eight-point E/F, PnP, a RANSAC
