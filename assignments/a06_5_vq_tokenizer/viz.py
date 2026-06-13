@@ -24,6 +24,7 @@ from prior import TokenPrior, ar_nll, ar_sample  # noqa: E402
 from vqvae import VQVAE, vq_vae_loss  # noqa: E402
 
 from nanovision.data import toy  # noqa: E402
+from nanovision.determinism import default_device  # noqa: E402
 from nanovision.quantize import codebook_perplexity  # noqa: E402
 
 _OUT = _here / "out"
@@ -31,7 +32,7 @@ _OUT.mkdir(exist_ok=True)
 
 
 def _train_vae(cfg, x, steps=2000):
-    vae = VQVAE(cfg)
+    vae = VQVAE(cfg).to(x.device)
     opt = torch.optim.Adam(vae.parameters(), lr=3e-3)
     for _ in range(steps):
         opt.zero_grad()
@@ -42,7 +43,7 @@ def _train_vae(cfg, x, steps=2000):
 
 
 def _train_prior(cfg, indices, steps=1500):
-    prior = TokenPrior(cfg)
+    prior = TokenPrior(cfg).to(indices.device)
     opt = torch.optim.Adam(prior.parameters(), lr=3e-3)
     for _ in range(steps):
         opt.zero_grad()
@@ -54,8 +55,10 @@ def _train_prior(cfg, indices, steps=1500):
 def main():
     torch.manual_seed(0)
     cfg = VQConfig()
+    dev = default_device()
     x, _ = toy.diffusion_image_batch(16, num_classes=3, size=cfg.img_size,
                                      channels=cfg.channels, seed=0)
+    x = x.to(dev)
     vae = _train_vae(cfg, x)
     with torch.no_grad():
         x_hat, idx, _ = vae(x)
@@ -65,13 +68,13 @@ def main():
     n = 8
     fig, axes = plt.subplots(2, n, figsize=(2 * n, 4))
     for j in range(n):
-        axes[0, j].imshow(x[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[0, j].axis("off")
-        axes[1, j].imshow(x_hat[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[1, j].axis("off")
+        axes[0, j].imshow(x[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1); axes[0, j].axis("off")
+        axes[1, j].imshow(x_hat[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1); axes[1, j].axis("off")
     axes[0, 0].set_ylabel("original"); axes[1, 0].set_ylabel("reconstruction")
     plt.tight_layout(); finish(_OUT / "recon.png")
 
     # Codebook usage.
-    counts = torch.bincount(idx.reshape(-1), minlength=cfg.num_codes).numpy()
+    counts = torch.bincount(idx.reshape(-1), minlength=cfg.num_codes).cpu().numpy()
     plt.figure(figsize=(5, 3.2))
     plt.bar(range(cfg.num_codes), counts)
     plt.xlabel("code"); plt.ylabel("usage count")
@@ -82,11 +85,11 @@ def main():
     prior = _train_prior(cfg, idx)
     with torch.no_grad():
         grids = ar_sample(prior, n, (cfg.grid, cfg.grid), cfg.num_codes,
-                          generator=torch.Generator().manual_seed(1))
+                          generator=torch.Generator(device=dev).manual_seed(1), device=str(dev))
         samples = vae.decode_indices(grids)
     fig, axes = plt.subplots(1, n, figsize=(2 * n, 2.2))
     for j in range(n):
-        axes[j].imshow(samples[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1); axes[j].axis("off")
+        axes[j].imshow(samples[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1); axes[j].axis("off")
     plt.tight_layout(); finish(_OUT / "samples.png")
 
     print(f"wrote figures to {_OUT}; perplexity {ppl:.2f}")

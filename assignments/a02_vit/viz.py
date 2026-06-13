@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent / "solution"))
 from vit import ViT  # noqa: E402
 
 from nanovision.attention import scaled_dot_product_attention  # noqa: E402
-from nanovision.determinism import set_seed  # noqa: E402
+from nanovision.determinism import default_device, set_seed  # noqa: E402
 from nanovision.trainer import Trainer  # noqa: E402
 
 OUT = Path(__file__).parent / "out"
@@ -41,7 +41,8 @@ def overfit_curve(out_path):
     model = ViT(img_size=32, patch=4, dim=64, depth=2, n_heads=4,
                 num_classes=num_classes, n_registers=4, pool="cls")
     opt = torch.optim.Adam(model.parameters(), lr=3e-3)
-    tr = Trainer(model, opt, lambda logits, t: F.cross_entropy(logits, t))
+    tr = Trainer(model, opt, lambda logits, t: F.cross_entropy(logits, t),
+                 device=str(default_device()))
     losses = tr.overfit_one_batch((x, y), steps=500)
     plot_loss_curve(losses, out_path, title="A2 ViT overfit (synthetic, cross-entropy)")
     return losses[-1]
@@ -142,7 +143,9 @@ def dinov2_register_comparison(out_path):
         return False
 
     set_seed(0)
-    img = torch.randn(1, 3, 518, 518)
+    dev = default_device()  # the pretrained ViT-Small forward at 518x518 is the heavy part
+    plain, reg = plain.to(dev), reg.to(dev)
+    img = torch.randn(1, 3, 518, 518, device=dev)
     fig, axs = plt.subplots(1, 2, figsize=(8, 4))
     for ax, (name, model) in zip(axs, [("DINOv2", plain), ("DINOv2-reg", reg)]):
         with torch.no_grad():
@@ -153,7 +156,7 @@ def dinov2_register_comparison(out_path):
         tokens = feats[0]
         n = tokens.shape[0]
         side = int(round((n) ** 0.5))
-        norms = tokens.norm(dim=-1)[: side * side].reshape(side, side).numpy()
+        norms = tokens.norm(dim=-1)[: side * side].reshape(side, side).cpu().numpy()
         im = ax.imshow(norms, cmap="viridis")
         ax.set_title(f"{name} patch-token norm")
         ax.axis("off")

@@ -24,24 +24,25 @@ from config import VideoSSLConfig  # noqa: E402
 from video_mae import VideoMAE  # noqa: E402
 
 from nanovision.data.toy import video_batch  # noqa: E402
-from nanovision.determinism import set_seed  # noqa: E402
+from nanovision.determinism import default_device, set_seed  # noqa: E402
 
 
 def main() -> None:
     set_seed(0)
     cfg = VideoSSLConfig()
+    dev = default_device()
     out = _here / "out"
     out.mkdir(exist_ok=True)
 
     vid = video_batch(batch=cfg.overfit_batch, n_frames=cfg.n_frames, size=cfg.img_size,
-                      channels=cfg.in_chans, n_blobs=cfg.n_blobs, seed=0)
+                      channels=cfg.in_chans, n_blobs=cfg.n_blobs, seed=0).to(dev)
     model = VideoMAE(
         img_size=cfg.img_size, patch=cfg.patch, tubelet_t=cfg.tubelet_t,
         n_frames=cfg.n_frames, in_chans=cfg.in_chans, enc_dim=cfg.enc_dim,
         enc_depth=cfg.enc_depth, enc_heads=cfg.enc_heads, dec_dim=cfg.dec_dim,
         dec_depth=cfg.dec_depth, dec_heads=cfg.dec_heads, mlp_ratio=cfg.mlp_ratio,
         mask_ratio=cfg.mask_ratio,
-    )
+    ).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.mae_lr)
 
     losses = []
@@ -77,7 +78,7 @@ def main() -> None:
     masked_input = vid * (1.0 - mask_pix)
 
     def to_img(frame):  # (C, H, W) -> (H, W, C) clamped for imshow
-        return frame.permute(1, 2, 0).clamp(0, 1).numpy()
+        return frame.permute(1, 2, 0).clamp(0, 1).cpu().numpy()
 
     b = 0
     T = cfg.n_frames

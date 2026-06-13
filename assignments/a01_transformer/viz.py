@@ -17,7 +17,7 @@ from charlm import CharLM  # noqa: E402
 
 from nanovision.attention import scaled_dot_product_attention  # noqa: E402
 from nanovision.data.toy import char_lm_batch  # noqa: E402
-from nanovision.determinism import set_seed  # noqa: E402
+from nanovision.determinism import default_device, set_seed  # noqa: E402
 from nanovision.trainer import Trainer  # noqa: E402
 from nanovision.transformer import build_causal_mask  # noqa: E402
 
@@ -45,7 +45,8 @@ def overfit_curve(out_path):
     opt = torch.optim.Adam(model.parameters(), lr=3e-3)
     vocab = tok.vocab_size
     tr = Trainer(model, opt,
-                 lambda logits, t: F.cross_entropy(logits.reshape(-1, vocab), t.reshape(-1)))
+                 lambda logits, t: F.cross_entropy(logits.reshape(-1, vocab), t.reshape(-1)),
+                 device=str(default_device()))
     losses = tr.overfit_one_batch((x, y), steps=500)
     plot_loss_curve(losses, out_path, title="A1 char-LM overfit (cross-entropy)")
     return losses[-1]

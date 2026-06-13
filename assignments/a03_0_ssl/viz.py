@@ -30,7 +30,7 @@ from config import SSLConfig  # noqa: E402
 from dino import build_student_teacher, dino_step, teacher_entropy  # noqa: E402
 from mae import MAE  # noqa: E402
 
-from nanovision.determinism import set_seed  # noqa: E402
+from nanovision.determinism import default_device, set_seed  # noqa: E402
 
 OUT = Path(__file__).parent / "out"
 
@@ -47,11 +47,12 @@ def _synthetic_image():
 def mae_reconstruction(out_path):
     """Overfit a small MAE on one image and plot original / masked / reconstruction."""
     cfg = SSLConfig()
-    img = _synthetic_image()
+    dev = default_device()
+    img = _synthetic_image().to(dev)
     model = MAE(img_size=cfg.img_size, patch=cfg.patch, in_chans=cfg.in_chans,
                 enc_dim=cfg.enc_dim, enc_depth=cfg.enc_depth, enc_heads=cfg.enc_heads,
                 dec_dim=cfg.dec_dim, dec_depth=cfg.dec_depth, dec_heads=cfg.dec_heads,
-                mask_ratio=cfg.mask_ratio)
+                mask_ratio=cfg.mask_ratio).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.mae_lr)
     for _ in range(cfg.mae_steps):
         torch.manual_seed(0)               # fixed mask -> clean memorization
@@ -88,7 +89,7 @@ def mae_reconstruction(out_path):
         [orig, masked, recon],
         ["original", f"masked ({int(cfg.mask_ratio * 100)}%)", "reconstruction"],
     ):
-        ax.imshow(im.permute(1, 2, 0).numpy())
+        ax.imshow(im.permute(1, 2, 0).cpu().numpy())
         ax.set_title(title)
         ax.axis("off")
     fig.suptitle(f"A3 MAE overfit (synthetic), masked-patch MSE {loss.item():.3e}")
@@ -102,12 +103,14 @@ def _collapse_curves():
     cfg = SSLConfig()
     cfg.ema_momentum = cfg.collapse_momentum
     set_seed(0)
-    img = torch.randn(cfg.overfit_batch, 3, 32, 32)
+    dev = default_device()
+    img = torch.randn(cfg.overfit_batch, 3, 32, 32, device=dev)
 
     def run(use_centering, teacher_temp):
         set_seed(0)
         student, teacher = build_student_teacher(cfg)
-        center = torch.zeros(1, cfg.out_dim)
+        student, teacher = student.to(dev), teacher.to(dev)
+        center = torch.zeros(1, cfg.out_dim, device=dev)
         opt = torch.optim.Adam(student.parameters(), lr=cfg.dino_lr)
         ents = []
         for _ in range(cfg.dino_steps):
@@ -159,12 +162,14 @@ def pretrained_dino_attention(out_path):
         return False
 
     set_seed(0)
-    img = torch.randn(1, 3, 224, 224)
+    dev = default_device()
+    model = model.to(dev)
+    img = torch.randn(1, 3, 224, 224, device=dev)
     with torch.no_grad():
         feats = model.forward_features(img)
     tokens = feats[0, 1:] if feats.ndim == 3 else feats[0]
     side = int(round(tokens.shape[0] ** 0.5))
-    norms = tokens.norm(dim=-1)[: side * side].reshape(side, side).numpy()
+    norms = tokens.norm(dim=-1)[: side * side].reshape(side, side).cpu().numpy()
     fig, ax = plt.subplots(figsize=(4, 4))
     im = ax.imshow(norms, cmap="inferno")
     ax.set_title("pretrained DINO patch-token norm")

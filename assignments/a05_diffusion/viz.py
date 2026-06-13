@@ -33,6 +33,7 @@ from schedule import cosine_alpha_bar, gather, linear_alpha_bar  # noqa: E402
 from unet import TimeEmbeddedUNet  # noqa: E402
 
 from nanovision.data.toy import diffusion_image_batch  # noqa: E402
+from nanovision.determinism import default_device  # noqa: E402
 
 _OUT = _here / "out"
 _OUT.mkdir(exist_ok=True)
@@ -84,15 +85,18 @@ def _conditioning(T=1000):
 def _train_and_sample(steps=3000):
     torch.manual_seed(0)
     cfg = DiffusionConfig()
+    dev = default_device()  # 3000 UNet steps + sampling: the heaviest demo, GPU pays off here
     T = 200
     _, abar = cosine_alpha_bar(T)
+    abar = abar.to(dev)
     x0, labels = diffusion_image_batch(n=64, num_classes=cfg.num_classes, size=cfg.img_size,
                                        channels=cfg.channels, seed=0)
-    model = TimeEmbeddedUNet(cfg)
+    x0, labels = x0.to(dev), labels.to(dev)
+    model = TimeEmbeddedUNet(cfg).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=2e-3)
-    gen = torch.Generator().manual_seed(0)
+    gen = torch.Generator(device=dev).manual_seed(0)
     for step in range(steps):
-        idx = torch.randint(0, x0.shape[0], (16,), generator=gen)
+        idx = torch.randint(0, x0.shape[0], (16,), generator=gen, device=dev)
         opt.zero_grad()
         loss = diffusion_loss(model, x0[idx], abar, kind="v", num_classes=cfg.num_classes,
                               cfg_drop_prob=0.1, min_snr_gamma=cfg.min_snr_gamma,
@@ -101,21 +105,21 @@ def _train_and_sample(steps=3000):
     model.eval()
 
     shape = (cfg.num_classes, cfg.channels, cfg.img_size, cfg.img_size)
-    cls = torch.arange(cfg.num_classes)
+    cls = torch.arange(cfg.num_classes, device=dev)
     ws = [1.0, 3.0, 7.5]
     fig, axes = plt.subplots(len(ws) + 1, cfg.num_classes, figsize=(2 * cfg.num_classes, 2 * (len(ws) + 1)))
     with torch.no_grad():
         ddpm = ddpm_sample(model, shape, abar, kind="v", labels=cls, guidance=1.0,
-                           generator=torch.Generator().manual_seed(1))
+                           generator=torch.Generator(device=dev).manual_seed(1))
         for j in range(cfg.num_classes):
-            axes[0, j].imshow(ddpm[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
+            axes[0, j].imshow(ddpm[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
             axes[0, j].set_title(f"DDPM cls {j}"); axes[0, j].axis("off")
         ts = list(range(T - 1, -1, -4))
         for i, w in enumerate(ws):
             grid = ddim_sample(model, shape, abar, ts, kind="v", eta=0.0, labels=cls,
-                               guidance=w, generator=torch.Generator().manual_seed(1))
+                               guidance=w, generator=torch.Generator(device=dev).manual_seed(1))
             for j in range(cfg.num_classes):
-                axes[i + 1, j].imshow(grid[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
+                axes[i + 1, j].imshow(grid[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
                 axes[i + 1, j].set_title(f"DDIM w={w}"); axes[i + 1, j].axis("off")
     plt.tight_layout(); finish(_OUT / "samples.png")
 

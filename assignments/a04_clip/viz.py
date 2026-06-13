@@ -26,18 +26,18 @@ from losses import clip_loss, siglip_loss  # noqa: E402
 from model import CLIPModel  # noqa: E402
 
 from nanovision.data.toy import image_text_batch  # noqa: E402
-from nanovision.determinism import set_seed  # noqa: E402
+from nanovision.determinism import default_device, set_seed  # noqa: E402
 
 
 def _sim(model, imgs, toks):
     with torch.no_grad():
         fi, ft = model(imgs, toks)
-        return (fi @ ft.T).numpy()
+        return (fi @ ft.T).cpu().numpy()
 
 
 def _train(cfg, imgs, toks, loss_name, steps):
     set_seed(0)
-    model = CLIPModel(cfg)
+    model = CLIPModel(cfg).to(imgs.device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     for _ in range(steps):
         fi, ft = model(imgs, toks)
@@ -54,6 +54,7 @@ def _train(cfg, imgs, toks, loss_name, steps):
 def main() -> None:
     set_seed(0)
     cfg = CLIPConfig()
+    dev = default_device()
     out = _here / "out"
     out.mkdir(exist_ok=True)
 
@@ -61,8 +62,9 @@ def main() -> None:
                                   channels=cfg.in_chans, n_classes=cfg.n_classes,
                                   n_attrs=cfg.n_attrs, vocab_size=cfg.vocab_size,
                                   max_len=cfg.max_len, seed=0)
+    imgs, toks = imgs.to(dev), toks.to(dev)
 
-    before = CLIPModel(cfg)
+    before = CLIPModel(cfg).to(dev)
     sim_before = _sim(before, imgs, toks)
     trained = _train(cfg, imgs, toks, "siglip", cfg.steps)
     sim_after = _sim(trained, imgs, toks)
@@ -86,12 +88,13 @@ def main() -> None:
         bimgs, btoks = image_text_batch(batch=n, size=cfg.img_size, channels=cfg.in_chans,
                                         n_classes=cfg.n_classes, n_attrs=cfg.n_attrs,
                                         vocab_size=cfg.vocab_size, max_len=cfg.max_len, seed=1)
+        bimgs, btoks = bimgs.to(dev), btoks.to(dev)
         for name in ("clip", "siglip"):
             m = _train(cfg, bimgs, btoks, name, 200)
             with torch.no_grad():
                 fi, ft = m(bimgs, btoks)
                 s = fi @ ft.T
-                frac = (s.argmax(dim=1) == torch.arange(n)).float().mean().item()
+                frac = (s.argmax(dim=1) == torch.arange(n, device=dev)).float().mean().item()
             align[name].append(frac)
 
     fig, ax = plt.subplots(figsize=(5, 3.2))

@@ -31,6 +31,7 @@ from sampling import euler_sample, straightness  # noqa: E402
 from timesteps import sample_timesteps  # noqa: E402
 
 from nanovision.data import toy  # noqa: E402
+from nanovision.determinism import default_device  # noqa: E402
 
 _OUT = _here / "out"
 _OUT.mkdir(exist_ok=True)
@@ -86,30 +87,32 @@ def _image_demo(steps=2500):
     from nanovision.unet import TimeEmbeddedUNet
 
     torch.manual_seed(0)
-    g = torch.Generator().manual_seed(0)
+    dev = default_device()  # the image-scale U-Net run is the heavy part; the 2D toy stays on CPU
+    g = torch.Generator(device=dev).manual_seed(0)
     cfg = _UNetCfg()
-    model = TimeEmbeddedUNet(cfg)
+    model = TimeEmbeddedUNet(cfg).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=2e-3)
     x1_all, labels_all = toy.diffusion_image_batch(64, num_classes=cfg.num_classes,
                                                    size=cfg.img_size, channels=cfg.channels, seed=0)
+    x1_all, labels_all = x1_all.to(dev), labels_all.to(dev)
     for _ in range(steps):
-        idx = torch.randint(0, 64, (16,), generator=g)
+        idx = torch.randint(0, 64, (16,), generator=g, device=dev)
         x1, lab = x1_all[idx], labels_all[idx]
         x0 = torch.randn_like(x1)
-        t = sample_timesteps(16, "logit_normal", generator=g)
+        t = sample_timesteps(16, "logit_normal", generator=g, device=str(dev))
         x_t = (1 - t.view(-1, 1, 1, 1)) * x0 + t.view(-1, 1, 1, 1) * x1
         pred = model(x_t, t, lab)
         opt.zero_grad(); ((pred - (x1 - x0)) ** 2).mean().backward(); opt.step()
 
     model.eval()
-    cls = torch.arange(cfg.num_classes)
+    cls = torch.arange(cfg.num_classes, device=dev)
     fig, axes = plt.subplots(1, cfg.num_classes, figsize=(2 * cfg.num_classes, 2.2))
     with torch.no_grad():
         x0 = torch.randn(cfg.num_classes, cfg.channels, cfg.img_size, cfg.img_size,
-                         generator=torch.Generator().manual_seed(1))
+                         generator=torch.Generator(device=dev).manual_seed(1), device=dev)
         out = euler_sample(lambda x, t: model(x, t, cls), x0, 20)
     for j in range(cfg.num_classes):
-        axes[j].imshow(out[j, 0].numpy(), cmap="gray", vmin=-1, vmax=1)
+        axes[j].imshow(out[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
         axes[j].set_title(f"CFM class {j}"); axes[j].axis("off")
     plt.tight_layout(); finish(_OUT / "image_cfm.png")
 

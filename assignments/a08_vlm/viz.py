@@ -26,6 +26,7 @@ from vlm import VLM, prepend_visual, vlm_loss  # noqa: E402
 
 from nanovision.transformer import build_causal_mask  # noqa: E402
 from nanovision.data import toy  # noqa: E402
+from nanovision.determinism import default_device  # noqa: E402
 
 _OUT = _here / "out"
 _OUT.mkdir(exist_ok=True)
@@ -46,14 +47,14 @@ def _train(model, img, tok, stage, steps, lr=3e-3):
 def _loss_with_visual(model, img, tok, mode):
     feats = model.vit.forward_features(img)
     if mode == "random_projector":
-        proj = MLPProjector(model.cfg.vit_dim, model.cfg.dim_l)
+        proj = MLPProjector(model.cfg.vit_dim, model.cfg.dim_l).to(feats.device)
         vis = proj(feats)
     else:
         vis = model.connector(feats)
         if mode == "zeroed":
             vis = torch.zeros_like(vis)
     seq = prepend_visual(vis, model.embed(tok))
-    mask = build_causal_mask(seq.shape[1])
+    mask = build_causal_mask(seq.shape[1]).to(seq.device)
     logits = model.head(model.norm(model.decoder(seq, mask=mask)))
     return vlm_loss(logits, tok, vis.shape[1]).item()
 
@@ -61,11 +62,13 @@ def _loss_with_visual(model, img, tok, mode):
 def main():
     torch.manual_seed(0)
     cfg = VLMConfig()
-    model = VLM(cfg)
+    dev = default_device()
+    model = VLM(cfg).to(dev)
     img, tok = toy.image_text_batch(
         batch=4, size=cfg.img_size, channels=cfg.in_chans, n_classes=cfg.n_classes,
         n_attrs=cfg.n_attrs, vocab_size=cfg.vocab_size, max_len=cfg.max_len, seed=0,
     )
+    img, tok = img.to(dev), tok.to(dev)
 
     s1 = _train(model, img, tok, stage=1, steps=300)
     s2 = _train(model, img, tok, stage=2, steps=300)
@@ -92,7 +95,7 @@ def main():
     # Images with their generated captions.
     fig, axes = plt.subplots(1, img.shape[0], figsize=(2.2 * img.shape[0], 2.6))
     for i in range(img.shape[0]):
-        axes[i].imshow(img[i].permute(1, 2, 0).clamp(0, 1).numpy())
+        axes[i].imshow(img[i].permute(1, 2, 0).clamp(0, 1).cpu().numpy())
         axes[i].set_title(f"gen {gen[i].tolist()}\ntgt {tok[i, :3].tolist()}", fontsize=8)
         axes[i].axis("off")
     plt.tight_layout()
