@@ -348,10 +348,17 @@ interviews" depth section.
   numerical-vs-analytic right Jacobian to ~1e-6. Viz: manifold vs naive pose interpolation
   (the naive blend leaves SO(3); det drops from 1, the manifold path stays rigid).
 
-### A14.1 - KF / EKF / UKF  **[Core]**
-- **Implements:** linear KF (Joseph form); EKF with a nonlinear process model + Jacobian and
-  a range-bearing measurement model; UKF unscented transform; information form.
-- **Depends on:** A14.0.
+### A14.1 - KF / EKF / UKF  **[Core]**  (built)
+- **Implements:** linear KF (Joseph form); EKF with a nonlinear unicycle process model +
+  Jacobian and a range-bearing measurement model + Jacobian; UKF unscented transform (sigma
+  points, weights with the beta term, cross-covariance); information form.
+- **Depends on:** A14.0 (reuses its estimation conventions; the unicycle motion model + F_x
+  here are what A14.2's EKF-SLAM motion update reuses).
+- **Verifiable result:** KF predict/Joseph-update match an independent NumPy reference;
+  analytic F_x/H match central differences to ~1e-6; UKF agrees with the KF on a
+  linear-Gaussian run to ~1e-6 (UT exact for affine); information update equals the KF
+  update and fuses two sensors additively. Viz: EKF vs UKF tracking a noisy unicycle from
+  one range-bearing landmark, with 1-sigma covariance ellipses.
 
 ### A14.2 - EKF-SLAM  **[Core]**
 - **Implements:** state augmentation on landmark init, the joint O(n^2) covariance update,

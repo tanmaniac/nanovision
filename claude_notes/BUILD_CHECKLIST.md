@@ -53,7 +53,7 @@ top-to-bottom (see `BUILD_ORDER.md`). 22 built assignments.
 
 ## Phase 5 - Classical SLAM / localization (C++; plan: claude_notes/a14_classical_slam_plan.md)
 - [x] A14.0 Lie groups SO(3)/SE(3)    [Core]   deps: A11.5a (conventions)  (C++/Eigen/pybind11; Rerun viz; 19 tests)
-- [ ] A14.1 KF / EKF / UKF            [Core]   deps: A14.0
+- [x] A14.1 KF / EKF / UKF            [Core]   deps: A14.0  (C++/Eigen/pybind11; Rerun EKF-vs-UKF viz; 18 tests)
 - [ ] A14.2 EKF-SLAM                  [Core]   deps: A14.1
 - [ ] A14.3 multi-view geometry       [Core]   deps: A14.0,A11.5a
 - [ ] A14.4 ICP registration          [Core]   deps: A14.0  (Open3D oracle)
