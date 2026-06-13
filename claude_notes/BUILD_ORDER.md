@@ -372,10 +372,18 @@ interviews" depth section.
   stays below its chi-square bound (not optimistic). Viz: the loop, robot+landmark 3-sigma
   ellipses, and NEES rising over the loop then dropping on loop closure.
 
-### A14.3 - Multi-view geometry estimators  **[Core]**
-- **Implements:** triangulation (DLT + nonlinear), normalized eight-point E/F, PnP, a RANSAC
-  robust wrapper, and a composed two-view relative-pose front-end.
+### A14.3 - Multi-view geometry estimators  **[Core]**  (built)
+- **Implements:** triangulation (DLT + nonlinear), normalized eight-point E/F, essential
+  decomposition + cheirality, PnP (DLT + SE(3) Gauss-Newton), the Sampson distance, a RANSAC
+  robust wrapper, and a composed two-view relative-pose front-end. SE(3) retraction + pinhole
+  helpers provided in models.cpp (compiled both builds).
 - **Depends on:** A14.0, A11.5a.
+- **Verifiable result:** noise-free triangulation/PnP/pose recovery to ~1e-6; recovered F
+  satisfies the epipolar constraint and is rank 2; cheirality picks the in-front pose; the
+  Sampson distance matches its closed form; with 35% outliers RANSAC recovers the inlier set
+  (>0.9 precision) and the robust pose (~0.1 deg) beats naive least squares (11-36 deg) across
+  seeds. Viz: triangulated points + two camera frusta in 3D, inlier/outlier correspondences
+  and epipolar lines in 2D.
 
 ### A14.4 - Point-cloud registration (ICP)  **[Core]**
 - **Implements:** point-to-point (Umeyama SVD) and point-to-plane ICP, correspondence +
