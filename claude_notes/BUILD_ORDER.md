@@ -411,10 +411,10 @@ interviews" depth section.
   equals the dense solve to ~1e-16. Viz: the drifted loop snapping onto ground truth across GN
   iterations, the loop-closure edge, falling cost, and H block-sparsity.
 
-### Reading-only note (a14_classical_slam/notes/)
+### Reading-only note (notes/classical_slam_frontiers.md)  (written)
 IMU pre-integration and VIO, time-sync and extrinsic calibration, place recognition /
 loop-closure detection, and a bridge from classical to the learned geometry models in the
-repo (A10.5 DUSt3R/VGGT, A11.5 BEV).
+repo (A10.5 DUSt3R/VGGT, A11.5 BEV). Lives in the repo's top-level `notes/` per its convention.
 
 ## Reading-only notes (NOT built; bundled as Markdown notes in the repo)
 

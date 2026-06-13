@@ -9,3 +9,5 @@ GPU, or the payoff is conceptual). See `claude_notes/BUILD_ORDER.md` for where e
 - `state_space_backbones.md` — Vision Mamba / SSMs (attaches to A1).
 - `mmdit_repa.md` — MM-DiT and REPA training techniques (attaches to A7).
 - `video_world_models.md` — Genie 2, DIAMOND, DreamerV4 (attaches to A12).
+- `classical_slam_frontiers.md` — IMU pre-integration/VIO, sensor calibration and time-sync,
+  loop-closure detection, and the classical-to-learned geometry bridge (attaches to A14).
