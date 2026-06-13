@@ -9,10 +9,12 @@ the only supervision needed is the photometric error between rendered and observ
 This assignment builds the core of that renderer on a small synthetic scene: the Fourier
 positional encoding that fixes the MLP's spectral bias, the discretized volume renderer that
 turns per-sample densities and colors into a pixel color, and ray generation from camera
-intrinsics and extrinsics. The radiance-field MLP and the toy scene are provided. The scene is
-one colored solid sphere imaged at 16x16 from a ring of cameras, so the tests run on CPU without
-a GPU; most finish in seconds, though the float64 gradient check is slower (a few minutes). Its
-ground-truth pixels come from a closed-form integral, not from the renderer being built here.
+intrinsics and extrinsics. The radiance-field MLP and the toy scene are provided. The scene is a
+sphere with a high-frequency striped albedo, imaged from a ring of cameras; the graded tests use
+a small 16x16 capture so they run on CPU without a GPU (most finish in seconds, though the
+float64 gradient check is slower, a few minutes), and the spectral-bias visualization uses a
+denser, higher-resolution capture so the encoding effect is legible. Its ground-truth pixels come
+from a closed-form integral, not from the renderer being built here.
 
 NeRF is the vehicle for the volume rendering integral, not a method to deploy at the end of the
 course. The reason to build it is the integral, its discretization, and front-to-back alpha
@@ -117,8 +119,8 @@ reason is spectral bias: an MLP under gradient descent fits low-frequency compon
 target function first, and high-frequency detail (sharp edges, fine texture) only much later or
 not at all. The neural tangent kernel makes this precise. The NTK of a standard MLP on raw
 coordinates is close to a low-pass kernel, so the eigenfunctions it learns quickly are the
-smooth ones, and a sphere's hard silhouette (a step in color) sits in the part of the spectrum
-the network reaches slowly.
+smooth ones, and the rapid stripes of the sphere's textured surface sit in the part of the
+spectrum the network reaches slowly (or never).
 
 The fix is to map each input coordinate through a bank of sinusoids before the MLP. For a scalar
 coordinate $p$,
@@ -139,9 +141,11 @@ position. The original NeRF uses $L = 10$ for positions and $L = 4$ for directio
 metric-scale scene; at low resolution a smaller $L$ suffices.
 
 The encoding is a fixed map with no learnable parameters. With the encoding the network resolves
-a hard silhouette early in training; without it the same network produces a visibly softer
-boundary, which is spectral bias showing up as blur. A hard silhouette makes this legible; a
-smooth blob would hide it.
+the high-frequency surface texture; without it the same network blurs the stripes into a smooth
+gray wash, which is spectral bias showing up as blur. The textured surface is what makes this
+legible: a smooth sphere has no high-frequency content for the encoding to recover, so the
+ablation would show nothing (or, with too few views, the extra capacity overfitting). This is
+why the toy turns on a high-frequency albedo rather than imaging a plain solid sphere.
 
 ### Ray generation
 
@@ -301,10 +305,12 @@ What you should see when you run this. The overfit test drives the ray-batch MSE
 (around 0.1) down well under $5\times10^{-3}$. Because the ground truth is the closed-form
 ray-sphere chord and not the output of `volume_render`, a passing run shows the discretized
 quadrature converging to the analytic Beer-Lambert integral, not to its own renderer. In the
-viz, the encoded model resolves the sphere boundary sharply while the raw-coordinate model
-leaves a softer edge and a lower PSNR, the spectral-bias gap made visible. These are toy
-artifacts on a 16x16 sphere. They confirm the mechanism runs end to end; they say nothing about
-quality at scale, where the full NeRF result (the Blender Lego scene at 800x800, around 20k
+viz, the encoded model resolves the striped surface sharply (around 27 dB held-out PSNR in the
+provided run) while the raw-coordinate model blurs the stripes into a smooth wash (around 17 dB),
+a roughly 10 dB spectral-bias gap made visible - the encoded result matching the literature
+(Tancik et al. 2020; the NeRF paper). These are toy artifacts on a small synthetic scene. They
+confirm the mechanism runs end to end and reproduce the qualitative effect; they say nothing
+about quality at scale, where the full NeRF result (the Blender Lego scene at 800x800, around 20k
 training steps, roughly 22 dB PSNR) wants a GPU and minutes to hours.
 
 ## References

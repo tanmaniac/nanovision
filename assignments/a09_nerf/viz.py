@@ -3,12 +3,15 @@
 Run from the repo root: `python -m assignments.a09_nerf.viz` (or
 `make viz A=a09_nerf`). Writes figures to out/.
 
-Three panels:
-- the closed-form ground truth of the held-out view next to the trained model's render;
-- the spectral-bias ablation: a model trained with the Fourier encoding vs one trained on
-  raw coordinates only (no encoding). The no-encoding render is visibly blurry at the sphere
-  boundary, since a raw-coordinate MLP fits low frequencies first;
-- the held-out PSNR after a short training run.
+The scene is a sphere with a high-frequency striped albedo, captured from a dense camera ring.
+Three panels show the held-out (novel) view:
+- the closed-form ground truth;
+- the render from a model trained WITH the Fourier encoding: it resolves the stripes;
+- the render from a model on raw coordinates only (no encoding): a raw-coordinate MLP is
+  biased to low frequencies, so it blurs the stripes away and its PSNR is much lower.
+This is the spectral-bias result from Tancik et al. 2020 / the NeRF paper - the encoding is
+what lets the MLP represent high-frequency detail. A smooth sphere has no such detail, which is
+why the ablation turns on a textured albedo.
 """
 
 import os
@@ -39,8 +42,8 @@ _OUT = _here / "out"
 _OUT.mkdir(exist_ok=True)
 
 
-def _render_view(model, K, c2w, near, far, cfg):
-    o, d, _ = stratified_sample_rays(cfg.H, cfg.W, K, c2w, near, far, cfg.n_samples, perturb=False)
+def _render_view(model, K, c2w, near, far, cfg, H):
+    o, d, _ = stratified_sample_rays(H, H, K, c2w, near, far, cfg.n_samples, perturb=False)
     zl = torch.linspace(0.0, 1.0, cfg.n_samples, device=K.device)
     z_vals = (near + (far - near) * zl).expand(o.shape[0], cfg.n_samples).contiguous()
     deltas = deltas_from_z(z_vals)
@@ -48,16 +51,16 @@ def _render_view(model, K, c2w, near, far, cfg):
         pts = sample_along_rays(o, d, z_vals)
         sigma, rgb = model(pts, d)
         color, _ = volume_render(sigma, rgb, deltas, white_background=cfg.white_background)
-    return color.reshape(cfg.H, cfg.W, 3).clamp(0, 1)
+    return color.reshape(H, H, 3).clamp(0, 1)
 
 
-def _train(cfg, images, poses, K, near, far, pos_L, steps, seed=0):
+def _train(cfg, images, poses, K, near, far, pos_L, steps, n_views, H, seed=0, nrays=1024):
     torch.manual_seed(seed)
     dev = K.device
     g = torch.Generator(device=dev).manual_seed(seed)
     ro_l, rd_l, tg_l = [], [], []
-    for v in range(cfg.n_views - 1):
-        o, d, _ = stratified_sample_rays(cfg.H, cfg.W, K, poses[v], near, far, cfg.n_samples, perturb=False)
+    for v in range(n_views - 1):
+        o, d, _ = stratified_sample_rays(H, H, K, poses[v], near, far, cfg.n_samples, perturb=False)
         ro_l.append(o); rd_l.append(d); tg_l.append(images[v].reshape(-1, 3))
     ro = torch.cat(ro_l); rd = torch.cat(rd_l); tg = torch.cat(tg_l)
     model = NeRFMLP(pos_L=pos_L, dir_L=cfg.dir_L, hidden=cfg.hidden, n_layers=cfg.n_layers,
@@ -65,7 +68,7 @@ def _train(cfg, images, poses, K, near, far, pos_L, steps, seed=0):
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     zl = torch.linspace(0.0, 1.0, cfg.n_samples, device=dev)
     for _ in range(steps):
-        idx = torch.randperm(ro.shape[0], generator=g, device=dev)[:512]
+        idx = torch.randperm(ro.shape[0], generator=g, device=dev)[:nrays]
         o, d, t = ro[idx], rd[idx], tg[idx]
         z_vals = (near + (far - near) * zl).expand(o.shape[0], cfg.n_samples).contiguous()
         deltas = deltas_from_z(z_vals)
@@ -80,18 +83,25 @@ def _train(cfg, images, poses, K, near, far, pos_L, steps, seed=0):
 def main():
     cfg = NeRFConfig()
     dev = default_device()
+    # The ablation uses a textured sphere (so encoding has high-frequency content to resolve)
+    # captured from a dense ring at higher resolution (so the texture, not overfitting, drives
+    # the held-out PSNR). The graded test uses the small smooth-by-default fast capture.
+    nv, H = cfg.abl_n_views, cfg.abl_H
     images, poses, K, near, far = toy.nerf_synthetic_scene(
-        n_views=cfg.n_views, H=cfg.H, W=cfg.W,
+        n_views=nv, H=H, W=H,
         radius=cfg.radius, sphere_sigma=cfg.sphere_sigma, cam_dist=cfg.cam_dist,
+        texture_freq=cfg.texture_freq, focal_mult=cfg.focal_mult,
     )
     images, poses, K = images.to(dev), poses.to(dev), K.to(dev)
     gt = images[-1].clamp(0, 1)
 
-    with_enc = _train(cfg, images, poses, K, near, far, pos_L=cfg.pos_L, steps=1500)
-    no_enc = _train(cfg, images, poses, K, near, far, pos_L=0, steps=1500)
+    with_enc = _train(cfg, images, poses, K, near, far, pos_L=cfg.pos_L, steps=cfg.abl_steps,
+                      n_views=nv, H=H)
+    no_enc = _train(cfg, images, poses, K, near, far, pos_L=0, steps=cfg.abl_steps,
+                    n_views=nv, H=H)
 
-    r_with = _render_view(with_enc, K, poses[-1], near, far, cfg)
-    r_no = _render_view(no_enc, K, poses[-1], near, far, cfg)
+    r_with = _render_view(with_enc, K, poses[-1], near, far, cfg, H)
+    r_no = _render_view(no_enc, K, poses[-1], near, far, cfg, H)
 
     def _psnr(a, b):
         mse = ((a - b) ** 2).mean()

@@ -246,13 +246,22 @@ def nerf_synthetic_scene(
     cam_dist: float = 4.0,
     focal: float | None = None,
     bg: float = 1.0,
+    texture_freq: float = 0.0,
+    focal_mult: float = 1.0,
     seed: int = 0,
     device: str = "cpu",
 ) -> tuple[Tensor, Tensor, Tensor, float, float]:
-    """A tiny posed-image scene of one colored solid sphere, for NeRF (A9).
+    """A tiny posed-image scene of one solid sphere, for NeRF (A9).
 
-    The object is a solid sphere of the given radius centered at the world origin,
-    constant interior density `sphere_sigma`, and a smooth position-dependent color.
+    The object is a solid sphere of the given radius centered at the world origin and
+    constant interior density `sphere_sigma`. Its surface albedo is either a smooth
+    position-dependent color (the default) or, when `texture_freq > 0`, a high-frequency
+    grayscale stripe pattern - the signal the Fourier positional encoding must resolve and a
+    raw-coordinate MLP blurs (the spectral-bias ablation in A9; a smooth sphere has no
+    high-frequency content for encoding to help with, so the ablation needs the texture).
+    `focal_mult` scales the focal length to zoom the sphere into the frame so the textured
+    surface, not the background, dominates the image.
+
     Cameras sit on a horizontal ring at distance `cam_dist`, each looking at the
     origin in the OpenCV convention (camera +z points into the scene, +x right,
     +y down). This matches nanovision.geometry, not the original NeRF's OpenGL -z.
@@ -264,14 +273,19 @@ def nerf_synthetic_scene(
     chord of length l, the exact transmittance through constant density is
     exp(-sphere_sigma * l), giving alpha = 1 - exp(-sphere_sigma * l) and a
     composited pixel alpha * c_sphere + (1 - alpha) * bg. A ray that misses the
-    sphere keeps the background. The hard sphere silhouette is the sharp feature
-    the spectral-bias ablation needs (a raw-coordinate MLP blurs it).
+    sphere keeps the background. With `texture_freq > 0` the high-frequency surface
+    albedo is the signal the spectral-bias ablation turns on: the encoded MLP resolves
+    the stripes, the raw-coordinate MLP blurs them.
 
     Args:
         n_views: number of cameras on the ring (the last one is the held-out view).
         H, W: image height and width in pixels.
         radius: sphere radius in world units.
         sphere_sigma: constant interior volume density.
+        texture_freq: if > 0, the angular frequency of the high-frequency grayscale
+            surface stripes used by the A9 spectral-bias ablation; 0 keeps the smooth color.
+        focal_mult: focal-length multiplier; > 1 zooms the sphere to fill the frame so the
+            textured surface dominates the image (used by the ablation).
         cam_dist: camera distance from the origin.
         focal: pinhole focal length in pixels; defaults to W (a ~53 degree FOV).
         bg: background gray level in [0, 1], applied to all three channels.
@@ -286,7 +300,7 @@ def nerf_synthetic_scene(
         far: float, a conservative far distance along the ray.
     """
     del seed  # deterministic per the fixed ring; kept for a uniform toy API
-    f = float(focal) if focal is not None else float(W)
+    f = (float(focal) if focal is not None else float(W)) * focal_mult
     cx, cy = (W - 1) / 2.0, (H - 1) / 2.0
     K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
 
@@ -294,9 +308,19 @@ def nerf_synthetic_scene(
     near = cam_dist - radius - 0.5
     far = cam_dist + radius + 0.5
 
-    # A smooth color over the sphere surface, so the held-out view tests color too.
+    # Surface albedo as a function of the entry point (so it is view-consistent: the same 3D
+    # surface point has the same color from every camera).
     def _sphere_color(p: Tensor) -> Tensor:
-        # p: (..., 3) the entry point on the sphere; map normalized coords to RGB.
+        if texture_freq > 0.0:
+            # High-frequency grayscale stripes: a smooth but high-frequency function of the
+            # surface position. The Fourier encoding resolves it; a raw-coordinate MLP, biased
+            # to low frequencies, blurs it. This is what makes the encoding ablation legible.
+            s = (0.5 + 0.5 * torch.sin(texture_freq * p[..., 0])
+                 * torch.sin(texture_freq * p[..., 1])
+                 * torch.sin(texture_freq * p[..., 2]))
+            g = (0.1 + 0.85 * s).clamp(0.0, 1.0)
+            return torch.stack([g, g, g], dim=-1)
+        # The default smooth color: map normalized coords to RGB.
         d = p / radius
         r = 0.5 + 0.5 * d[..., 0]
         gch = 0.5 + 0.5 * d[..., 1]

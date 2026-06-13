@@ -26,6 +26,7 @@ def test_overfit_rays():
     images, poses, K, near, far = toy.nerf_synthetic_scene(
         n_views=cfg.n_views, H=cfg.H, W=cfg.W,
         radius=cfg.radius, sphere_sigma=cfg.sphere_sigma, cam_dist=cfg.cam_dist,
+        texture_freq=cfg.texture_freq, focal_mult=cfg.focal_mult,
     )
     # Build all rays from the training views (drop the held-out last view).
     g = torch.Generator().manual_seed(0)

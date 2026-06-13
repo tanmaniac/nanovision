@@ -26,5 +26,20 @@ class NeRFConfig:
     cam_dist: float = 4.0       # camera distance from the origin
     scene_bound: float = 4.0    # positions divided by this before encoding (~[-1, 1])
 
+    # High-frequency surface albedo for the spectral-bias ablation. A smooth sphere has no
+    # high-frequency content, so encoding cannot help there; these stripes are the signal the
+    # encoding resolves and a raw-coordinate MLP blurs. focal_mult zooms the textured sphere
+    # to fill the frame so the texture, not the background, drives the PSNR.
+    texture_freq: float = 12.0
+    focal_mult: float = 2.0
+
+    # The ablation render (viz) needs a denser, slightly larger capture than the CPU test
+    # above: separating "encoding resolves the texture" from "encoding overfits a few views"
+    # requires enough views to constrain the high-frequency field. The graded test stays at
+    # the small fast capture (n_views, H) and only overfits training rays, so it is unaffected.
+    abl_n_views: int = 40
+    abl_H: int = 48
+    abl_steps: int = 3500
+
     white_background: bool = True
     lr: float = 5e-4
