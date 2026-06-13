@@ -398,10 +398,18 @@ interviews" depth section.
   with Open3D when present. Viz: source sliding onto target, point-to-point vs point-to-plane
   side by side with shrinking RMS.
 
-### A14.5 - Pose-graph / bundle adjustment  **[Core]**
-- **Implements:** SE(2)/SE(3) pose-graph residuals + analytic Jacobians, Gauss-Newton/LM,
-  the Schur complement for landmark marginalization, a loop-closure edge; g2o/GTSAM oracle.
+### A14.5 - Pose-graph / bundle adjustment  **[Core]**  (built)
+- **Implements:** the SE(3) between-factor residual + analytic edge Jacobians (Barfoot/GTSAM
+  form, -J_r^-1(r) Ad on the i-side), the Gauss-Newton loop with a gauge anchor, and the Schur
+  complement for BA landmark marginalization; loop closure as the centerpiece scenario. The
+  SE(3) machinery incl. the 6x6 J_r^-1 (Barfoot Q) is provided in models.cpp; GTSAM is a
+  skip-if-absent oracle. Done on SE(3) (planar trajectory), not a separate SE(2) toolkit.
 - **Depends on:** A14.0, A14.3.
+- **Verifiable result:** residual zero at truth; analytic edge Jacobians match numerical to
+  ~5e-7 (a 0.1% Q error fails by 2 orders); GN recovers ground truth to ~1e-15 and cost ~0;
+  one loop-closure edge cuts end-drift ~39x while removing it changes nothing; Schur solve
+  equals the dense solve to ~1e-16. Viz: the drifted loop snapping onto ground truth across GN
+  iterations, the loop-closure edge, falling cost, and H block-sparsity.
 
 ### Reading-only note (a14_classical_slam/notes/)
 IMU pre-integration and VIO, time-sync and extrinsic calibration, place recognition /

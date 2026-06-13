@@ -170,8 +170,11 @@ visualization-first and each README ends with an "In interviews" section; the de
 in `claude_notes/a14_classical_slam_plan.md`. So far `a14_0_lie_se3` (the SO(3)/SE(3)
 Lie-group layer), `a14_1_kalman` (KF, EKF, UKF, and the information form), `a14_2_ekf_slam`
 (the joint robot+map filter), `a14_3_multiview` (triangulation, the eight-point algorithm,
-PnP, RANSAC, and the two-view front-end), and `a14_4_icp` (point-to-point and point-to-plane
-registration) are built; a14_5 is in progress.
+PnP, RANSAC, and the two-view front-end), `a14_4_icp` (point-to-point and point-to-plane
+registration), and `a14_5_factor_graph` (pose-graph optimization and the bundle-adjustment
+Schur complement) are built. The module's mechanism assignments are complete; a reading-only
+`notes/` writeup (IMU pre-integration, VIO, loop-closure detection, and the bridge to the
+learned geometry models) is the remaining piece.
 
 `notes/` holds reading-only writeups for topics studied but not built (video
 generation, VLA data engines, efficient attention, state-space backbones, MM-DiT and
