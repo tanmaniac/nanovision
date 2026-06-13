@@ -385,10 +385,18 @@ interviews" depth section.
   seeds. Viz: triangulated points + two camera frusta in 3D, inlier/outlier correspondences
   and epipolar lines in 2D.
 
-### A14.4 - Point-cloud registration (ICP)  **[Core]**
-- **Implements:** point-to-point (Umeyama SVD) and point-to-plane ICP, correspondence +
-  outlier rejection (the kd-tree is provided); Open3D/GICP as the comparison oracle.
+### A14.4 - Point-cloud registration (ICP)  **[Core]**  (built)
+- **Implements:** point-to-point (Umeyama SVD with the det-correction) and point-to-plane ICP
+  (linearized 6x6 normal equations + SE(3) retraction), and the outer loop (associate via the
+  provided brute-force NN, max-distance rejection, solve, iterate). Open3D as a skip-if-absent
+  comparison oracle.
 - **Depends on:** A14.0.
+- **Verifiable result:** matched point-to-point recovers a known SE(3) to ~1e-7 and stays a
+  proper rotation on a reflection-forcing planar cloud (the det correction); point-to-plane
+  iterated recovers the transform and converges in ~2 iters vs point-to-point's ~10-12 on a
+  surface-rich cloud; the gate rejects unmatched outliers; the from-scratch transform agrees
+  with Open3D when present. Viz: source sliding onto target, point-to-point vs point-to-plane
+  side by side with shrinking RMS.
 
 ### A14.5 - Pose-graph / bundle adjustment  **[Core]**
 - **Implements:** SE(2)/SE(3) pose-graph residuals + analytic Jacobians, Gauss-Newton/LM,
