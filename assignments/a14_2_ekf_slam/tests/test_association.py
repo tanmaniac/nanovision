@@ -24,9 +24,11 @@ def test_empty_map_associates_nothing():
 
 
 def test_matching_observation_associates_to_its_landmark():
+    # A realistically noisy reading of each landmark (not the exact prediction, which would
+    # make d^2 ~ 0 trivially) still associates to the right index and passes the gate.
     mu, P, R = _two_landmark_state()
-    z0 = np.asarray(range_bearing(mu[:3], mu[3:5]))
-    z1 = np.asarray(range_bearing(mu[:3], mu[5:7]))
+    z0 = np.asarray(range_bearing(mu[:3], mu[3:5])) + np.array([0.08, np.deg2rad(1.5)])
+    z1 = np.asarray(range_bearing(mu[:3], mu[5:7])) + np.array([-0.06, np.deg2rad(-1.2)])
     assert slam_associate(mu, P, z0, R, GATE) == 0
     assert slam_associate(mu, P, z1, R, GATE) == 1
 

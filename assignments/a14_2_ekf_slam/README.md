@@ -137,9 +137,10 @@ plotting the robot NEES (normalized estimation error squared, expectation 3 for 
 3-DOF estimate), you will see it climb as the robot drives away from its anchored start -
 roughly $0.2 \to 0.9 \to 1.9 \to 3.0 \to 4.5$ across the loop in the provided run, brushing
 the chi-square bound near the far side - and then drop back down when loop closure re-sees
-the first landmarks and re-tightens the map. The early-loop values below 3 are the
-absolute-frame uncertainty being conservative (the map is only known relative to the start);
-the climb toward and across the bound is the optimism. Both problems are why the field moved
+the first landmarks and re-tightens the map. The early values below 3 mean the robot's
+absolute pose error is still small near its anchored start, where the filter's (correctly
+larger) reported covariance leaves it consistent-to-conservative; the climb toward and across
+the bound, as linearization error accumulates over the drive, is the optimism. Both problems are why the field moved
 to factor-graph smoothing, the subject of the bundle-adjustment assignment: it keeps all
 poses and relinearizes, and it exploits sparsity instead of fighting a dense covariance.
 

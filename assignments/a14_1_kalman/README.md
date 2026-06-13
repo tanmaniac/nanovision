@@ -90,7 +90,11 @@ The bearing $\phi$ is an angle, so its residual must be wrapped to $(-\pi, \pi]$
 measurement at $+179^\circ$ and a prediction at $-179^\circ$ are $2^\circ$ apart, not
 $358^\circ$, and an unwrapped innovation injects a huge spurious correction. The heading
 state is likewise kept wrapped. This is the most common EKF-on-a-pose bug; `wrap_angle`
-(provided) handles it, and you call it in the residual and after the mean update.
+(provided) handles it, and you call it in the residual and after the mean update. The
+range-bearing model is also singular at zero range: $H$ has $1/r$ and $1/r^2$ terms, so a
+landmark at the robot's exact position has undefined bearing and an infinite Jacobian. Real
+sensors never report zero range and the simulation keeps a standoff, so the code does not
+guard it, but it is the kind of degeneracy worth naming.
 
 The EKF's weakness is the linearization. $F_x$ and $H$ are a first-order Taylor expansion
 at the mean, so when the model curves sharply over the spread of the covariance, the
