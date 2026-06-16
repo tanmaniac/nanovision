@@ -26,3 +26,7 @@ assignments/**/out/
 
 # os
 .DS_Store
+
+# local-only scaffolding and harness config (not part of the published repo)
+claude_notes/
+.claude/
