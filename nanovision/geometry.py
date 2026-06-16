@@ -1,21 +1,33 @@
-"""Camera geometry and BEV (A11.5a), plus pointmap/depth utilities (A10.5).
+"""Camera geometry primitives with three owners, re-exported under one import path.
 
-The camera primitives are sourced from assignments/a11_5a_camera_geometry_bev/geometry.py and
-the DUSt3R-style pointmap utilities from assignments/a10_5_geometry_fm/geometry_fm.py (or each
-assignment's solution/ under NANOVISION_IMPL=solution), through nanovision/_student.py. Import as
+The base pinhole model and SE(3) toolkit (project_points, unproject, make_transform,
+apply_transform, invert_transform, compose_transforms) are sourced from
+assignments/a09_nerf/geometry.py; the autonomous-driving objects (BEVGrid, CameraRig,
+ipm_to_bev) from assignments/a11_5a_camera_geometry_bev/geometry.py; and the DUSt3R-style
+pointmap utilities from assignments/a10_5_geometry_fm/geometry_fm.py (or each assignment's
+solution/ under NANOVISION_IMPL=solution), through nanovision/_student.py. Import as
 `from nanovision.geometry import project_points, depth_to_pointmap`, etc.
+
+Load order matters: the a11_5a and a10_5 modules import the base primitives back through this
+shim at import time, so the base primitives must be assigned on this module before those
+modules are loaded.
 """
 
 from nanovision._student import load
 
-_m = load("a11_5a_camera_geometry_bev", "geometry")
+# Base pinhole + SE(3) primitives, owned by A9 (the first 3D assignment; NeRF ray
+# generation needs back-projection). Assigned first so a11_5a/a10_5 can import them
+# back through this shim while they load.
+_base = load("a09_nerf", "geometry")
+project_points = _base.project_points
+unproject = _base.unproject
+make_transform = _base.make_transform
+apply_transform = _base.apply_transform
+invert_transform = _base.invert_transform
+compose_transforms = _base.compose_transforms
 
-project_points = _m.project_points
-unproject = _m.unproject
-make_transform = _m.make_transform
-apply_transform = _m.apply_transform
-invert_transform = _m.invert_transform
-compose_transforms = _m.compose_transforms
+# Autonomous-driving objects, owned by A11.5a (built on the base primitives above).
+_m = load("a11_5a_camera_geometry_bev", "geometry")
 BEVGrid = _m.BEVGrid
 CameraRig = _m.CameraRig
 ipm_to_bev = _m.ipm_to_bev

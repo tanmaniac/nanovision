@@ -10,13 +10,14 @@ becomes the shared substrate for everything downstream: it is where multiple cam
 where consecutive frames fuse (ego-motion shifts the previous grid into the current ego frame),
 and where detection, segmentation, occupancy, and motion prediction all read and write.
 
-Build the geometry the rest of the autonomous-driving module imports: pinhole projection and
-its inverse, the four SE(3) transform primitives, a multi-camera rig that decides which camera
-sees a given 3-D point, and the flat-ground inverse-perspective-mapping (IPM) baseline that
-warps images into the BEV grid. Most of the real content is coordinate-frame plumbing (the
-nested sensor, ego, and global frames of nuScenes, the lidar-camera temporal offset, and the
-quaternion order) rather than the pinhole model itself. The reference solution and all tests run
-on synthetic cameras, so no dataset is needed.
+Build the autonomous-driving geometry on top of the base camera primitives from the NeRF
+assignment: a multi-camera rig that decides which camera sees a given 3-D point, and the
+flat-ground inverse-perspective-mapping (IPM) baseline that warps images into the BEV grid. The
+pinhole model, its inverse, and the four SE(3) transform primitives are built in the NeRF
+assignment and imported here through the `nanovision.geometry` shim. Most of the real content is
+coordinate-frame plumbing (the nested sensor, ego, and global frames of nuScenes, the
+lidar-camera temporal offset, and the quaternion order) rather than the pinhole model itself. The
+reference solution and all tests run on synthetic cameras, so no dataset is needed.
 
 Required reading before starting:
 - Caesar et al. 2020, "nuScenes: A Multimodal Dataset for Autonomous Driving",
@@ -70,38 +71,14 @@ The core nuScenes images are pre-undistorted and stored rectified, so the stored
 is an exact pinhole matrix with no radial or tangential distortion terms. (The nuImages spin-off
 keeps distortion; the core dataset does not.) No undistortion is needed.
 
-### Pinhole projection
+### The pinhole model and SE(3) toolkit
 
-A camera-frame point $(X, Y, Z)$ with $Z > 0$ projects to a pixel by
-
-$$u = f_x \frac{X}{Z} + c_x, \qquad v = f_y \frac{Y}{Z} + c_y,$$
-
-and back-projects at a known depth $d$ by
-
-$$X = (u - c_x)\frac{d}{f_x}, \qquad Y = (v - c_y)\frac{d}{f_y}, \qquad Z = d.$$
-
-The forward pass is a divide by depth followed by the intrinsic scale and offset:
-
-```mermaid
-flowchart LR
-    A["pts_cam (N,3)<br/>X, Y, Z in camera frame"] -->|"divide by Z"| B["(X/Z, Y/Z)<br/>normalized image plane"]
-    B -->|"u = fx·X/Z + cx<br/>v = fy·Y/Z + cy"| C["px (N,2)<br/>pixels u, v"]
-    C -. "back-project at depth d<br/>X=(u-cx)·d/fx, Y=(v-cy)·d/fy, Z=d" .-> A
-```
-
-The dashed edge recovers the camera-frame point only because the depth $d$ is supplied
-separately. A single pixel alone fixes a ray, not a point. Every BEV lift depends on this
-back-projection; the only place to get it wrong is the sign or order when chaining it with the
-extrinsics.
-
-### The four SE(3) primitives
-
-A rigid transform on points needs four operations. Assembly builds the 4x4 matrix
-$[[R, t], [0, 1]]$ from a 3x3 rotation $R$ and a 3-vector $t$. Application maps a batch of points
-through $R\,p + t$. Inversion uses the SE(3) structure rather than a general matrix inverse:
-for $T = [[R, t], [0, 1]]$ the inverse is $[[R^\top, -R^\top t], [0, 1]]$, which is exact and
-cheap. Composition multiplies a sequence left to right, so $A B C$ applied to a point is the
-same as applying $C$, then $B$, then $A$. The whole later module is built from these four.
+The pinhole projection $u = f_x X/Z + c_x$, $v = f_y Y/Z + c_y$, its depth-back-projection
+inverse, and the four SE(3) primitives (build a 4x4 transform from $R, t$; apply $R\,p + t$ to a
+batch of points; invert via the structured $[[R^\top, -R^\top t], [0, 1]]$; compose left to
+right) are built in the NeRF assignment and imported here from `nanovision.geometry`. The chains
+below compose those SE(3) transforms and finish with the pinhole projection; the only place to
+get the projection wrong is the sign or order when chaining it with the extrinsics.
 
 ### The four-step lidar-to-camera chain
 
@@ -200,28 +177,24 @@ propagate.
 
 ## The assignment
 
-Implement the pinhole model, the SE(3) toolkit, the multi-camera rig, and the flat-ground IPM
-warp. The file docstrings give the exact signatures, shapes, and formulas (the OpenCV camera
-axes, the $T_{\text{cam}\_\text{ego}}$ extrinsic convention, the grid_sample normalization).
-Read those; this section maps each piece to the concept above. Everything is autograd-compatible
-float tensors, and the tests are float64 gradchecks on the differentiable pieces.
+Implement the multi-camera rig and the flat-ground IPM warp on top of the base camera primitives
+(pinhole projection and the SE(3) toolkit) imported from `nanovision.geometry`. The file
+docstrings give the exact signatures, shapes, and formulas (the OpenCV camera axes, the
+$T_{\text{cam}\_\text{ego}}$ extrinsic convention, the grid_sample normalization). Read those;
+this section maps each piece to the concept above. Everything is autograd-compatible float
+tensors, and the tests are float64 gradchecks on the differentiable pieces.
 
 ### Files to modify
 
-All four tasks are in `geometry.py`, marked with `raise NotImplementedError("A11.5a Task N: ...")`.
+Both tasks are in `geometry.py`, marked with `raise NotImplementedError("A11.5a Task N: ...")`.
+`project_points`, `unproject`, and the four SE(3) primitives are imported at the top of the file
+from `nanovision.geometry` (built in the NeRF assignment); you do not reimplement them here.
 
-Task 1, `project_points` and `unproject`, is the pinhole model and its inverse on the OpenCV
-camera axes from the pinhole-projection section.
-
-Task 2, `make_transform`, `apply_transform`, `invert_transform`, and `compose_transforms`, is
-the SE(3) toolkit from the four-primitives section, including the structured inverse
-($R^\top$, $-R^\top t$) rather than a general matrix inverse.
-
-Task 3, `CameraRig.world_to_cam`, `cam_to_world`, and `world_to_pixel`, is the multi-camera rig.
+Task 1, `CameraRig.world_to_cam`, `cam_to_world`, and `world_to_pixel`, is the multi-camera rig.
 `world_to_pixel` projects ego points into a named camera and returns the in-front ($z > 0$) and
 in-bounds visibility mask, the back half of the projection chain.
 
-Task 4, `ipm_to_bev`, is the flat-ground IPM warp: for each BEV cell, project its ground point
+Task 2, `ipm_to_bev`, is the flat-ground IPM warp: for each BEV cell, project its ground point
 into each camera and bilinearly sample the image with `grid_sample`, last-camera-wins on
 overlap.
 

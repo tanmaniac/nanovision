@@ -1,4 +1,4 @@
-"""Task 1: pinhole project / unproject. Run first."""
+"""Pinhole project / unproject (geometry.py)."""
 
 import torch
 

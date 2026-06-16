@@ -147,11 +147,59 @@ legible: a smooth sphere has no high-frequency content for the encoding to recov
 ablation would show nothing (or, with too few views, the extra capacity overfitting). This is
 why the toy turns on a high-frequency albedo rather than imaging a plain solid sphere.
 
+### Pinhole projection
+
+NeRF is the first 3D assignment, so it builds the base camera-geometry primitives the rest of
+the course reuses: the pinhole model and the four SE(3) transform operations. They live in
+`geometry.py` and are re-exported through the `nanovision.geometry` shim, so the later 3D
+assignments (Gaussian splatting, the geometry foundation models) and the whole autonomous-driving
+module import them from there rather than re-deriving them.
+
+A camera-frame point $(X, Y, Z)$ with $Z > 0$ projects to a pixel by
+
+$$u = f_x \frac{X}{Z} + c_x, \qquad v = f_y \frac{Y}{Z} + c_y,$$
+
+and back-projects at a known depth $d$ by
+
+$$X = (u - c_x)\frac{d}{f_x}, \qquad Y = (v - c_y)\frac{d}{f_y}, \qquad Z = d.$$
+
+The forward pass is a divide by depth followed by the intrinsic scale and offset:
+
+```mermaid
+flowchart LR
+    A["pts_cam (N,3)<br/>X, Y, Z in camera frame"] -->|"divide by Z"| B["(X/Z, Y/Z)<br/>normalized image plane"]
+    B -->|"u = fx·X/Z + cx<br/>v = fy·Y/Z + cy"| C["px (N,2)<br/>pixels u, v"]
+    C -. "back-project at depth d<br/>X=(u-cx)·d/fx, Y=(v-cy)·d/fy, Z=d" .-> A
+```
+
+The dashed edge recovers the camera-frame point only because the depth $d$ is supplied
+separately. A single pixel alone fixes a ray, not a point. Ray generation below is exactly this
+back-projection at unit depth, rotated into the world frame; the camera-geometry assignment later
+chains the same projection with extrinsics to lift image features into a bird's-eye view.
+
+The course uses the OpenCV camera convention throughout: $+x$ right, $+y$ down, $+z$ forward into
+the scene. The intrinsic $K$ above assumes a rectified pinhole camera with no distortion terms.
+
+### The four SE(3) primitives
+
+A rigid transform on points needs four operations. Assembly builds the 4x4 matrix
+$[[R, t], [0, 1]]$ from a 3x3 rotation $R$ and a 3-vector $t$. Application maps a batch of points
+through $R\,p + t$. Inversion uses the SE(3) structure rather than a general matrix inverse: for
+$T = [[R, t], [0, 1]]$ the inverse is $[[R^\top, -R^\top t], [0, 1]]$, which is exact and cheap.
+Composition multiplies a sequence left to right, so $A B C$ applied to a point is the same as
+applying $C$, then $B$, then $A$. A transform $T_{b\_a}$ reads "a-to-b": it takes points in frame
+$a$ and returns them in frame $b$.
+
+NeRF uses only the camera-to-world matrix $c2w$ directly (one transform, applied to ray
+directions and origins), so the full toolkit is more than this assignment strictly needs. It is
+built here because the camera-geometry module needs all four to chain the lidar-to-camera and
+ego-to-camera transforms, and they belong with the pinhole model as one geometry primitive set.
+
 ### Ray generation
 
-Generating rays is applying the pinhole camera model, prerequisite geometry from the
-camera-geometry module, not new content. A pixel $(u, v)$ back-projects to a camera-frame
-direction. With intrinsic matrix $K$ (focal lengths $f_x, f_y$, principal point $c_x, c_y$),
+Generating rays applies the pinhole back-projection above. A pixel $(u, v)$ back-projects to a
+camera-frame direction. With intrinsic matrix $K$ (focal lengths $f_x, f_y$, principal point
+$c_x, c_y$),
 
 $$\mathbf{d}_c = \big((u - c_x)/f_x,\; (v - c_y)/f_y,\; 1\big).$$
 
@@ -227,13 +275,22 @@ a ray.
 
 ## The assignment
 
-Implement the Fourier positional encoding, the discretized volume renderer, and pinhole ray
-generation. The radiance-field MLP, the config, the toy scene, and the visualization script are
-provided. Each file's docstrings give the exact signatures, shapes, and sampling conventions (the
-near-to-far ordering of samples along a ray and the camera-to-world axis convention). Read those
-in the files; this section maps each file to the concept above.
+Implement the base camera-geometry primitives, the Fourier positional encoding, the discretized
+volume renderer, and pinhole ray generation. The radiance-field MLP, the config, the toy scene,
+and the visualization script are provided. Each file's docstrings give the exact signatures,
+shapes, and sampling conventions (the near-to-far ordering of samples along a ray and the
+camera-to-world axis convention). Read those in the files; this section maps each file to the
+concept above.
 
 ### Files to modify
+
+`geometry.py` is the base camera-geometry toolkit. Implement `project_points` and `unproject`
+(the pinhole model and its inverse from the pinhole-projection section) and the four SE(3)
+primitives `make_transform`, `apply_transform`, `invert_transform`, and `compose_transforms`
+(including the structured inverse $[[R^\top, -R^\top t], [0, 1]]$ rather than a general matrix
+inverse). Ray generation uses `unproject`, and the downstream 3D and autonomous-driving
+assignments import all six through the `nanovision.geometry` shim, so this is shared,
+autograd-compatible code with float64 gradchecks on the differentiable pieces.
 
 `encoding.py` is the Fourier encoding. Implement `PositionalEncoding.forward`, the $\gamma(p)$
 feature map from the spectral-bias section, with the `include_input` option and no learnable
@@ -254,10 +311,11 @@ to world and unit-normalized, with stratified depth samples), `sample_along_rays
 $\mathbf{o} + z\mathbf{d}$ on each ray), and `deltas_from_z` (consecutive-difference segment
 lengths with the large final delta).
 
-`render.py` and `rays.py` are shared files: the downstream Gaussian-splatting and
-occupancy/neural-SDF assignments import their symbols through the `nanovision.volume` shim. The
-MLP (`model.py`), `config.py`, the toy scene
-(`nanovision.data.toy.nerf_synthetic_scene`), and `viz.py` are provided.
+`geometry.py`, `render.py`, and `rays.py` are shared files: the downstream Gaussian-splatting,
+geometry-foundation-model, occupancy/neural-SDF, and autonomous-driving assignments import their
+symbols through the `nanovision.geometry` and `nanovision.volume` shims. The MLP (`model.py`),
+`config.py`, the toy scene (`nanovision.data.toy.nerf_synthetic_scene`), and `viz.py` are
+provided.
 
 ### Running and validating
 

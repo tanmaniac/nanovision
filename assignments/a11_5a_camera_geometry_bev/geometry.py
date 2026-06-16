@@ -3,6 +3,11 @@
 The reference implementation lives in this assignment's `solution/geometry.py` (read it if you
 get stuck). Do not import it here; implement the bodies yourself.
 
+The pinhole model (project_points/unproject) and the four SE(3) primitives
+(make_transform/apply_transform/invert_transform/compose_transforms) are built in the NeRF
+assignment (A9) and imported here through the `nanovision.geometry` shim. This assignment owns
+the multi-camera rig and the flat-ground IPM warp on top of them.
+
 Conventions
 -----------
 Camera frame is OpenCV-style: +x right, +y down, +z forward (into the scene),
@@ -18,94 +23,11 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-# ---------------------------------------------------------------------------
-# Task 1: pinhole projection
-# ---------------------------------------------------------------------------
-
-
-def project_points(pts_cam: Tensor, K: Tensor) -> Tensor:
-    """Project camera-frame points to pixels with the pinhole model.
-
-    Args:
-        pts_cam: (N, 3) points in the camera frame (OpenCV axes, +z forward).
-        K: (3, 3) intrinsic matrix.
-
-    Returns:
-        (N, 2) pixel coordinates (u, v).
-
-    Formula:
-        u = fx * X / Z + cx
-        v = fy * Y / Z + cy
-    """
-    raise NotImplementedError("A11.5a Task 1: implement pinhole project_points")
-
-
-def unproject(px: Tensor, depth: Tensor, K: Tensor) -> Tensor:
-    """Back-project pixels at a given depth to camera-frame points.
-
-    Args:
-        px: (N, 2) pixel coordinates (u, v).
-        depth: (N,) or scalar depth along +z (meters).
-        K: (3, 3) intrinsic matrix.
-
-    Returns:
-        (N, 3) points in the camera frame.
-
-    Formula (the inverse of project_points):
-        X = (u - cx) * d / fx
-        Y = (v - cy) * d / fy
-        Z = d
-    """
-    raise NotImplementedError("A11.5a Task 1: implement unproject")
-
-
-# ---------------------------------------------------------------------------
-# Task 2: SE(3) primitives
-# ---------------------------------------------------------------------------
-
-
-def make_transform(R: Tensor, t: Tensor) -> Tensor:
-    """Assemble a 4x4 SE(3) matrix from rotation R and translation t.
-
-    Args:
-        R: (3, 3) rotation matrix.
-        t: (3,) translation.
-
-    Returns:
-        (4, 4) homogeneous transform [[R, t], [0, 1]].
-    """
-    raise NotImplementedError("A11.5a Task 2: implement make_transform")
-
-
-def apply_transform(T: Tensor, pts: Tensor) -> Tensor:
-    """Apply a 4x4 SE(3) transform to a batch of 3-D points.
-
-    Args:
-        T: (4, 4) transform.
-        pts: (N, 3) points.
-
-    Returns:
-        (N, 3) transformed points, (R @ p) + t via homogeneous coordinates.
-    """
-    raise NotImplementedError("A11.5a Task 2: implement apply_transform")
-
-
-def invert_transform(T: Tensor) -> Tensor:
-    """Invert a 4x4 SE(3) transform using its structure (no general inverse).
-
-    For T = [[R, t], [0, 1]] the inverse is [[R^T, -R^T t], [0, 1]].
-    """
-    raise NotImplementedError("A11.5a Task 2: implement invert_transform")
-
-
-def compose_transforms(*Ts: Tensor) -> Tensor:
-    """Compose a sequence of 4x4 transforms left-to-right.
-
-    compose_transforms(A, B, C) returns A @ B @ C, so applying the result to a
-    point is the same as applying C, then B, then A.
-    """
-    raise NotImplementedError("A11.5a Task 2: implement compose_transforms")
-
+from nanovision.geometry import (
+    apply_transform,
+    invert_transform,
+    project_points,
+)
 
 # ---------------------------------------------------------------------------
 # BEV grid contract (provided - read it, no hole)
@@ -144,7 +66,7 @@ class BEVGrid:
 
 
 # ---------------------------------------------------------------------------
-# Task 3: multi-camera rig
+# Task 1: multi-camera rig
 # ---------------------------------------------------------------------------
 
 
@@ -175,14 +97,14 @@ class CameraRig:
 
         Use apply_transform with this camera's extrinsic (already world-to-cam).
         """
-        raise NotImplementedError("A11.5a Task 3: implement world_to_cam")
+        raise NotImplementedError("A11.5a Task 1: implement world_to_cam")
 
     def cam_to_world(self, name: str, pts_cam: Tensor) -> Tensor:
         """Transform camera-frame points back into the world/ego frame.
 
         Invert the world-to-camera extrinsic, then apply_transform.
         """
-        raise NotImplementedError("A11.5a Task 3: implement cam_to_world")
+        raise NotImplementedError("A11.5a Task 1: implement cam_to_world")
 
     def world_to_pixel(self, name: str, pts_world: Tensor):
         """Project world/ego points into camera `name`.
@@ -195,11 +117,11 @@ class CameraRig:
         Steps: world_to_cam, then project_points; valid is cam z > 0 AND (if
         image_sizes[name] is set) 0 <= u < w and 0 <= v < h.
         """
-        raise NotImplementedError("A11.5a Task 3: implement world_to_pixel")
+        raise NotImplementedError("A11.5a Task 1: implement world_to_pixel")
 
 
 # ---------------------------------------------------------------------------
-# Task 4: inverse perspective mapping (flat-ground BEV)
+# Task 2: inverse perspective mapping (flat-ground BEV)
 # ---------------------------------------------------------------------------
 #
 # Flat-ground assumption and where it breaks: ipm_to_bev maps every BEV cell to
@@ -243,4 +165,4 @@ def ipm_to_bev(
            padding_mode="zeros", align_corners=True).
         3. Write the sampled colors into bev only where valid (last camera wins).
     """
-    raise NotImplementedError("A11.5a Task 4: implement ipm_to_bev")
+    raise NotImplementedError("A11.5a Task 2: implement ipm_to_bev")

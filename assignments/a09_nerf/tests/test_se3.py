@@ -1,4 +1,4 @@
-"""Task 2: SE(3) primitives. Run after projection."""
+"""The four SE(3) primitives (geometry.py)."""
 
 import math
 
