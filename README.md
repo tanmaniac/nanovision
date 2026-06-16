@@ -1,10 +1,10 @@
 # nanovision
 
-An implement-the-mechanism course in modern computer vision, covering the methods
-that shaped the field from 2020 to 2026 (ViT, self-supervised pretraining, CLIP,
-diffusion and flow matching, latent DiT, VLMs, NeRF and Gaussian splatting,
-detection and segmentation, autonomous-driving BEV and occupancy, world models, and
-VLA) by writing the core mechanism of each one from scratch in PyTorch.
+nanovision is a course in modern computer vision where you build the core mechanism
+of each method from scratch in PyTorch. It covers what shaped the field from 2020 to
+2026: ViT, self-supervised pretraining, CLIP, diffusion and flow matching, latent
+DiT, VLMs, NeRF and Gaussian splatting, detection and segmentation,
+autonomous-driving BEV and occupancy, world models, and VLA.
 
 The premise is that you understand a method when you can build the piece that does
 the actual work yourself, not when you can call a library. So each topic leaves a
@@ -46,14 +46,12 @@ loads from the owning assignment through `nanovision/_student.py`, keyed on the
 `NANOVISION_IMPL` switch (described under "Running tests" below), so the same import
 resolves to either your code or the `solution/` answer key.
 
-The import-path contract has one rule: a shared symbol's owning file is imported
-only through `nanovision.*`, and an assignment-local file (`vit.py`, `mae.py`, a
-training script) is imported only by its bare name, never through `nanovision`. That
-split keeps each file a single module identity under the impl switch. A file is
-shared when a later assignment imports it (the primitives, attention, the
-transformer block, the `Trainer`, the geometry and volume kernels); it is local when
-it is glue for one assignment only. The "Depends on" column in the assignments table
-lists, for each assignment, which owning assignments it imports from.
+The import-path contract has one rule: a shared symbol (the primitives, attention,
+the transformer block, the `Trainer`, the geometry and volume kernels) is imported
+only through `nanovision.*`, while a file that is glue for one assignment (`vit.py`,
+`mae.py`, a training script) is imported only by its bare name. That split keeps each
+file a single module identity under the impl switch. The "Depends on" column in the
+assignments table lists which owning assignments each one imports from.
 
 ## How to approach the material
 
@@ -148,10 +146,9 @@ assignment adds beyond that, with `—` for none. The extra groups:
   used only in clearly marked probe/survey notebooks, never in graded mechanism code.
 - **av** - `nuscenes-devkit`, `pyquaternion`, `shapely`, plus the nuScenes `v1.0-mini`
   dataset (~4GB, account and license click-through).
-- **C++** - a C++17 compiler, `eigen`, `cmake`, `pybind11`, `rerun-sdk`. The a14
-  mechanism is C++17 with Eigen, built on demand by CMake and exposed to the same
-  pytest bar through pybind11; visualization is Rerun (interactive plus a headless
-  export). `gtsam` and `open3d` are optional comparison oracles (tests skip when absent).
+- **C++** - a C++17 compiler, `eigen`, `cmake`, `pybind11`, `rerun-sdk`; `gtsam` and
+  `open3d` are optional comparison oracles (tests skip when absent). The
+  classical-SLAM module note below explains how the C++ plugs into the same test bar.
 
 | Id | Title | What to build | Depends on | Deps |
 |----|-------|----------------|------------|------|
@@ -184,10 +181,15 @@ assignment adds beyond that, with `—` for none. The extra groups:
 | a14_4_icp | Point-cloud registration (C++) | Point-to-point (Umeyama SVD) and point-to-plane ICP, and the associate/reject/solve outer loop | code: a14_0 | C++ (opt. `open3d`) |
 | a14_5_factor_graph | Pose-graph / bundle adjustment (C++) | The SE(3) between-factor residual and edge Jacobians, the Gauss-Newton loop, the BA Schur complement | code: a14_0, a14_3 | C++ (opt. `gtsam`) |
 
-The seven modules: foundations (a00, a01); visual representations (a02, a03_0,
-a03_5, a04); generative (a05, a06_0, a06_5, a07); multimodal and 3D (a08, a09,
-a10, a10_5, a11); autonomous-driving perception on nuScenes-mini (a11_5a through
-a11_5e); action and dynamics (a12, a13); classical SLAM in C++ (a14_0 through a14_5).
+The seven modules:
+
+- foundations - a00, a01
+- visual representations - a02, a03_0, a03_5, a04
+- generative - a05, a06_0, a06_5, a07
+- multimodal and 3D - a08, a09, a10, a10_5, a11
+- autonomous-driving perception on nuScenes-mini - a11_5a through a11_5e
+- action and dynamics - a12, a13
+- classical SLAM in C++ - a14_0 through a14_5
 
 The autonomous-driving chain (a11_5a through a11_5e) runs on the nuScenes-mini
 dataset (~4GB). The camera-geometry assignment documents the account click-through
@@ -207,15 +209,12 @@ calibration, loop-closure detection, and the bridge to the learned geometry mode
 
 ### Study-order dependency graph
 
-A **solid** arrow `x → y` is a code dependency: y imports x's shared-library symbols,
-so x must be built first (every solid edge here was checked against the actual
-imports). A **dashed** arrow is a concept-only prerequisite: you should understand x
-before y, but no code crosses between them (y reimplements the piece or just builds
-on the idea). To prepare for any assignment, follow the arrows backward to its roots;
-solid edges are what you must have built, dashed edges are what you should have
-studied. The a00 harness underlies every assignment (primitives, `Trainer`, viz);
-its edges are drawn only to the assignments whose sole code dependency is a00, to
-keep the graph legible.
+Solid arrows are code dependencies (the table's `code:`), dashed arrows are
+concept-only (`concept:`), both defined above. To prepare for any assignment, follow
+the arrows backward to its roots: solid edges are what you must have built, dashed
+edges are what you should have studied. The a00 harness underlies every assignment,
+so its edges are drawn only where a00 is the sole code dependency, to keep the graph
+legible.
 
 ```mermaid
 graph TD
