@@ -44,8 +44,9 @@ def bev_reference_points(
     """Build a vertical pillar of 3D reference points over every BEV cell, in the ego frame.
 
     Each cell center ``(x, y)`` (from ``BEVGrid.cell_centers``) is repeated at ``n_heights``
-    z-values spaced uniformly in ``[z_min, z_max]`` (inclusive endpoints, ``linspace``). These
-    pillars are the anchor 3D points the BEV query later projects into the cameras.
+    z-values spaced uniformly over ``[z_min, z_max]`` with inclusive endpoints. These pillars
+    are the anchor 3D points the BEV query later projects into the cameras. See the
+    reference-pillars section of the README.
 
     Args:
         bev_grid: the centered BEV grid contract.
@@ -64,21 +65,18 @@ def project_reference_points(
 ) -> tuple[Tensor, Tensor]:
     """Project ego pillar points into every rig camera and return grid_sample coords + a mask.
 
-    Each ego point is projected with ``rig.world_to_pixel`` (the same projection chain the
-    camera-geometry assignment defined), which returns pixel ``(u, v)`` and a combined mask of
-    points in front of the camera and inside the image bounds. The pixels are normalized to
-    grid_sample's ``[-1, 1]`` extent with the ``align_corners=False`` map
+    Each ego point is projected with ``rig.world_to_pixel``, which returns pixel ``(u, v)`` and
+    a combined mask of points in front of the camera and inside the image bounds. The pixels are
+    normalized to grid_sample's ``[-1, 1]`` extent (align_corners=False); see the
+    projection-to-grid_sample-coordinates section of the README for the map. The last grid dim
+    is ordered ``(gx, gy)`` = (width, height), because ``F.grid_sample`` reads the last grid dim
+    as x=width first.
 
-        gx = 2 * (u + 0.5) / W - 1,    gy = 2 * (v + 0.5) / H - 1
-
-    where ``(W, H) = image_hw`` is the FULL image size. The last dim is ordered ``(gx, gy)``,
-    i.e. (width, height), because ``F.grid_sample`` reads the last grid dim as x=width first.
-
-    Normalize by the full image size, NOT by the downsampled feature-map size ``Wf = W // stride``.
-    ``grid_sample`` on a feature map of any resolution maps the same ``[-1, 1]`` extent across the
-    whole map, so it handles the stride itself. Normalizing by ``Wf`` instead would offset every
-    sample by the stride factor while the hit-mask (from ``world_to_pixel``, computed in full-image
-    pixels) still looked correct - a quiet garbage-features bug.
+    Correctness contract: normalize by the FULL image size ``(W, H) = image_hw``, NOT by the
+    downsampled feature-map size ``Wf = W // stride``. ``grid_sample`` maps the same ``[-1, 1]``
+    extent across a feature map of any resolution, so it handles the stride itself; normalizing
+    by ``Wf`` offsets every sample by the stride factor while the hit-mask (in full-image pixels)
+    still looks correct - a quiet garbage-features bug.
 
     Args:
         ref3d: (nx, ny, n_heights, 3) ego points from ``bev_reference_points``.
@@ -176,15 +174,10 @@ class SpatialCrossAttention(nn.Module):
         Returns:
             (nx, ny, C) updated queries (residual add; no-hit cells keep the input query).
 
-        Implement BOTH paths:
-        - offsets=False: grid_sample each camera's value map at ref_uv (bilinear,
-          align_corners=False) -> (n_cam, C, nx, ny, n_heights), then call
-          _reduce_over_heights_and_views.
-        - offsets=True: predict per-head offsets and softmax weights from query, add the offsets
-          to ref_uv (normalized units), grid_sample at the shifted locations, weight-sum over the
-          n_points samples and mean over heads -> (n_cam, C, nx, ny, n_heights), then call the SAME
-          _reduce_over_heights_and_views.
-        In both cases apply out_proj, residual-add to query, and leave no_hit cells unchanged.
+        Both paths (the simplified ``offsets=False`` bilinear sample and the ``offsets=True``
+        deformable path) sample the camera value maps, reduce with the shared
+        ``_reduce_over_heights_and_views``, apply out_proj, and residual-add to the query while
+        leaving no_hit cells unchanged. See the spatial-cross-attention section of the README.
         """
         raise NotImplementedError("SpatialCrossAttention.forward")
 
@@ -198,14 +191,10 @@ def warp_bev(prev_bev: Tensor, ego_delta: Tensor, bev_grid: BEVGrid) -> Tensor:
     W axis (lateral, ego +y / left) and row 1 is the H axis (forward, ego +x); the sampling grid's
     last dim is ``(x=W, y=H)``.
 
-    ``affine_grid`` builds a SAMPLING (inverse) warp: for output cell p it gives the source cell to
-    read. After a forward ego translation of ``k_x = forward_m / res`` cells, a static world point
-    that was at forward index i must appear at a LOWER current index ``i - k_x``; reading that
-    output cell from source index ``i`` needs a normalized translation of ``+2*k_x/nx`` in
-    ``theta[1, 2]`` (the H row). ``-2*k_x/nx`` would send it to ``i + k_x`` (the double-inverse
-    bug). The lateral term goes in ``theta[0, 2] = +2*k_y/ny``. Yaw rotates the 2x2 block of
-    ``theta`` consistently with the same (W=col0, H=row1) assignment. Zero ego motion is the
-    identity warp.
+    ``affine_grid`` builds a SAMPLING (inverse) warp: for output cell p it gives the source cell
+    to read. See the ego-motion-warp section of the README for ``theta``; the subtle part is the
+    SIGN of the translation, since affine_grid already inverts once (getting it backwards is the
+    double-inverse bug). Zero ego motion is the identity warp.
 
     Args:
         prev_bev: (C, nx, ny) previous-frame BEV features.
@@ -239,10 +228,9 @@ class TemporalSelfAttention(nn.Module):
     def forward(self, query: Tensor, prev_bev_warped: Tensor | None) -> Tensor:
         """Temporal self-attention with residual add.
 
-        For each of the nx*ny cells, attend the query (1 token) against the key/value set
-        {query, warped history} (2 tokens) when history is present, or {query} alone on the first
-        frame. Reuse MultiHeadAttention (the cross-attention form, kv given). Residual-add the
-        output to the input query.
+        Each BEV cell attends over the key/value set {query, warped history} when history is
+        present, or {query} alone on the first frame, then the output is residual-added to the
+        input query. See the temporal-self-attention section of the README.
 
         Args:
             query: (nx, ny, C) current BEV queries.
@@ -312,13 +300,10 @@ class BEVFormerEncoder(nn.Module):
     ) -> Tensor:
         """Run the encoder for one frame (toy B=1).
 
-        Steps:
-        1. project_reference_points(self.ref3d, rig, (img, img)) -> ref_uv, valid.
-        2. If prev_bev is not None, warp it with warp_bev(prev_bev, ego_delta, bev_grid); else
-           the warped history is None.
-        3. Start from self.query_embed and run each layer in order: tsa(query, prev_warped),
-           then sca(query, feats, ref_uv, valid), then ffn(query).
-        4. Return the final query permuted to (C, nx, ny).
+        Project the reference pillars into the cameras, warp the previous BEV grid by the ego
+        motion (None on the first frame), then start from ``self.query_embed`` and run each layer
+        in order (temporal self-attention, spatial cross-attention, feed-forward). Returns the
+        final query as ``(C, nx, ny)``. See the assembling-the-encoder section of the README.
 
         Args:
             feats: (n_cam, C, Hf, Wf) per-camera feature maps for the current frame.
@@ -355,8 +340,7 @@ class BEVFormerSeg(nn.Module):
     ) -> Tensor:
         """Encode the BEV grid and apply the segmentation head.
 
-        Run self.encoder to get the (C, nx, ny) BEV grid, then apply self.seg_head (a 1x1 conv)
-        and return (n_classes, nx, ny) logits.
+        Run the encoder, then the 1x1 segmentation head, returning (n_classes, nx, ny) logits.
 
         Args:
             feats: (n_cam, C, Hf, Wf) per-camera feature maps.

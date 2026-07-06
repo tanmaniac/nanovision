@@ -38,19 +38,16 @@ std::pair<std::vector<int>, Eigen::VectorXd> nearest_neighbors(const Eigen::Matr
 // ---- The holes (icp.cpp) ---------------------------------------------------
 
 // Point-to-point alignment in closed form (the Umeyama / Kabsch solution to the orthogonal
-// Procrustes problem). For matched clouds P, Q (row i of P corresponds to row i of Q),
-// center both, form H = sum (p_i - p_bar)(q_i - q_bar)^T, take H = U S V^T, and
-//   R = V diag(1, 1, det(V U^T)) U^T,   t = q_bar - R p_bar.
-// The det(V U^T) correction on the last singular direction prevents R from being a reflection
-// on planar or otherwise degenerate data. Returns T = [[R, t],[0,1]] mapping P onto Q.
+// Procrustes problem). For matched clouds P, Q (row i of P corresponds to row i of Q), solve
+// via the SVD of the centroid-centered cross-covariance, including the determinant correction
+// that prevents R from being a reflection on planar or otherwise degenerate data. Returns
+// T = [[R, t],[0,1]] mapping P onto Q.
 Eigen::Matrix4d align_point_to_point(const Eigen::MatrixXd& P, const Eigen::MatrixXd& Q);
 
 // One Gauss-Newton step of point-to-plane alignment. For matched current source points P,
-// target points Q, and target unit normals N, minimize sum_i (n_i . (R p_i + t - q_i))^2
-// over the small motion xi = [rho; theta]. Linearizing the retraction gives, per point,
-//   a_i = [n_i; p_i x n_i] (6-vector),   b_i = -(p_i - q_i) . n_i,
-// and the normal equations (sum a_i a_i^T) xi = sum a_i b_i. Return the incremental
-// transform se3_exp(xi) (to be composed onto the current pose).
+// target points Q, and target unit normals N, minimize the summed squared distance along the
+// normals over the small motion xi = [rho; theta]. Assemble and solve the 6x6 normal equations
+// and return the incremental transform se3_exp(xi) (to be composed onto the current pose).
 Eigen::Matrix4d point_to_plane_step(const Eigen::MatrixXd& P, const Eigen::MatrixXd& Q,
                                     const Eigen::MatrixXd& N);
 

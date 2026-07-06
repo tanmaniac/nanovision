@@ -15,14 +15,13 @@ using Matrix6d = Eigen::Matrix<double, 6, 6>;
 Eigen::Matrix4d hat6(const Vector6d& xi);
 Vector6d vee6(const Eigen::Matrix4d& Xi);
 
-// Exponential / logarithm: T = exp(hat6(xi)), xi = log(T). The translation block
-// of exp uses the SO(3) left Jacobian V = J_l(theta): t = V rho.
+// Exponential / logarithm: T = exp(hat6(xi)), xi = log(T). See the README (exp/log) for
+// how the translation part couples through the rotation.
 Eigen::Matrix4d se3_exp(const Vector6d& xi);
 Vector6d se3_log(const Eigen::Matrix4d& T);
 
 // Adjoint: Ad_T maps a body/right twist to a spatial/left one,
-// T * exp(xi) = exp(Ad_T xi) * T. For xi = [rho; theta],
-// Ad_T = [[R, [t]_x R],[0, R]].
+// T * exp(xi) = exp(Ad_T xi) * T. See the README (the adjoint) for the closed form.
 Matrix6d se3_adjoint(const Eigen::Matrix4d& T);
 
 // Manifold retraction (right perturbation) and its inverse.

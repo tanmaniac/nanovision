@@ -24,9 +24,8 @@ from nanovision.attention import MultiHeadAttention
 class PerceiverResampler(nn.Module):
     """Q learned queries cross-attend over patch features: (B, N, dim_v) -> (B, Q, dim_l).
 
-    A small input projection maps the ViT features to dim_l first, then the queries (an
-    nn.Parameter expanded to the batch) attend to them with one MultiHeadAttention layer.
-    The output length is Q for any N.
+    The output length is Q for any patch count N. See the connector families section of the
+    README.
     """
 
     def __init__(self, dim_v: int, dim_l: int, n_queries: int, n_heads: int):
@@ -40,8 +39,7 @@ class PerceiverResampler(nn.Module):
     def forward(self, feats: Tensor) -> Tensor:
         """feats (B, N, dim_v) -> (B, Q, dim_l).
 
-        Project feats to dim_l, expand the queries to the batch, then
-        out = norm(queries + attn(queries, kv=feats_proj)): one cross-attention with one
-        residual and one norm.
+        One cross-attention with one residual and one norm. See the connector families
+        section of the README.
         """
         raise NotImplementedError("implement the single cross-attention resampler forward")

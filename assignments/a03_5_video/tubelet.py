@@ -13,19 +13,18 @@ from torch import Tensor, nn
 class TubeletEmbedding(nn.Module):
     """Spatiotemporal tubelet embedding (Arnab et al., ViViT, 2021).
 
-    A Conv3d with kernel and stride both (t, p, p) over a video (B, C, T, H, W)
-    produces one token per (t x p x p) space-time tubelet, then the tubelet grid is
-    flattened to a token sequence:
+    The temporal analog of the image patch embedding: the provided Conv3d (kernel and
+    stride both (t, p, p)) produces one token per (t x p x p) space-time tubelet, and
+    the hole turns its output grid into a token sequence.
 
-        Conv3d(C -> dim, kernel=(t,p,p), stride=(t,p,p))   # (B, dim, T', H', W')
-        flatten(2).transpose(1, 2)                          # (B, N, dim)
-
-    with T' = T/t, H' = H/p, W' = W/p, and N = T' * H' * W'. The flatten must be
-    temporal-outermost (the default flatten(2) order over (T', H', W')), so token
-    idx = t' * (H'*W') + (h'*W' + w'); the backbone PE, the tube mask, and the
-    reconstruction target all assume this order.
+    With T' = T/t, H' = H/p, W' = W/p, the sequence has N = T' * H' * W' tokens and
+    must be in temporal-outermost order: token idx = t' * (H'*W') + (h'*W' + w').
+    The backbone PE, the tube mask, and the reconstruction target all assume this
+    order, so it is a hard constraint, not a choice.
 
     forward(video): video is (B, C, T, H, W); returns (B, N, dim).
+
+    See the tubelet embedding section of the README.
     """
 
     def __init__(self, in_chans: int, dim: int, patch: int, tubelet_t: int):
@@ -37,11 +36,8 @@ class TubeletEmbedding(nn.Module):
         )
 
     def forward(self, video: Tensor) -> Tensor:
-        """video: (B, C, T, H, W) -> (B, N, dim).
+        """video: (B, C, T, H, W) -> (B, N, dim), tokens in temporal-outermost order.
 
-        Implement:
-            1. x = self.proj(video)                # (B, dim, T', H', W')
-            2. x = x.flatten(2).transpose(1, 2)    # (B, N, dim), temporal-outermost
-            3. return x
+        See the tubelet embedding section of the README.
         """
         raise NotImplementedError("A3.5 Task 1: implement TubeletEmbedding.forward")

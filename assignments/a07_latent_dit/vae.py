@@ -21,11 +21,10 @@ def _groups(c: int) -> int:
 
 
 def reparameterize(mu: Tensor, logvar: Tensor) -> Tensor:
-    """Sample z = mu + sigma * eps with sigma = exp(0.5*logvar), eps ~ N(0, I).
+    """Sample a latent from the encoder's Gaussian via the reparameterization trick.
 
-    The reparameterization trick: routing the randomness through eps (drawn independently
-    of the parameters) keeps the sample differentiable in mu and logvar. Use
-    torch.randn_like(mu) for eps.
+    Routing the randomness through an external noise draw keeps the sample differentiable in
+    mu and logvar. See the KL-VAE section of the README.
     """
     raise NotImplementedError("implement the reparameterization trick")
 
@@ -33,18 +32,18 @@ def reparameterize(mu: Tensor, logvar: Tensor) -> Tensor:
 def kl_divergence(mu: Tensor, logvar: Tensor) -> Tensor:
     """KL( N(mu, sigma^2) || N(0, I) ), summed over latent dims and averaged over the batch.
 
-    Closed form per element: 0.5 * (exp(logvar) + mu^2 - 1 - logvar). Sum over the (C, H, W)
-    latent dims, then mean over the batch.
+    Sum over the (C, H, W) latent dims, then mean over the batch. See the KL-VAE section of
+    the README for the closed form.
     """
     raise NotImplementedError("implement the closed-form KL divergence")
 
 
 def vae_loss(x: Tensor, x_hat: Tensor, mu: Tensor, logvar: Tensor, beta: float):
-    """VAE loss = recon + beta * KL.
+    """VAE loss combining reconstruction and beta-weighted KL.
 
-    recon is the squared error summed over pixels per image then averaged over the batch
-    (the same per-image-sum, batch-mean reduction the flow-matching loss uses). Return the
-    three scalars (total, recon, kl) so the test and viz can see the split.
+    Reconstruction uses the same per-image-sum, batch-mean reduction as the flow-matching
+    loss. Return the three scalars (total, recon, kl) so the test and viz can see the split.
+    See the KL-VAE section of the README.
     """
     raise NotImplementedError("implement the VAE loss (recon + beta * KL)")
 

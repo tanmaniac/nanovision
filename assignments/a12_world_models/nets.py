@@ -1,21 +1,21 @@
 """Scalar-target encodings and the straight-through categorical sampler.
 
 DreamerV3 makes one fixed hyperparameter set work across reward scales with two ideas this file
-implements. symlog compresses large magnitudes: symlog(x) = sign(x) * log(|x| + 1), with exact
-inverse symexp(x) = sign(x) * (exp(|x|) - 1). Two-hot encoding turns scalar regression into
-classification over a fixed set of bins, so the loss is a cross-entropy that cannot blow up on an
-outlier the way a squared error does.
+implements. symlog compresses large magnitudes while staying near the identity around zero, with an
+exact inverse symexp. Two-hot encoding turns scalar regression into classification over a fixed set
+of bins, so the loss is a cross-entropy that cannot blow up on an outlier the way a squared error
+does.
 
-The bins live in SYMLOG space: bins = linspace(-20, 20, n_bins). twohot_encode pushes the target
-through symlog before splitting it over the bins, and twohot_decode applies symexp once after the
-bin expectation, matching the canonical DreamerV3 DiscDist (transfwd=symlog, transbwd=symexp). The
-round-trip is exact because a clean two-hot label has its expectation at symlog(y) and
-symexp(symlog(y)) = y. Symlog-space bins also keep the decode bounded; value-space bins would put
-the outer buckets at symexp(20) ~ 5e8, so any residual softmax tail mass there would dominate the
-expectation. symlog/symexp are also applied to the reconstruction MSE targets in world_model.py.
+The bins live in SYMLOG space. twohot_encode pushes the target through symlog before splitting it
+over the bins, and twohot_decode applies symexp once after the bin expectation, matching the
+canonical DreamerV3 DiscDist. Keeping the bins in symlog space also keeps the decode bounded.
+symlog/symexp are also applied to the reconstruction MSE targets in world_model.py.
 
 The straight-through estimator lets a discrete categorical sample carry gradients: the forward
 pass uses a hard one-hot, the backward pass uses the (unimix-blended) softmax probabilities.
+
+The math is in the symlog and two-hot encoding, and the categorical latents and the straight-through
+estimator, sections of the README.
 
 Also provided here: the CNN encoder and decoder (conv plumbing, not the lesson) and twohot_loss.
 """
@@ -26,13 +26,13 @@ from torch import Tensor, nn
 
 
 def symlog(x: Tensor) -> Tensor:
-    """symlog(x) = sign(x) * log(|x| + 1). Compresses large magnitudes, ~identity near 0."""
-    raise NotImplementedError("implement symlog: sign(x) * log(|x| + 1)")
+    """symlog: compresses large magnitudes, ~identity near 0. See the symlog and two-hot encoding section of the README."""
+    raise NotImplementedError("implement symlog, the signed logarithmic compressor")
 
 
 def symexp(x: Tensor) -> Tensor:
-    """symexp(x) = sign(x) * (exp(|x|) - 1). Exact inverse of symlog."""
-    raise NotImplementedError("implement symexp: sign(x) * (exp(|x|) - 1), the inverse of symlog")
+    """symexp: the exact inverse of symlog. See the symlog and two-hot encoding section of the README."""
+    raise NotImplementedError("implement symexp, the inverse of symlog")
 
 
 def value_bins(cfg) -> Tensor:
@@ -47,15 +47,16 @@ def value_bins(cfg) -> Tensor:
 def twohot_encode(y: Tensor, bins: Tensor) -> Tensor:
     """Soft two-hot label of target y over symlog-space bins.
 
-    Push y through symlog, clamp into the bin range, and split it across the two bracketing bins
-    b_lo <= symlog(y) <= b_hi with weight (b_hi - symlog(y))/(b_hi - b_lo) on lo and the complement
-    on hi. The symlog here pairs with the symexp in twohot_decode, so the round-trip is exact.
+    The target is pushed through symlog before it is split across the two bracketing bins, so it
+    pairs with the symexp in twohot_decode and the round-trip is exact.
 
     Args:
         y: (...) raw target values.
         bins: (n_bins,) monotonically increasing symlog-space bin positions.
     Returns:
         (..., n_bins) two-hot soft labels summing to 1 along the last axis.
+
+    See the symlog and two-hot encoding section of the README.
     """
     raise NotImplementedError(
         "implement twohot_encode: ys = symlog(y), clamp into [bins[0], bins[-1]], find the "
@@ -65,10 +66,10 @@ def twohot_encode(y: Tensor, bins: Tensor) -> Tensor:
 
 
 def twohot_decode(probs: Tensor, bins: Tensor) -> Tensor:
-    """Decode a bin distribution: symexp of the expectation symexp(sum(probs * bins)).
+    """Decode a bin distribution back to a scalar in value space.
 
-    The bins are in symlog space, so take the expected symlog value and invert with symexp. Keeping
-    the expectation in symlog space (bins at +/- 20, not +/- 5e8) keeps the decode bounded even when
+    The bins are in symlog space, so the expectation is taken over the symlog-space bins and then
+    inverted with symexp. Keeping the expectation in symlog space keeps the decode bounded even when
     a little probability mass lands on the extreme bins.
 
     Args:
@@ -76,6 +77,8 @@ def twohot_decode(probs: Tensor, bins: Tensor) -> Tensor:
         bins: (n_bins,) symlog-space bin positions.
     Returns:
         (...) the decoded scalar in value space.
+
+    See the symlog and two-hot encoding section of the README.
     """
     raise NotImplementedError(
         "implement twohot_decode: symexp(sum(probs * bins)) over the last axis"
@@ -96,13 +99,12 @@ def twohot_loss(logits: Tensor, target: Tensor, bins: Tensor) -> Tensor:
 def categorical_sample(logits: Tensor, unimix: float, n_cat: int, n_cls: int, greedy: bool = False):
     """Straight-through sample from n_cat categoricals, each over n_cls classes.
 
-    Reshape logits to (B, n_cat, n_cls), softmax, blend with a uniform distribution
-    (unimix floor): probs = (1 - unimix) * softmax + unimix / n_cls. Draw a one-hot sample
-    (argmax when greedy, else multinomial), then return the straight-through estimate
-    z = (onehot - probs).detach() + probs flattened to (B, n_cat * n_cls), plus the blended probs.
+    The class probabilities are blended with a uniform distribution (the unimix floor) so no logit
+    can be driven to -infinity, and the returned sample is a straight-through estimate: a hard
+    one-hot in the forward pass whose gradient is that of the blended probabilities.
 
     The greedy path keeps the graph deterministic for gradcheck and the shape/straight-through
-    tests; training uses the multinomial path under a fixed global seed.
+    tests; training uses the sampled path under a fixed global seed.
 
     Args:
         logits: (B, n_cat * n_cls) raw logits.
@@ -112,6 +114,8 @@ def categorical_sample(logits: Tensor, unimix: float, n_cat: int, n_cls: int, gr
     Returns:
         z: (B, n_cat * n_cls) straight-through one-hot sample.
         probs: (B, n_cat, n_cls) the unimix-blended probabilities (used by the KL).
+
+    See the categorical latents and the straight-through estimator section of the README.
     """
     raise NotImplementedError(
         "implement categorical_sample: reshape logits to (B, n_cat, n_cls), softmax, blend "

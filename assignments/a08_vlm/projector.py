@@ -24,5 +24,8 @@ class MLPProjector(nn.Module):
         self.fc2 = nn.Linear(dim_l, dim_l)
 
     def forward(self, feats: Tensor) -> Tensor:
-        """feats (B, N, dim_v) -> (B, N, dim_l). Apply fc1, GELU, fc2 per patch token."""
+        """feats (B, N, dim_v) -> (B, N, dim_l), applied per patch token.
+
+        See the visual-token interface section of the README.
+        """
         raise NotImplementedError("implement the 2-layer MLP projector forward")

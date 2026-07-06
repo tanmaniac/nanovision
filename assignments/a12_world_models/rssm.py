@@ -1,14 +1,15 @@
 """The RSSM cell: a deterministic GRU recurrence plus a stochastic categorical latent.
 
 The recurrent state-space model (RSSM, from PlaNet) runs two state components in parallel. The
-deterministic state h_t = GRU(h_{t-1}, [z_{t-1}, a_{t-1}]) carries memory and is differentiable
-end to end. The stochastic latent z_t is a set of categoricals sampled from a posterior
-q(z_t | h_t, o_t) during training (it sees the observation through the encoder embedding) and from
-a prior p(z_t | h_t) during imagination (no observation). The full model state is the
-concatenation (h_t, z_t); every predictor conditions on it.
+deterministic state h_t is carried by a GRU and is differentiable end to end. The stochastic latent
+z_t is a set of categoricals sampled from a posterior q(z_t | h_t, o_t) during training (it sees the
+observation through the encoder embedding) and from a prior p(z_t | h_t) during imagination (no
+observation). The full model state is the concatenation (h_t, z_t); every predictor conditions on it.
 
 The KL between posterior and prior trains the prior to predict the posterior, so imagination,
 which uses only the prior, stays on the manifold the posterior learned from real frames.
+
+The math is in the RSSM cell section of the README.
 """
 
 import torch
@@ -43,7 +44,7 @@ class RSSMCell(nn.Module):
         )
 
     def forward_h(self, h: Tensor, z: Tensor, a: Tensor) -> Tensor:
-        """Advance the deterministic state: h_new = GRU(proj([z, onehot(a)]), h).
+        """Advance the deterministic state h by one GRU step.
 
         Args:
             h: (B, h_dim) previous deterministic state.
@@ -51,6 +52,8 @@ class RSSMCell(nn.Module):
             a: (B,) integer actions or (B, action_dim) one-hot.
         Returns:
             (B, h_dim) new deterministic state.
+
+        See the RSSM cell section of the README.
         """
         raise NotImplementedError(
             "implement forward_h: one-hot the action if integer, project in_proj([z, a]) to the "
@@ -58,9 +61,10 @@ class RSSMCell(nn.Module):
         )
 
     def prior(self, h: Tensor, greedy: bool = False):
-        """Transition prior p(z_t | h_t): MLP(h) -> logits, then a straight-through sample.
+        """Transition prior p(z_t | h_t), with a straight-through categorical sample of z.
 
         Returns (logits (B, n_cat*n_cls), z (B, n_cat*n_cls), probs (B, n_cat, n_cls)).
+        See the RSSM cell section of the README.
         """
         raise NotImplementedError(
             "implement prior: logits = self.prior_mlp(h), then categorical_sample(...); "
@@ -68,9 +72,11 @@ class RSSMCell(nn.Module):
         )
 
     def posterior(self, h: Tensor, embed: Tensor, greedy: bool = False):
-        """Posterior q(z_t | h_t, o_t): MLP([h, embed]) -> logits, then a straight-through sample.
+        """Posterior q(z_t | h_t, o_t) conditioned on the encoder embedding, with a straight-through
+        categorical sample of z.
 
         Returns (logits (B, n_cat*n_cls), z (B, n_cat*n_cls), probs (B, n_cat, n_cls)).
+        See the RSSM cell section of the README.
         """
         raise NotImplementedError(
             "implement posterior: logits = self.post_mlp(cat([h, embed])), then "

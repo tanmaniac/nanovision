@@ -19,18 +19,14 @@ LayerNorm, gelu = _a0.LayerNorm, _a0.gelu
 class ConvNeXtBlock(nn.Module):
     """ConvNeXt block (Liu et al., 2022), the modernized ResNet residual unit.
 
-    A depthwise 7x7 conv mixes spatially within each channel, then an inverted
-    bottleneck (Linear dim->4*dim, gelu, Linear 4*dim->dim) mixes across channels,
-    with an optional learnable layer-scale on the branch and a residual add:
-
-        y = x + LayerScale(Linear(gelu(Linear(LayerNorm(DWConv7x7(x))))))
-
-    The depthwise conv and the channel MLP separate spatial mixing from channel
-    mixing the same way attention and the FFN do in a transformer. LayerNorm and
-    the two Linears run channels-last (B, H, W, dim); the conv and the residual run
-    channels-first (B, dim, H, W).
+    A depthwise spatial conv and an inverted-bottleneck channel MLP on a residual
+    branch, with an optional learnable layer-scale gain. The depthwise conv and the
+    residual add run channels-first (B, dim, H, W); LayerNorm and the two Linears run
+    channels-last (B, H, W, dim), so the block permutes between the two layouts.
 
     forward(x): x is (B, dim, H, W); output is (B, dim, H, W).
+
+    See the ConvNeXt block section of the README.
     """
 
     def __init__(self, dim: int, layer_scale_init: float = 1e-6):
@@ -49,13 +45,7 @@ class ConvNeXtBlock(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """x: (B, dim, H, W) -> (B, dim, H, W).
 
-        Implement:
-            1. residual = x
-            2. x = dwconv(x)                       # depthwise 7x7, (B, dim, H, W)
-            3. permute to channels-last (B, H, W, dim)
-            4. x = LayerNorm(x); x = pw1(x); x = gelu(x); x = pw2(x)
-            5. if self.gamma is not None: x = self.gamma * x   # layer scale
-            6. permute back to (B, dim, H, W)
-            7. return residual + x
+        The layer-scale gain is applied only when self.gamma is not None. See the
+        ConvNeXt block section of the README.
         """
         raise NotImplementedError("A2 Task 1: implement ConvNeXtBlock.forward")

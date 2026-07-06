@@ -11,22 +11,18 @@ from torch import Tensor, nn
 
 
 def gelu(x: Tensor) -> Tensor:
-    """Exact (erf) GELU.
+    """Exact (erf) GELU, not the tanh approximation. Input/output shape: same as x.
 
-    Implement: GELU(x) = x * 0.5 * (1 + erf(x / sqrt(2)))
-    Input/output shape: same as x. Use torch.erf.
+    See the GELU section of the README.
     """
     raise NotImplementedError("A0 Task 1: implement exact erf GELU")
 
 
 class LayerNorm(nn.Module):
-    """Layer normalization over the last dimension, from mean/var ops.
+    """Layer normalization over the last dimension, computed from mean/var ops.
 
-    Implement forward as:
-        mean = x.mean(-1, keepdim=True)
-        var  = x.var(-1, keepdim=True, unbiased=False)
-        y    = (x - mean) / sqrt(var + eps) * weight + bias
     Shapes: x is (..., dim); output is the same shape. No nn.LayerNorm.
+    See the layer normalization section of the README.
     """
 
     def __init__(self, dim: int, eps: float = 1e-5):
@@ -42,8 +38,8 @@ class LayerNorm(nn.Module):
 class MLP(nn.Module):
     """Two-layer MLP: Linear -> act -> dropout -> Linear.
 
-    Implement forward: self.fc2(self.drop(self.act(self.fc1(x)))).
     Shapes: x is (..., dim); output is (..., dim).
+    See the MLP section of the README.
     """
 
     def __init__(self, dim: int, hidden: int, dropout: float = 0.0, act=gelu):

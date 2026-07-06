@@ -5,13 +5,14 @@ reconstructs the frame from (h_t, z_t); the reward and continuation heads predic
 The KL trains the prior p(z_t | h_t) toward the posterior so imagination (prior only) stays
 grounded.
 
-DreamerV3 splits the KL into two separately-weighted terms with stop-gradient on the opposite
-side (arXiv:2301.04104 eq. 2-3), NOT DreamerV2's single 0.8/0.2 balance:
-  dynamics loss      L_dyn = max(free_bits, KL[sg(q) || p])   trains the prior toward q,
-  representation loss L_rep = max(free_bits, KL[q || sg(p)])  trains the posterior toward p.
-The per-head KLs are summed over the n_cat heads first (the factorized posterior makes the joint
-KL the sum of per-head KLs), then the free-bits max clips that single summed scalar per term at
-1 nat. The total is 0.5 * L_dyn + 0.1 * L_rep; the 5:1 ratio moves the prior faster.
+DreamerV3 splits the KL into two separately-weighted terms, each with a stop-gradient
+(sg = detach) on the opposite side (arXiv:2301.04104 eq. 2-3), NOT DreamerV2's single 0.8/0.2
+balance. The dynamics term trains the prior toward the posterior; the representation term trains the
+posterior toward the prior. The per-head KLs are summed over the n_cat heads first (the factorized
+posterior makes the joint KL the sum of per-head KLs), and the free-bits floor is applied to that
+single summed scalar per term, not per head. The weighting moves the prior faster than the posterior.
+
+The math is in the two KL terms, free bits, and weighting section of the README.
 """
 
 import torch
@@ -46,6 +47,8 @@ def kl_loss(post_logits: Tensor, prior_logits: Tensor, free_bits: float,
         n_cat, n_cls: categorical layout.
     Returns:
         scalar weighted KL, and a dict {"dyn": L_dyn, "rep": L_rep} of the clipped per-term means.
+
+    See the two KL terms, free bits, and weighting section of the README.
     """
     raise NotImplementedError(
         "implement kl_loss (DreamerV3 eq. 2-3): reshape to (-1, n_cat, n_cls); use the provided "
@@ -84,13 +87,14 @@ class WorldModel(nn.Module):
         """The full world-model ELBO on a batch of sequences.
 
         batch holds obs (B, T, 3, S, S), actions (B, T), rewards (B, T), conts (B, T) as tensors.
-        Encode the frames, run the posterior over the sequence, decode the states, predict reward
-        and continuation, and add the balanced KL.
 
-        Reconstruction is MSE against symlog(obs) (the symexp is applied at viz time). Reward uses
-        the two-hot cross-entropy over value-space bins. Continuation is a Bernoulli-logit BCE.
+        The loss sums four terms: reconstruction is MSE against symlog(obs) (the symexp is applied at
+        viz time), reward is the two-hot cross-entropy over the value-space bins, continuation is a
+        Bernoulli-logit BCE, and the balanced KL ties the prior to the posterior.
 
         Returns (total_loss, parts_dict).
+
+        See the world-model ELBO section of the README.
         """
         raise NotImplementedError(
             "implement the ELBO assembly: encode_seq(obs) -> embeds; rssm.observe(...) -> "

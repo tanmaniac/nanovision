@@ -5,11 +5,11 @@ spectral-bias result of Tancik et al. 2020). The encoding lifts each input coord
 bank of sinusoids at geometrically spaced frequencies, so the network can represent
 high-frequency detail (sharp object boundaries) early in training.
 
-Input-range contract: the frequency schedule 2^k is only well-behaved when inputs are
-normalized to roughly [-1, 1] first. The caller (NeRFMLP) divides sample positions by a
+Input-range contract: the geometric frequency schedule is only well-behaved when inputs
+are normalized to roughly [-1, 1] first. The caller (NeRFMLP) divides sample positions by a
 scene-bound constant before encoding and feeds unit-length directions. An unnormalized
-position of magnitude ~4 with the top 2^(L-1) * pi band aliases badly, so this module
-assumes the caller has normalized.
+position hit with the highest-frequency band aliases badly, so this module assumes the
+caller has normalized.
 """
 
 import torch
@@ -19,10 +19,10 @@ from torch import Tensor, nn
 class PositionalEncoding(nn.Module):
     """Map (..., D) coordinates to Fourier features with no learnable parameters.
 
-    The encoding of one scalar coordinate p is
-        gamma(p) = (sin(2^0 pi p), cos(2^0 pi p), ..., sin(2^(L-1) pi p), cos(2^(L-1) pi p)),
-    applied to each of the D input coordinates. With include_input the raw input is
-    concatenated first, so the output dim is D + D*2*L; without it, D*2*L.
+    The encoding is applied to each of the D input coordinates. With include_input the raw
+    input is concatenated first, so the output dim is D + D*2*L; without it, D*2*L.
+
+    See the "Spectral bias and the Fourier encoding" section of the README for the encoding.
 
     Args:
         L: number of frequency bands.

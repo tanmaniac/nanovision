@@ -3,14 +3,14 @@
 The forward rasterizer needs each 3D Gaussian's footprint in pixels. A 3D Gaussian does
 not project to an exact 2D Gaussian under perspective (the projection is nonlinear), so
 the EWA (elliptical weighted average) splatting of Zwicker et al. linearizes the
-projection by its Jacobian J at the Gaussian's mean and pushes the covariance through that
-linear map: Sigma_2D = J W Sigma_3D W^T J^T, then drop the third (depth) row and column.
+projection by its Jacobian at the Gaussian's mean and pushes the covariance through that
+linear map.
 
 Convention: OpenCV camera frame, +z forward, matching nanovision.geometry. The pinhole
-projection is u = fx*x/z + cx, v = fy*y/z + cy, the same project_points the camera-geometry
-assignment uses, so the Jacobian below is exactly d(project_points)/d(x,y,z) at the mean.
-Getting the Jacobian sign or the W transpose wrong silently distorts every splat, so this
-matches project_points by construction.
+projection is the same project_points the camera-geometry assignment uses, so the Jacobian
+below matches d(project_points)/d(x,y,z) at the mean by construction.
+
+See the "The EWA projection" section of the README for the projection.
 
 Assignment-local. Import bare.
 """
@@ -24,12 +24,8 @@ from nanovision.geometry import apply_transform, project_points
 def perspective_jacobian(means_cam: Tensor, K: Tensor) -> Tensor:
     """The 2x3 Jacobian of the pinhole projection at each camera-space mean.
 
-    For pi(x, y, z) = (fx*x/z + cx, fy*y/z + cy), the Jacobian is
-
-        J = [[fx/z,    0,   -fx*x/z^2],
-             [   0, fy/z,   -fy*y/z^2]]
-
-    evaluated at the camera-space mean (x, y, z). This is d(project_points)/d(pts_cam).
+    This is d(project_points)/d(pts_cam) evaluated at each camera-space mean. See the
+    "The EWA projection" section of the README.
 
     Args:
         means_cam: (N, 3) Gaussian means in the camera frame (+z forward).
@@ -44,15 +40,16 @@ def perspective_jacobian(means_cam: Tensor, K: Tensor) -> Tensor:
 def project_cov_to_2d(cov3d: Tensor, W: Tensor, J: Tensor, *, dilation: float = 0.3) -> Tensor:
     """Project 3D covariances to 2D screen-space covariances (the EWA step).
 
-    Sigma_2D = J W Sigma_3D W^T J^T + dilation * I, where W is the world-to-camera
-    ROTATION (3x3) and J is the 2x3 perspective Jacobian at the camera-space mean. The
-    translation of the world-to-camera transform shifts the mean, not the covariance, so
-    only the rotation enters here.
+    W is the world-to-camera ROTATION (3x3) and J is the 2x3 perspective Jacobian at the
+    camera-space mean. The translation of the world-to-camera transform shifts the mean,
+    not the covariance, so only the rotation enters here.
 
     The dilation adds `dilation` (px^2) to the two diagonal entries of the 2x2 result. It
-    keeps Sigma_2D invertible and guarantees each Gaussian covers at least about a pixel,
-    so the closed-form 2x2 inverse used by the rasterizer is safe (the determinant is
-    bounded away from zero). The original 3D Gaussian splatting uses dilation ~= 0.3.
+    keeps the covariance invertible and guarantees each Gaussian covers at least about a
+    pixel, so the closed-form 2x2 inverse used by the rasterizer is safe (the determinant
+    is bounded away from zero). The original 3D Gaussian splatting uses dilation ~= 0.3.
+
+    See the "The EWA projection" section of the README.
 
     Args:
         cov3d: (N, 3, 3) world-space covariances.
@@ -63,7 +60,7 @@ def project_cov_to_2d(cov3d: Tensor, W: Tensor, J: Tensor, *, dilation: float = 
     Returns:
         (N, 2, 2) screen-space covariances.
     """
-    raise NotImplementedError("compute Sigma_2D = J W Sigma_3D W^T J^T + dilation*I")
+    raise NotImplementedError("project the 3D covariance into 2D image space")
 
 
 def project_gaussians(model, K: Tensor, w2c: Tensor, *, dilation: float = 0.3):

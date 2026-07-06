@@ -22,13 +22,11 @@ from nanovision.primitives import MLP, LayerNorm, RMSNorm, SwiGLU
 
 
 def build_causal_mask(seq_len: int) -> Tensor:
-    """Additive (seq_len, seq_len) mask with -inf above the diagonal.
+    """Additive (seq_len, seq_len) mask that makes attention causal.
 
     Adding this to the attention logits before softmax forbids each position from
     attending to later positions. Entry (i, j) is 0 for j <= i and -inf for j > i.
-
-    Implement: start from a full -inf matrix and keep the strict upper triangle
-    (torch.triu(..., diagonal=1)); the rest is 0.
+    See the causal mask section of the README.
     """
     raise NotImplementedError("A1 Task 3: implement build_causal_mask")
 
@@ -37,11 +35,7 @@ def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Ten
     """Rotary position embedding (Su et al., 2021), the core positional scheme.
 
     Rotate each pair of channels by an angle proportional to the position so the
-    q.k dot product depends only on the relative offset:
-
-        q' = q * cos + rotate_half(q) * sin
-
-    where rotate_half((x1, x2)) = (-x2, x1) over the two halves of the last dim.
+    q.k dot product depends only on the relative offset between q and k.
 
     Args:
         q: (B, H, S, Dh). k: (B, H, S, Dh). Dh must be even. base: theta (10000).
@@ -49,12 +43,8 @@ def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Ten
     Returns:
         (q_rot, k_rot), each (B, H, S, Dh).
 
-    Implement:
-        1. half = Dh // 2; inv_freq = 1 / base^(arange(half)/half)
-        2. positions = arange(S), S = q.shape[2];
-           angles = outer(positions, inv_freq); cos/sin = cat([angles, angles])
-           cos/sin reshaped to (1, 1, S, Dh)
-        3. apply q*cos + rotate_half(q)*sin (same for k)
+    The module-level _rotate_half helper is provided for you.
+    See the rotary position embedding section of the README.
     """
     raise NotImplementedError("A1 Task 4: implement apply_rope")
 
@@ -146,16 +136,15 @@ class _RoPEAttention(nn.Module):
 class TransformerBlock(nn.Module):
     """Pre-norm transformer block; LLaMA-style defaults are the core.
 
-        h = x + Attn(Norm(x))
-        y = h + FFN(Norm(h))
-
+    Each sub-layer normalizes its input before the operation and adds a residual.
     With cross_attn=True a cross-attention sub-layer (attending to kv) sits
     between the self-attention and FFN sub-layers.
 
-    Args: see solution/transformer.py. norm in {"rms","layer"};
-    ffn in {"swiglu","mlp"}; pos in {"rope","none"}; n_kv_heads for GQA/MQA.
+    Args: norm in {"rms","layer"}; ffn in {"swiglu","mlp"}; pos in {"rope","none"};
+    n_kv_heads for GQA/MQA.
 
     forward(x, kv=None, mask=None): x is (B, S, dim); returns (B, S, dim).
+    See the pre-norm block section of the README.
     """
 
     def __init__(
@@ -196,13 +185,10 @@ class TransformerBlock(nn.Module):
             self.ffn = MLP(dim, int(mlp_ratio * dim))
 
     def forward(self, x: Tensor, kv: Optional[Tensor] = None, mask: Optional[Tensor] = None) -> Tensor:
-        """Pre-norm residual sub-layers.
+        """Pre-norm residual sub-layers: self-attention, optional cross-attention,
+        then the feed-forward, each wrapped in a residual.
 
-        Implement:
-            x = x + self.attn(self.norm1(x), mask=mask)
-            if self.cross_attn: x = x + self.cross(self.norm_cross(x), kv=kv)
-            x = x + self.ffn(self.norm2(x))
-            return x
+        See the pre-norm block section of the README.
         """
         raise NotImplementedError("A1 Task 7: implement TransformerBlock.forward")
 

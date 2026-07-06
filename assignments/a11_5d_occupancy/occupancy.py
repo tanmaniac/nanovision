@@ -5,10 +5,9 @@ front-to-back alpha compositing that the NeRF assignment uses to render a known 
 to a pixel runs backward here: rays cast into the grid accumulate occupancy into a rendered
 depth and a rendered semantic vector, and the 2D supervision (depth, class) pulls the 3D field
 into agreement. The bridge is the identity between the per-voxel opacity and the occupancy
-probability: with density $\\sigma_i$ and segment length $\\delta_i$, the segment opacity
-$\\alpha_i = 1 - e^{-\\sigma_i \\delta_i}$ is the occupancy probability of that segment, so a
-sampled occupancy $o \\in [0, 1)$ converts to a density $\\sigma = -\\log(1 - o) / \\delta$ and
-the NeRF renderer composites it unchanged.
+probability: a segment's opacity is its occupancy probability, so a sampled occupancy converts
+to a NeRF density and the same renderer composites it unchanged. See the NeRF-and-occupancy-
+duality section of the README for the conversion.
 
 Module layout: this is an assignment-LOCAL file (nothing imports it, so there is no
 nanovision shim). It is imported bare by the tests through conftest. The alpha-compositing
@@ -78,10 +77,11 @@ def inverse_frequency_weights(target: Tensor, n_classes: int, eps: float = 1.0) 
     """Per-class loss weights that grow as a class gets rarer.
 
     Free voxels dominate the grid (often >90%), so an unweighted cross-entropy collapses to
-    predicting the majority class. Inverse-frequency weighting counters this: weight class $c$
-    by $1 / (\\text{count}_c + \\varepsilon)$, then normalize so the weights have mean 1
-    (equivalently sum to n_classes). The normalization is scale-only and does not change the
-    ordering: the most frequent class (free) gets the smallest weight, rare classes the largest.
+    predicting the majority class. Inverse-frequency weighting counters this: rarer classes get
+    larger weights. See the class-imbalance section of the README.
+
+    Contract: normalize the weights to mean 1 (equivalently sum to n_classes); the normalization
+    is scale-only and does not change the ordering.
 
     Args:
         target: [B, Z, Y, X] long class indices in [0, n_classes).
@@ -97,10 +97,10 @@ def inverse_frequency_weights(target: Tensor, n_classes: int, eps: float = 1.0) 
 def weighted_ce_loss(logits: Tensor, target: Tensor, weights: Tensor) -> Tensor:
     """Class-weighted cross-entropy with the weighted-mean reduction that F.cross_entropy uses.
 
-    The reduction is the weighted mean over voxels, $\\sum_v w_{t_v} \\ell_v / \\sum_v w_{t_v}$,
-    where $\\ell_v$ is the per-voxel cross-entropy and $w_{t_v}$ is the weight of voxel $v$'s
-    target class. This matches F.cross_entropy(logits, target, weight=weights) exactly. The plain
-    $\\sum_v w_{t_v} \\ell_v / N$ reduction differs by a factor $\\sum w / N$ and would not match.
+    Contract: the reduction is the weighted mean over voxels (each voxel's per-class cross-entropy
+    weighted by its target class's weight, divided by the sum of those weights). This must match
+    F.cross_entropy(logits, target, weight=weights) exactly; the plain sum-over-N reduction
+    differs by a constant factor and would not match. See the README.
 
     Args:
         logits: [B, n_classes, Z, Y, X] class logits.
@@ -118,10 +118,10 @@ def occupancy_iou(
 ) -> Tensor:
     """Mean intersection-over-union over the occupied classes.
 
-    For each class, IoU is $|pred = c \\cap target = c| / |pred = c \\cup target = c|$. The mean
-    is taken over occupied classes only (class 0 = free is excluded when ignore_free, so the
-    metric is not dominated by the ~95% free voxels). A class absent from both prediction and
-    target (empty union) is excluded from the mean, the standard mIoU convention.
+    Per-class IoU averaged over the occupied classes. Two conventions this metric follows (see
+    the mIoU section of the README): class 0 = free is excluded from the mean when ignore_free,
+    so the ~95% free voxels do not dominate; and a class absent from both prediction and target
+    (empty union) is excluded from the mean, the standard mIoU convention.
 
     Args:
         pred_labels: [...] predicted class indices.
@@ -149,23 +149,19 @@ def render_occupancy_rays(
     The rendering-supervision step. Sample points along each ray, trilinearly sample the
     occupancy and semantic grids at those points, convert occupancy to density so the reused
     NeRF kernel produces the exact compositing weights, then accumulate depth and semantics.
+    See the NeRF-and-occupancy-duality section of the README (including trilinear sampling and
+    the axis order).
 
     Trilinear sampling axis order (the highest-risk line). The grid is fed to F.grid_sample as
     [N, C, Z, Y, X] = [N, C, D, H, W], so D maps to Z, H to Y, W to X. grid_sample's last grid
-    dimension is ordered (gx, gy, gz) mapping to the (W, H, D) = (X, Y, Z) axes:
+    dimension is ordered (gx, gy, gz) mapping to the (W, H, D) = (X, Y, Z) axes, the reverse of
+    the volume's axis order. Use align_corners=False to match the voxel_centers cell-center
+    convention. A wrong stack order silently transposes the field (Z=8 vs Y=X=32 still broadcasts
+    to a valid-but-garbage sample), so the order is pinned.
 
-        gx = 2 * (px - x0) / (x1 - x0) - 1      # X axis (W)
-        gy = 2 * (py - y0) / (y1 - y0) - 1      # Y axis (H)
-        gz = 2 * (pz - z0) / (z1 - z0) - 1      # Z axis (D)
-        grid = stack([gx, gy, gz], dim=-1)      # order MUST be (gx, gy, gz)
-
-    align_corners=False matches the voxel_centers cell-center convention (center i at
-    a + (i + 0.5) * cell). A wrong stack order silently transposes the field (Z=8 vs Y=X=32 still
-    broadcasts to a valid-but-garbage sample), so the order is pinned.
-
-    Density bridge: deltas = deltas_from_z(z_vals); sigma = -log(clamp(1 - o, min=1e-6)) / delta,
-    so alpha = 1 - exp(-sigma * delta) = o exactly. The compositing weights come from
-    nanovision.volume.volume_render (its second return); the color argument is a zeros dummy
+    Density bridge: convert the sampled occupancy to a density (see the README) so the composited
+    alpha equals the occupancy exactly, then take the compositing weights from
+    nanovision.volume.volume_render (its second return). The color argument is a zeros dummy
     because semantics are composited separately, not through the RGB color path. Depth adds the
     leftover-transmittance term so miss rays reach z_far.
 

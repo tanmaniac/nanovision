@@ -29,14 +29,9 @@ def linear_alpha_bar(T: int, beta_start: float = 1e-4,
 def cosine_alpha_bar(T: int, s: float = 0.008) -> tuple[Tensor, Tensor]:
     """Cosine schedule (Nichol & Dhariwal 2021, eq 17).
 
-        f(t) = cos^2( (t/T + s) / (1 + s) * pi/2 ),  alpha_bar_t = f(t) / f(0)
-
     The small offset s keeps beta_t from getting too tiny near t=0. Clip betas to <= 0.999
-    to avoid singular values near t=T. Build f on the T+1 grid points t=0..T so that
-    alpha_bar normalizes to f(0) at t=0; return alphas_bar = abar at t=1..T (length T) and
-    betas[t] = 1 - abar_t / abar_{t-1} (length T, with abar_0 = 1 as the base).
-
-    Returns (betas (T,), alphas_bar (T,)).
+    to avoid singular values near t=T. Returns (betas (T,), alphas_bar (T,)). See the
+    noise-schedules section of the README.
     """
     raise NotImplementedError("implement the cosine schedule")
 

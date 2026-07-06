@@ -6,10 +6,11 @@ sample to the demonstrated action chunk along a straight path, integrated with a
 inference (pi0, Black et al. 2024).
 
 Convention (matching the course's flow-matching assignment): t=0 is noise z0 ~ N(0, I), t=1 is the
-data action chunk a_chunk. The straight path is z_t = (1-t) z0 + t a_chunk, so the conditional
-velocity dz_t/dt = a_chunk - z0 is CONSTANT in t. The network regresses onto that constant target.
+data action chunk a_chunk. The network regresses onto the conditional velocity of the straight path,
+which is CONSTANT in t.
 
 Shapes: a_chunk, z0, z_t are (B, H, 2); t is (B, 1, 1) broadcast over (H, 2); c is (B, cond_dim).
+The math is in the conditional flow matching section of the README.
 """
 
 import math
@@ -38,12 +39,11 @@ def cfm_target(a_chunk: Tensor, z0: Tensor, t: Tensor) -> tuple[Tensor, Tensor]:
     Build z_t on the straight line from the noise z0 (at t=0) to the action chunk a_chunk (at t=1),
     and return the constant conditional velocity target.
 
-      z_t = (1 - t) * z0 + t * a_chunk
-      v   = a_chunk - z0                 (the target, CONSTANT in t)
-
     a_chunk, z0 are (B, H, 2); t is (B, 1, 1) and broadcasts over (H, 2). Return (z_t, v), both
     (B, H, 2). The target v does NOT depend on t: a velocity field that has a t-dependent target is
     wrong (a test asserts t-independence).
+
+    See the conditional flow matching section of the README.
     """
     raise NotImplementedError("implement the CFM interpolant z_t and the constant velocity target v")
 
@@ -82,10 +82,11 @@ def flow_loss(head: FlowHead, a_chunk: Tensor, c: Tensor,
               generator: torch.Generator | None = None) -> Tensor:
     """The conditional flow-matching loss. HOLE.
 
-    Sample z0 ~ N(0, I) the shape of a_chunk and t ~ Uniform(0, 1) of shape (B, 1, 1). Build z_t
-    and the target v with cfm_target, predict v_hat = head(z_t, t, c), and return the mean squared
-    error between v_hat and v (mean over all elements). The objective is plain velocity regression;
-    do not weight by t.
+    Plain velocity regression: over fresh z0 ~ N(0, I) and t ~ Uniform(0, 1), the mean squared error
+    between the network's predicted velocity and the cfm_target velocity. The objective is
+    unweighted: do not weight by t.
+
+    See the conditional flow matching section of the README.
     """
     raise NotImplementedError("implement the conditional flow-matching loss")
 
@@ -94,12 +95,11 @@ def flow_sample(head: FlowHead, c: Tensor, H: int, n_steps: int,
                 generator: torch.Generator | None = None) -> Tensor:
     """Euler-integrate the ODE from t=0 (noise) to t=1 (action). HOLE.
 
-    Start from z ~ N(0, I) of shape (B, H, 2). Take n_steps forward-Euler steps with dt = 1/n_steps,
-    t running 0, dt, 2dt, ...: at step k use t = k*dt for the whole batch and update
+    Start from z ~ N(0, I) of shape (B, H, 2) and take n_steps forward-Euler steps of the learned
+    velocity field, integrating from t=0 to t=1. Return the final z as the predicted action chunk
+    (B, H, 2). No external ODE library; this is a short loop. Integrating in the wrong direction
+    (starting at t=1 instead of t=0) or with the wrong step size is the likely bug.
 
-      z <- z + dt * head(z, t, c)
-
-    Return the final z as the predicted action chunk (B, H, 2). No external ODE library; this is a
-    short loop. Starting at t=1 instead of t=0, or using the wrong dt, is the likely bug.
+    See the conditional flow matching section of the README.
     """
     raise NotImplementedError("implement Euler ODE sampling for the flow head")

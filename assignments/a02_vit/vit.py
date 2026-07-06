@@ -22,12 +22,13 @@ from nanovision.transformer import TransformerEncoder
 class PatchEmbed(nn.Module):
     """Split an image into non-overlapping patches and linearly project each.
 
-    A Conv2d with kernel_size = stride = patch applies one shared linear map to
-    every p x p patch, which is exactly the ViT patch projection. The spatial grid
-    of conv outputs is then flattened to a token sequence.
+    The projection is the provided Conv2d (kernel_size = stride = patch); the hole
+    turns its spatial output grid into a token sequence.
 
     forward(x): x is (B, in_chans, H, W); output is (B, N, dim) with
     N = (H / patch) * (W / patch).
+
+    See the patch embedding section of the README.
     """
 
     def __init__(self, in_chans: int, dim: int, patch: int):
@@ -38,10 +39,7 @@ class PatchEmbed(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """x: (B, in_chans, H, W) -> (B, N, dim).
 
-        Implement:
-            1. x = self.proj(x)        # (B, dim, H/p, W/p)
-            2. flatten the spatial dims: (B, dim, N)
-            3. transpose to (B, N, dim)
+        See the patch embedding section of the README.
         """
         raise NotImplementedError("A2 Task 2: implement PatchEmbed.forward")
 
@@ -50,36 +48,31 @@ def interpolate_pos_embed(pos_embed: Tensor, old_grid: int, new_grid: int) -> Te
     """Bicubically resize the patch part of a learned PE table to a new grid.
 
     The table is (1, 1 + old_grid^2, dim): row 0 is the [CLS] positional vector,
-    the remaining old_grid^2 rows are the patch positions in row-major order. Keep
-    the CLS row unchanged; reshape the patch rows to an (old_grid, old_grid)
-    spatial map per channel and resize to (new_grid, new_grid) with bicubic
-    interpolation. This is the trick that lets a ViT trained at one resolution run
-    at another.
+    the remaining old_grid^2 rows are the patch positions in row-major order. The
+    CLS row is kept unchanged; only the patch rows are resized, from an old_grid x
+    old_grid spatial map to new_grid x new_grid. This is the trick that lets a ViT
+    trained at one resolution run at another.
 
     Returns a (1, 1 + new_grid^2, dim) table.
 
-    Implement:
-        1. split off cls_pe = pos_embed[:, :1] and patch_pe = pos_embed[:, 1:]
-        2. reshape patch_pe to (1, old_grid, old_grid, dim) then permute to
-           (1, dim, old_grid, old_grid)
-        3. F.interpolate(..., size=(new_grid, new_grid), mode="bicubic",
-           align_corners=False)
-        4. permute/reshape back to (1, new_grid^2, dim)
-        5. torch.cat([cls_pe, patch_pe], dim=1)
+    See the positional-embedding interpolation section of the README.
     """
     raise NotImplementedError("A2 Task 5: implement interpolate_pos_embed")
 
 
 class ViT(nn.Module):
-    """Vision transformer assembled from the A1 transformer encoder.
+    """Vision transformer assembled from the transformer encoder.
 
-    Pipeline: patch embed -> prepend [CLS] -> add learned absolute PE over
-    [CLS] + patches -> append n_registers learnable register tokens (no PE) ->
-    LayerNorm + GELU-MLP transformer encoder -> final LayerNorm -> pool (CLS or
-    mean over patch tokens) -> linear classifier head.
+    Patch tokens plus a prepended [CLS] token, a learned absolute positional
+    embedding, and appended register tokens are run through the encoder and pooled
+    to one vector per image for a linear classifier head. The construction and the
+    forward plumbing are given; the holes are the token assembly and the pooling.
+    Pooling is selected by the `pool` option ("cls" or "mean").
 
     forward(x): x is (B, in_chans, H, W); returns (B, num_classes) logits. The
     encoder sequence length is recorded on `self.seq_len` after a forward.
+
+    See the token sequence and pooling sections of the README.
     """
 
     def __init__(
@@ -122,14 +115,11 @@ class ViT(nn.Module):
     def _assemble_tokens(self, patches: Tensor) -> Tensor:
         """Build the encoder input sequence from patch tokens.
 
-        patches: (B, N, dim). Returns (B, 1 + N + n_registers, dim).
+        patches: (B, N, dim). Returns (B, 1 + N + n_registers, dim). The positional
+        embedding covers the [CLS] and patch rows only; the register tokens (appended
+        when n_registers > 0) get no positional embedding.
 
-        Implement:
-            1. expand self.cls_token to (B, 1, dim) and cat in front of patches
-               -> (B, 1 + N, dim)
-            2. add self.pos_embed (covers the CLS + patch rows)
-            3. if self.n_registers > 0: expand self.register_tokens to
-               (B, n_registers, dim) and cat them on the end (no PE added)
+        See the token sequence section of the README.
         """
         raise NotImplementedError("A2 Task 3: assemble CLS + PE + register tokens")
 
@@ -139,9 +129,7 @@ class ViT(nn.Module):
         "cls": the [CLS] token at index 0. "mean": the mean over the N patch
         tokens only (indices 1 .. 1 + N), excluding CLS and the register tokens.
 
-        Implement:
-            if self.pool == "cls": return tokens[:, 0]
-            else: return the mean over tokens[:, 1 : 1 + self.n_patches]
+        See the pooling section of the README.
         """
         raise NotImplementedError("A2 Task 4: implement _pool (cls vs mean)")
 

@@ -15,9 +15,7 @@ from torch import Tensor
 def ot_coupling(x0: Tensor, x1: Tensor) -> tuple[Tensor, Tensor]:
     """Reorder x1 so row i of x0 pairs with its optimal x1 under squared-L2 cost.
 
-    Build C[i, j] = ||x0[i] - x1[j]||^2 (use torch.cdist then square), solve the assignment
-    with scipy.optimize.linear_sum_assignment (the exact Hungarian minimizer), and return
-    (x1_reordered, perm) with x1_reordered = x1[perm]. linear_sum_assignment returns row
-    indices already sorted, so the permutation to apply to x1 is the column indices.
+    Returns (x1_reordered, perm) with x1_reordered = x1[perm], the minibatch OT pairing.
+    See the optimal-transport coupling section of the README.
     """
     raise NotImplementedError("implement minibatch OT coupling")

@@ -1,22 +1,18 @@
 """The differentiable DETR training loss (the LOSS side). Assignment-local.
 
 Computed AFTER the matcher fixes the assignment indices. The indices are treated as
-constants here; no gradient flows back through the matching. Three terms, summed with the
-DETR weights class 1, L1 5, GIoU 2:
+constants here; no gradient flows back through the matching. The loss sums three terms (a
+classification cross-entropy over all queries, a box L1, and a GIoU loss) with fixed weights.
+See the set-prediction-loss section of the README for the terms and weights.
 
-  (a) Classification: cross-entropy over ALL N queries. A matched query's target is its gt
-      class; an unmatched query's target is the no-object class (index num_classes). The
-      no-object class is downweighted by eos_coef = 0.1 through a length-(C+1) CE weight
-      vector, weight[num_classes] = eos_coef and 1.0 for the real classes. This is the
-      class imbalance fix, not a post-hoc scaling of unmatched queries: most of the N=10
-      queries match nothing on a 1-2 object image, so without the downweight the no-object
-      term dominates and the model collapses to predicting no-object everywhere.
-  (b) Box L1 on the matched (query, gt) pairs, cxcywh.
-  (c) GIoU loss 1 - GIoU on the matched pairs.
+The no-object class is downweighted (eos_coef) to counter class imbalance: on a 1-2 object
+image most of the N queries match nothing, so without the downweight the no-object term
+dominates and the model collapses to predicting no-object everywhere. This is a class-imbalance
+fix, not a post-hoc scaling of unmatched queries.
 
-The class term differs from the matching cost: the cost uses -p[c] (raw probability), the
-loss uses cross-entropy -log p[c]. Same information, different function. L1 and GIoU are the
-same function used in both.
+The class term differs from the matching cost: the cost uses raw probability, the loss uses
+cross-entropy. Same information, different function. L1 and GIoU are the same function used in
+both the cost and the loss.
 """
 
 import torch
@@ -41,21 +37,14 @@ def detr_loss(
 ) -> tuple[Tensor, dict[str, Tensor]]:
     """Return (total_loss, components). total_loss is a scalar with requires_grad.
 
-    Steps:
-      1. target_classes: a (B, N) long tensor filled with num_classes (the no-object class).
-         For each image b with non-empty indices (row, col), set
-         target_classes[b, row] = gt_labels[b][col].
-      2. ce_weight: a length-(C+1) vector of ones (matching pred_logits.dtype) with
-         ce_weight[num_classes] = eos_coef.
-         loss_class = F.cross_entropy(pred_logits.reshape(B*N, C+1),
-                                      target_classes.reshape(B*N), weight=ce_weight).
-      3. Gather the matched predicted and gt boxes across images (pred_boxes[b, row] vs
-         gt_boxes[b][col]); concatenate to mp, mg of shape (sum_M, 4).
-         loss_l1 = F.l1_loss(mp, mg). loss_giou = (1 - generalized_iou(mp, mg).diagonal())
-         .mean() (the matched pairs are the diagonal of the pairwise GIoU). If there are no
-         matched pairs, use a zero that still depends on pred_boxes (e.g. pred_boxes.sum()*0)
-         so the graph stays connected.
-      4. total = weight_class*loss_class + weight_l1*loss_l1 + weight_giou*loss_giou.
-      5. Return total and {"class": loss_class, "l1": loss_l1, "giou": loss_giou}.
+    Classification is a cross-entropy over all N queries with the no-object class downweighted
+    by eos_coef; box L1 and the GIoU loss are computed on the matched (query, gt) pairs only.
+    The three terms are summed with weight_class / weight_l1 / weight_giou. See the
+    set-prediction-loss section of the README for the exact terms.
+
+    components is the dict {"class", "l1", "giou"} of the three unweighted terms.
+
+    Contract: when an image has no matched pairs, the box terms must still be a zero that
+    depends on pred_boxes so the autograd graph stays connected.
     """
     raise NotImplementedError("implement the DETR set-prediction loss")

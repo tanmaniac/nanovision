@@ -1,9 +1,7 @@
 """Ray generation and stratified depth sampling for volume rendering.
 
-A pixel back-projects to a ray in the camera frame (the pinhole model), which rotates into
-world coordinates by the camera-to-world matrix. The ray origin is the camera center. Depth
-samples are stratified: split [near, far] into uniform bins and (optionally) jitter one
-sample inside each bin so training sees a continuous range of depths rather than a fixed grid.
+Build one camera ray per pixel and a set of stratified depth samples along each ray. See
+the "Ray generation" section of the README for the construction.
 
 Convention: OpenCV +z forward (matching nanovision.geometry), not the original NeRF's OpenGL
 -z. rays_d is normalized to unit length, so a depth value z is Euclidean distance along the
@@ -45,12 +43,14 @@ def stratified_sample_rays(
         rays_o: (H*W, 3) ray origins (the camera center, repeated).
         rays_d: (H*W, 3) unit-length world-frame ray directions.
         z_vals: (H*W, n_samples) sample distances stratified in [near, far].
+
+    See the "Ray generation" section of the README.
     """
     raise NotImplementedError("implement stratified ray + depth sampling")
 
 
 def sample_along_rays(rays_o: Tensor, rays_d: Tensor, z_vals: Tensor) -> Tensor:
-    """3D sample points along each ray: o + z * d.
+    """3D sample points along each ray.
 
     Args:
         rays_o: (R, 3) origins.

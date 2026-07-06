@@ -37,8 +37,9 @@ class PointmapHead(nn.Module):
     def forward(self, tokens: Tensor) -> tuple[Tensor, Tensor]:
         """Map (B, N, dim) tokens to a pointmap and a confidence map.
 
-        N must equal grid * grid; row-major reshape recovers the (h, w) = (grid, grid) layout
-        that matches the toy's patch-center ordering.
+        N must equal grid * grid; a row-major reshape recovers the (h, w) = (grid, grid)
+        layout that matches the toy's patch-center ordering. See the "The architecture"
+        section of the README.
 
         Returns:
             pts: (B, grid, grid, 3) per-patch XYZ.

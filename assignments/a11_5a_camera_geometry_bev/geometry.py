@@ -93,17 +93,11 @@ class CameraRig:
         self.image_sizes = image_sizes or {}
 
     def world_to_cam(self, name: str, pts_world: Tensor) -> Tensor:
-        """Transform world/ego points into camera `name`'s frame. (N,3)->(N,3).
-
-        Use apply_transform with this camera's extrinsic (already world-to-cam).
-        """
+        """Transform world/ego points into camera `name`'s frame. (N,3)->(N,3)."""
         raise NotImplementedError("A11.5a Task 1: implement world_to_cam")
 
     def cam_to_world(self, name: str, pts_cam: Tensor) -> Tensor:
-        """Transform camera-frame points back into the world/ego frame.
-
-        Invert the world-to-camera extrinsic, then apply_transform.
-        """
+        """Transform camera-frame points back into the world/ego frame. (N,3)->(N,3)."""
         raise NotImplementedError("A11.5a Task 1: implement cam_to_world")
 
     def world_to_pixel(self, name: str, pts_world: Tensor):
@@ -112,10 +106,10 @@ class CameraRig:
         Returns:
             px: (N, 2) pixel coordinates.
             valid: (N,) bool mask of points in front of the camera (z > 0) and,
-                when image_sizes is known, inside the image bounds.
+                when image_sizes[name] is known, inside the image bounds (0 <= u < w,
+                0 <= v < h).
 
-        Steps: world_to_cam, then project_points; valid is cam z > 0 AND (if
-        image_sizes[name] is set) 0 <= u < w and 0 <= v < h.
+        See the four-step lidar-to-camera-chain section of the README.
         """
         raise NotImplementedError("A11.5a Task 1: implement world_to_pixel")
 
@@ -155,14 +149,10 @@ def ipm_to_bev(
     Returns:
         (C, nx, ny) BEV image. Cells with no camera coverage are zero.
 
-    Steps:
-        1. Get cell centers (nx, ny, 2); build ego ground points (M, 3) with
-           z = ground_z.
-        2. For each camera: rig.world_to_pixel the ground points; normalize
-           pixels to grid_sample's [-1, 1] range
-           (gx = 2u/(W-1) - 1, gy = 2v/(H-1) - 1); reshape to (1, nx, ny, 2);
-           call F.grid_sample(img[None], grid, mode="bilinear",
-           padding_mode="zeros", align_corners=True).
-        3. Write the sampled colors into bev only where valid (last camera wins).
+    See the flat-ground-IPM section of the README for the per-cell data flow (ground point,
+    projection, sample). Sampling conventions this file pins (not spelled out in the README):
+    pixels are mapped to grid_sample's [-1, 1] extent with the align_corners=True map
+    gx = 2u/(W-1) - 1, gy = 2v/(H-1) - 1; sampling is bilinear with zero padding; where cameras
+    overlap the last camera wins.
     """
     raise NotImplementedError("A11.5a Task 2: implement ipm_to_bev")

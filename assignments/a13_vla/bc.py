@@ -42,8 +42,10 @@ class BCPolicy(nn.Module):
 def bc_loss(policy: BCPolicy, a_chunk: Tensor, c: Tensor) -> Tensor:
     """The behavior-cloning loss. HOLE.
 
-    Plain regression: predict the chunk with policy(c) and return the mean squared error against
-    the demonstrated a_chunk (mean over all elements). a_chunk is (B, H, 2), c is (B, cond_in).
+    Plain regression: the mean squared error between the policy's predicted chunk and the
+    demonstrated a_chunk. a_chunk is (B, H, 2), c is (B, cond_in).
+
+    See the behavior cloning and compounding error section of the README.
     """
     raise NotImplementedError("implement the behavior-cloning MSE loss")
 
@@ -51,10 +53,11 @@ def bc_loss(policy: BCPolicy, a_chunk: Tensor, c: Tensor) -> Tensor:
 def chunk_actions(actions: Tensor, H: int) -> Tensor:
     """Build overlapping H-step chunks from a per-step action sequence. HOLE.
 
-    actions is (B, T, 2). Return overlapping windows of length H: chunk i is actions[:, i:i+H],
-    stacked to (B, T-H+1, H, 2). These overlapping windows are the chunk-training targets; the
-    overlap means the windows are redundant, so de_chunk defines the inverse used to test the
-    round-trip. Requires H <= T.
+    actions is (B, T, 2); return the overlapping length-H windows stacked to (B, T-H+1, H, 2). These
+    windows are the chunk-training targets; because they overlap they are redundant, so de_chunk is
+    the inverse used to test the round-trip. Requires H <= T.
+
+    See the action chunking section of the README.
     """
     raise NotImplementedError("implement overlapping action chunking")
 
@@ -62,10 +65,10 @@ def chunk_actions(actions: Tensor, H: int) -> Tensor:
 def de_chunk(chunks: Tensor) -> Tensor:
     """Reconstruct the per-step sequence from overlapping chunks. HOLE.
 
-    chunks is (B, M, H, 2) where M = T-H+1 from chunk_actions. The inverse rule: take the full
-    first chunk (its H steps), then append the LAST action of each subsequent chunk. This recovers
-    the original (B, T, 2) sequence exactly, because chunk i+1's last action is actions[i+H], the
-    one new step that window introduced. Return (B, M + H - 1, 2) = (B, T, 2).
+    chunks is (B, M, H, 2) where M = T-H+1 from chunk_actions; this is the exact inverse of
+    chunk_actions, returning (B, M + H - 1, 2) = (B, T, 2).
+
+    See the action chunking section of the README.
     """
     raise NotImplementedError("implement the de-chunk inverse of chunk_actions")
 
@@ -73,8 +76,10 @@ def de_chunk(chunks: Tensor) -> Tensor:
 def receding_horizon_indices(T: int, H: int) -> list[int]:
     """The chunk start indices for open-loop receding-horizon execution. HOLE.
 
-    Execute an H-step chunk, then re-query: starts are 0, H, 2H, ... up to T. The last chunk is
-    clamped so it does not run past T (start = min(kH, T-H)). Return the list of start indices,
-    with duplicates from the clamp removed, covering all T steps. Requires H <= T.
+    Execute an H-step chunk, then re-query. Return the list of chunk start indices covering all T
+    steps, with the final chunk clamped so it does not run past T and any duplicate from that clamp
+    removed. Requires H <= T.
+
+    See the action chunking section of the README.
     """
     raise NotImplementedError("implement the receding-horizon chunk start indices")

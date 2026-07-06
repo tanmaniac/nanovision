@@ -1,16 +1,12 @@
 """The discretized volume renderer: emission-absorption quadrature with alpha compositing.
 
-This is the single most important equation in the assignment. The continuous volume
-rendering integral
-    C(r) = integral T(t) sigma(r(t)) c(r(t), d) dt,   T(t) = exp(-integral_0^t sigma ds)
-discretizes, on N samples with segment lengths delta_i, to
-    alpha_i = 1 - exp(-sigma_i delta_i)
-    T_i = prod_{j<i} (1 - alpha_j)         (exclusive cumulative product, T_0 = 1)
-    w_i = T_i alpha_i,   C = sum_i w_i c_i
-T(t) = exp(-integral sigma ds) is Beer-Lambert's law for transmittance through an
-absorbing medium; alpha_i = 1 - exp(-sigma_i delta_i) is the exact opacity of one segment
-of constant density. This same front-to-back alpha compositing returns in Gaussian
-splatting (A10) and in occupancy / neural-SDF rendering (A11.5d).
+This is the single most important equation in the assignment: the continuous volume
+rendering integral, discretized onto N ray samples and evaluated by front-to-back alpha
+compositing. The same compositing returns in Gaussian splatting (A10) and in occupancy /
+neural-SDF rendering (A11.5d).
+
+See the "The volume rendering integral" section of the README for the integral and its
+discrete quadrature.
 
 Shared OWNED file. Import its symbols through nanovision.volume, never by bare name.
 """
@@ -40,7 +36,9 @@ def volume_render(
 
     Returns:
         color: (R, 3) rendered pixel color.
-        weights: (R, N) per-sample compositing weights w_i = T_i alpha_i, used by the
-            ablation and (optionally) hierarchical fine sampling.
+        weights: (R, N) per-sample compositing weights, used by the ablation and
+            (optionally) hierarchical fine sampling.
+
+    See the "The volume rendering integral" section of the README.
     """
     raise NotImplementedError("implement the discretized volume renderer")

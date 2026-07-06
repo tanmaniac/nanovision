@@ -17,27 +17,31 @@ Vector6d vee6(const Eigen::Matrix4d& Xi) {
 }
 
 Eigen::Matrix4d se3_exp(const Vector6d& xi) {
-  // T = [[R, t],[0, 1]] with R = so3_exp(theta) and t = V rho,
-  // V = so3_left_jacobian(theta).
+  // Twist -> rigid transform (SE(3) exponential). xi = [rho; theta]; the translation is not
+  // just rho - it couples through the rotation. See the README (exp/log).
   throw std::logic_error("NOT_IMPLEMENTED: se3_exp");
 }
 
 Vector6d se3_log(const Eigen::Matrix4d& T) {
-  // theta = so3_log(R); rho = so3_left_jacobian_inv(theta) * t. Return [rho; theta].
+  // Rigid transform -> twist (SE(3) log), the inverse of se3_exp. Return [rho; theta].
+  // See the README (exp/log).
   throw std::logic_error("NOT_IMPLEMENTED: se3_log");
 }
 
 Matrix6d se3_adjoint(const Eigen::Matrix4d& T) {
-  // Ad_T = [[R, hat3(t) R],[0, R]] for the [rho; theta] ordering.
+  // SE(3) adjoint Ad_T: remaps a twist between frames, defined by T exp(xi) = exp(Ad_T xi) T,
+  // for the [rho; theta] ordering. See the README (the adjoint).
   throw std::logic_error("NOT_IMPLEMENTED: se3_adjoint");
 }
 
 Eigen::Matrix4d se3_boxplus(const Eigen::Matrix4d& T, const Vector6d& xi) {
-  // Right perturbation: T * se3_exp(xi).
+  // Retraction: apply the tangent perturbation xi to T in the right (body) frame.
+  // See the README (box-plus / box-minus).
   throw std::logic_error("NOT_IMPLEMENTED: se3_boxplus");
 }
 
 Vector6d se3_boxminus(const Eigen::Matrix4d& T2, const Eigen::Matrix4d& T1) {
-  // Inverse of boxplus: se3_log(T1^-1 * T2).
+  // Inverse of boxplus: the tangent vector taking T1 to T2 in T1's right (body) frame.
+  // See the README (box-plus / box-minus).
   throw std::logic_error("NOT_IMPLEMENTED: se3_boxminus");
 }

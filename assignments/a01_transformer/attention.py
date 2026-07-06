@@ -18,7 +18,7 @@ from torch import Tensor, nn
 def scaled_dot_product_attention(
     q: Tensor, k: Tensor, v: Tensor, mask: Optional[Tensor] = None
 ) -> tuple[Tensor, Tensor]:
-    """Attention(q, k, v) = softmax(q k^T / sqrt(Dh) + mask) v.
+    """Scaled dot-product attention over a single set of heads.
 
     Args:
         q: (B, H, Sq, Dh) queries.
@@ -31,13 +31,8 @@ def scaled_dot_product_attention(
         out: (B, H, Sq, Dh), the attention-weighted sum of values.
         attn: (B, H, Sq, Sk), the softmax weights (each row sums to 1).
 
-    Implement:
-        1. scores = q @ k^T / sqrt(Dh)              -> (B, H, Sq, Sk)
-        2. if mask is not None: scores = scores + mask
-        3. numerically stable softmax over the last dim (subtract the row max
-           before exp), giving attn
-        4. out = attn @ v
-    Do NOT use F.scaled_dot_product_attention.
+    Use a numerically stable softmax. Do NOT use F.scaled_dot_product_attention.
+    See the scaled dot-product attention section of the README.
     """
     raise NotImplementedError(
         "A1 Task 1: implement scaled dot-product attention (stable softmax)"
@@ -47,11 +42,9 @@ def scaled_dot_product_attention(
 class MultiHeadAttention(nn.Module):
     """Multi-head attention with self-, cross-, and grouped-query support.
 
-    Project x (and kv if given) to Q, K, V; split into n_heads heads of size
-    dim // n_heads; run scaled_dot_product_attention per head; concat heads;
-    project back to dim. kv=None is self-attention; kv given is cross-attention.
-    n_kv_heads < n_heads is GQA/MQA: KV is projected to fewer heads, each shared
-    across a group of query heads (repeat_interleave to expand before attention).
+    kv=None is self-attention; kv given is cross-attention. n_kv_heads < n_heads
+    is GQA/MQA: KV uses fewer heads, each shared across a group of query heads.
+    See the multi-head attention section of the README.
     """
 
     def __init__(
@@ -80,16 +73,8 @@ class MultiHeadAttention(nn.Module):
     ) -> Tensor:
         """x: (B, Sq, dim). kv: (B, Sk, dim) or None. Returns (B, Sq, dim).
 
-        Implement:
-            1. src = x if kv is None else kv
-            2. project x->q (n_heads), src->k,v (n_kv_heads); reshape each to
-               (B, H, S, Dh) via .view(...).transpose(1, 2)
-            3. if n_kv_heads != n_heads: repeat_interleave k, v on the head dim by
-               n_heads // n_kv_heads (GQA/MQA)
-            4. if mask is None and self.causal: build an additive (1,1,Sq,Sk) mask
-               with -inf above the diagonal
-            5. call scaled_dot_product_attention; merge heads back to
-               (B, Sq, n_heads*head_dim); apply out_proj
+        When mask is None and self.causal, build the causal mask internally.
+        See the multi-head attention section of the README.
         """
         raise NotImplementedError(
             "A1 Task 2: implement MultiHeadAttention.forward (self/cross/GQA)"

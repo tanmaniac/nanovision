@@ -160,8 +160,18 @@ The DDPM head uses the epsilon-prediction objective from the course's diffusion 
 on $c$. With cumulative signal level $\bar\alpha_t$ from a linear schedule, sample an integer $t$ and
 noise $\varepsilon \sim \mathcal{N}(0, I)$, form the noised chunk $a_t = \sqrt{\bar\alpha_t}\,a +
 \sqrt{1 - \bar\alpha_t}\,\varepsilon$, and regress $\varepsilon_\theta(a_t, t, c)$ onto $\varepsilon$
-by MSE. Sampling runs the ancestral reverse chain from $t = T-1$ down to $0$, recovering the posterior
-mean at each step and adding Gaussian noise everywhere except the last step. RDT-1B (Liu et al. 2024,
+by MSE. Sampling runs the ancestral reverse chain from $t = T-1$ down to $0$: at each step recover the
+clean-chunk estimate $\hat a_0 = (a_t - \sqrt{1-\bar\alpha_t}\,\varepsilon_\theta)/\sqrt{\bar\alpha_t}$
+and take the posterior step
+
+$$a_{t-1} = \frac{\sqrt{\bar\alpha_{t-1}}\,\beta_t}{1-\bar\alpha_t}\,\hat a_0
+          + \frac{\sqrt{\alpha_t}\,(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}\,a_t
+          + \sqrt{\tilde\beta_t}\,z,$$
+
+with $\alpha_t = \bar\alpha_t/\bar\alpha_{t-1}$, $\beta_t = 1-\alpha_t$, posterior variance
+$\tilde\beta_t = \frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}\,\beta_t$, and $z \sim \mathcal{N}(0,I)$ for
+$t>0$ with no noise added at $t=0$ (take $\bar\alpha_{-1} := 1$). This is the same ancestral sampler as
+the course's diffusion topic. RDT-1B (Liu et al. 2024,
 [arXiv:2410.07864](https://arxiv.org/abs/2410.07864)) is a diffusion transformer for bimanual
 manipulation; it is a reading pointer, not the plain DDPM denoiser used here.
 

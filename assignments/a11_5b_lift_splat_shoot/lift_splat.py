@@ -77,8 +77,8 @@ class DepthLift(nn.Module):
     def lift(self, feat: Tensor) -> Tensor:
         """Outer-product lift: (B, c_in, Hf, Wf) -> (B, D, C_ctx, Hf, Wf).
 
-        Softmax the depth logits over the D bins, then multiply by the context map:
-        ``volume[b, d, c, i, j] = softmax(depth_logits)[b, d, i, j] * context[b, c, i, j]``.
+        Per pixel, the outer product of the softmax depth distribution (over the D bins) with
+        the context vector. See the lift section of the README.
         """
         raise NotImplementedError("DepthLift.lift")
 
@@ -86,9 +86,8 @@ class DepthLift(nn.Module):
 def frustum_points(pixel_xy: Tensor, depths: Tensor, K: Tensor, E: Tensor) -> Tensor:
     """Back-project a frustum of pixel centers at each depth into ego-frame 3D points.
 
-    For each depth bin d and feature cell (i, j), back-project the pixel center to a
-    camera-frame point with ``unproject(pixel, depth=d, K)``, then transform it into the ego
-    frame with the inverse of E (E is T_cam_ego, so its inverse is T_ego_cam).
+    For each depth bin and feature cell, back-project the pixel center to a camera-frame point
+    and transform it into the ego frame (E is T_cam_ego). See the frustum section of the README.
 
     Args:
         pixel_xy: (Hf, Wf, 2) image-pixel centers (u, v) per feature cell.
@@ -105,9 +104,9 @@ def frustum_points(pixel_xy: Tensor, depths: Tensor, K: Tensor, E: Tensor) -> Te
 def pillar_index(pts_ego_xy: Tensor, bev_grid: BEVGrid) -> Tensor:
     """Map ego (x, y) points to flat BEV pillar indices, -1 for out-of-bounds.
 
-    A point at ego (x, y) falls in cell ``ix = floor((x - x_min) / res)`` along forward x and
-    ``iy = floor((y - y_min) / res)`` along lateral y. The flat index is ``ix * ny + iy``.
-    Points outside ``[x_min, x_max) x [y_min, y_max)`` map to -1 (dropped by the pool).
+    Discretize each point to its BEV cell and flatten with the module-wide ``ix * ny + iy``
+    index layout. Points outside ``[x_min, x_max) x [y_min, y_max)`` map to -1 (dropped by the
+    pool). See the splat section of the README.
 
     Args:
         pts_ego_xy: (N, 2) ego (x, y).
@@ -122,11 +121,11 @@ def pillar_index(pts_ego_xy: Tensor, bev_grid: BEVGrid) -> Tensor:
 def cumsum_pool(feats: Tensor, idx: Tensor, n_bins: int) -> Tensor:
     """Sum features that share a bin index, via the sort+cumsum trick (no scatter_add).
 
-    Drop points with ``idx < 0``. Sort the remaining points by ``idx`` (stable), cumsum the
-    sorted features along N, then the sum for a bin is the cumsum at the last row of its
-    equal-idx run minus the cumsum at the last row of the previous run. Equivalently, keep the
-    last row of each run and take successive differences. Scatter each run's sum into
-    ``out[bin]``. Differentiable wrt ``feats`` (the sort is a fixed permutation given ``idx``).
+    This is the splat: pool every point into its bin without a scatter-add. See the splat
+    section of the README for the sort-and-cumsum derivation.
+
+    Contracts: drop points with ``idx < 0``; the result must be differentiable wrt ``feats``
+    (the sort is a fixed permutation given ``idx``).
 
     Args:
         feats: (N, C).
@@ -185,15 +184,9 @@ class LiftSplatShoot(nn.Module):
     def forward(self, images: Tensor, K: Tensor, E: Tensor) -> Tensor:
         """Run one (or more) camera images through the full LSS pipeline.
 
-        Steps for each camera:
-        1. ``backbone(image)`` -> feature map (1, C_bb, Hf, Wf).
-        2. ``depth_lift.lift`` -> volume (1, D, C, Hf, Wf).
-        3. ``frustum_points(self.pixel_xy, self.bins, K, E)`` -> ego points (D, Hf, Wf, 3).
-        4. Flatten the volume to (N, C) and the ego (x, y) to (N, 2) over (D, Hf, Wf).
-        5. ``pillar_index`` -> idx (N,); ``cumsum_pool`` -> (nx*ny, C).
-        6. Reshape to (C, nx, ny), run ``bev_encoder`` then ``seg_head``.
-
-        Sum the pooled BEV contributions across cameras before the encoder.
+        Chain the pieces built above: backbone -> depth_lift.lift -> frustum_points ->
+        pillar_index -> cumsum_pool -> reshape to (C, nx, ny) -> bev_encoder -> seg_head. The
+        pooled BEV contributions are summed across cameras before the encoder. See the README.
 
         Args:
             images: (B, 3, H, W) - B handled as 1 in the toy.

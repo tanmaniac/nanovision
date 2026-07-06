@@ -17,12 +17,12 @@ from diffusion import to_x0_eps
 
 
 def classifier_free_guidance(eps_cond: Tensor, eps_uncond: Tensor, w: float) -> Tensor:
-    """Extrapolate the conditional score away from the unconditional one (Ho & Salimans
-    2022): eps_guided = eps_uncond + w * (eps_cond - eps_uncond).
+    """Extrapolate the conditional score away from the unconditional one (Ho & Salimans 2022).
 
     w = 1 is the plain conditional (no guidance boost); w > 1 sharpens at the cost of
     diversity; w = 0 is unconditional. (The diffusers `guidance_scale` is this same w, with
-    guidance_scale=1 the plain conditional.)
+    guidance_scale=1 the plain conditional.) See the classifier-free-guidance section of the
+    README.
     """
     raise NotImplementedError("implement the classifier-free guidance combine")
 
@@ -49,14 +49,11 @@ def ddpm_sample(model, shape, alphas_bar: Tensor, *, kind: str = "v",
                 guidance: float = 1.0, generator: torch.Generator | None = None) -> Tensor:
     """Ancestral DDPM sampler (Ho et al. 2020), t from T-1 down to 0.
 
-    Start from x ~ N(0, I) of `shape`. At each t, get x0_hat from _predict, form the
-    posterior mean (eq 6-7):
-      mu = sqrt(abar_prev)*beta_t/(1-abar_t) * x0_hat
-         + sqrt(alpha_t)*(1-abar_prev)/(1-abar_t) * x_t
-    with alpha_t = abar_t/abar_prev, beta_t = 1 - alpha_t, and abar_prev being abar[t-1]
-    (abar_{-1} := 1). Add noise at every step except t=0: x = mu + sqrt(var)*z where var is
-    beta_tilde_t = (1-abar_prev)/(1-abar_t)*beta_t for variance="beta_tilde" (default) or
-    beta_t for variance="beta". Return the final x.
+    Start from x ~ N(0, I) of `shape`. At each t, get x0_hat from _predict, form the analytic
+    posterior mean, and add Gaussian noise at every step except t=0. abar_prev is abar[t-1]
+    with abar_{-1} := 1. variance="beta_tilde" (default) uses the true posterior variance
+    beta_tilde_t; variance="beta" uses beta_t. Return the final x. See the DDPM ancestral
+    sampler section of the README.
     """
     raise NotImplementedError("implement the DDPM ancestral sampler")
 
@@ -67,11 +64,9 @@ def ddim_sample(model, shape, alphas_bar: Tensor, timesteps, *, kind: str = "v",
     """DDIM sampler (Song et al. 2020). `timesteps` is a decreasing subset of indices.
 
     Start from x ~ N(0, I). At each step with current index t and next index prev (use
-    abar_prev := 1 when prev is past the end), get (x0_hat, eps_hat) from _predict and step
-      sigma  = eta * sqrt((1-abar_prev)/(1-abar_t)) * sqrt(1 - abar_t/abar_prev)
-      x_prev = sqrt(abar_prev)*x0_hat + sqrt(1 - abar_prev - sigma^2)*eps_hat + sigma*z
-    eta = 0 is deterministic (the probability-flow ODE); eta = 1 produces variance
-    beta_tilde_t. Add the sigma*z noise only when eta > 0 and a real prev step exists.
-    Return the final x.
+    abar_prev := 1 when prev is past the end), get (x0_hat, eps_hat) from _predict and step to
+    x_prev. eta = 0 is deterministic (the probability-flow ODE); eta = 1 produces variance
+    beta_tilde_t. Add the stochastic noise term only when eta > 0 and a real prev step exists.
+    Return the final x. See the DDIM section of the README.
     """
     raise NotImplementedError("implement the DDIM sampler")

@@ -27,26 +27,25 @@ inline double wrap_angle(double a) {
 }
 
 // ---- Linear Kalman filter --------------------------------------------------
-// predict: mu' = F mu + B u,  P' = F P F^T + Q.
+// predict: push the mean through the linear motion model and inflate the covariance with Q.
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kf_predict(
     const Eigen::VectorXd& mu, const Eigen::MatrixXd& P, const Eigen::MatrixXd& F,
     const Eigen::MatrixXd& B, const Eigen::VectorXd& u, const Eigen::MatrixXd& Q);
 
-// update: innovation y = z - H mu, S = H P H^T + R, gain K = P H^T S^-1,
-// mu' = mu + K y, and the Joseph-form covariance P' = (I-KH) P (I-KH)^T + K R K^T.
+// update: form the innovation and Kalman gain, correct the mean, and update the covariance in
+// the Joseph form (symmetric and SPD under round-off).
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kf_update(
     const Eigen::VectorXd& mu, const Eigen::MatrixXd& P, const Eigen::VectorXd& z,
     const Eigen::MatrixXd& H, const Eigen::MatrixXd& R);
 
 // ---- EKF nonlinear models and their Jacobians ------------------------------
-// Motion model f(x, u, dt): forward-Euler unicycle.
-//   px' = px + v dt cos(theta),  py' = py + v dt sin(theta),  theta' = theta + omega dt.
+// Motion model f(x, u, dt): forward-Euler unicycle (heading wrapped).
 Eigen::Vector3d ekf_f(const Eigen::Vector3d& x, const Eigen::Vector2d& u, double dt);
 // Its Jacobian F_x = df/dx (3x3).
 Eigen::Matrix3d ekf_F_x(const Eigen::Vector3d& x, const Eigen::Vector2d& u, double dt);
 
-// Measurement model h(x, landmark): range and bearing to a known 2D landmark.
-//   r = ||landmark - p||,  phi = wrap(atan2(ly-py, lx-px) - theta).
+// Measurement model h(x, landmark): range and bearing to a known 2D landmark (bearing relative
+// to the robot heading and wrapped).
 Eigen::Vector2d ekf_h(const Eigen::Vector3d& x, const Eigen::Vector2d& landmark);
 // Its Jacobian H = dh/dx (2x3).
 Matrix23d ekf_H(const Eigen::Vector3d& x, const Eigen::Vector2d& landmark);
@@ -61,41 +60,38 @@ std::pair<Eigen::Vector3d, Eigen::Matrix3d> ekf_update(
     const Eigen::Vector2d& landmark, const Eigen::Matrix2d& R);
 
 // ---- UKF unscented-transform primitives ------------------------------------
-// Sigma points and weights for the unscented transform. n = mu.size().
-// lambda = alpha^2 (n + kappa) - n. The 2n+1 points are mu and mu +/- the columns
-// of the matrix square root of (n + lambda) P (Cholesky). Returns:
+// Sigma points and weights for the unscented transform. Returns:
 //   sigmas: (2n+1) x n, one point per row (row 0 is the mean point);
-//   Wm: 2n+1 mean weights, Wm[0] = lambda/(n+lambda), rest 1/(2(n+lambda));
-//   Wc: 2n+1 covariance weights, Wc[0] = Wm[0] + (1 - alpha^2 + beta), rest as Wm.
-// The (1 - alpha^2 + beta) term on Wc[0] (beta = 2 is Gaussian-optimal) is easy to
-// drop and a real bug when dropped: it corrects the covariance, not the mean.
+//   Wm: 2n+1 mean weights;
+//   Wc: 2n+1 covariance weights.
+// The center covariance weight Wc[0] carries an extra (1 - alpha^2 + beta) term (beta = 2 is
+// Gaussian-optimal) that the mean weight does not; dropping it is a real bug that corrupts the
+// covariance, not the mean.
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd> ukf_sigma_points(
     const Eigen::VectorXd& mu, const Eigen::MatrixXd& P, double alpha, double beta,
     double kappa);
 
-// Recover a Gaussian from propagated sigma points: weighted mean and covariance,
-// plus an additive process/measurement noise term.
-//   mean = sum_i Wm[i] y_i,  cov = sum_i Wc[i] (y_i - mean)(y_i - mean)^T + noise_cov.
+// Recover a Gaussian from propagated sigma points: the weighted mean and covariance, plus an
+// additive process/measurement noise term.
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> ukf_unscented_transform(
     const Eigen::MatrixXd& sigmas, const Eigen::VectorXd& Wm, const Eigen::VectorXd& Wc,
     const Eigen::MatrixXd& noise_cov);
 
-// Cross-covariance between the state sigma points and the measurement sigma points,
-// P_xz = sum_i Wc[i] (x_i - x_mean)(z_i - z_mean)^T. The UKF gain is K = P_xz S^-1.
+// Cross-covariance between the state sigma points and the measurement sigma points. The UKF
+// gain is K = P_xz S^-1.
 Eigen::MatrixXd ukf_cross_covariance(
     const Eigen::MatrixXd& sigmas_x, const Eigen::VectorXd& x_mean,
     const Eigen::MatrixXd& sigmas_z, const Eigen::VectorXd& z_mean,
     const Eigen::VectorXd& Wc);
 
 // ---- Information (canonical) form ------------------------------------------
-// The dual of the moment form: Omega = P^-1 (information matrix), eta = Omega mu.
+// The dual of the moment form: the information matrix and the information vector.
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> moments_to_information(
     const Eigen::VectorXd& mu, const Eigen::MatrixXd& P);
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> information_to_moments(
     const Eigen::VectorXd& eta, const Eigen::MatrixXd& Omega);
 
-// The measurement update is purely additive in information form:
-//   Omega' = Omega + H^T R^-1 H,  eta' = eta + H^T R^-1 z.
+// The measurement update is purely additive in information form (no state-sized inverse).
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> information_update(
     const Eigen::VectorXd& eta, const Eigen::MatrixXd& Omega, const Eigen::VectorXd& z,
     const Eigen::MatrixXd& H, const Eigen::MatrixXd& R);
