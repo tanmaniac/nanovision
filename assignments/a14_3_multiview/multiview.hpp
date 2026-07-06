@@ -61,11 +61,9 @@ Eigen::Vector3d triangulate_refine(const Matrix34d& P1, const Matrix34d& P2,
 Eigen::Matrix3d eight_point(const Eigen::MatrixXd& p1, const Eigen::MatrixXd& p2);
 
 // Decompose an essential matrix into its two rotation candidates and the translation
-// direction. Take the SVD E = U S V^T; a true essential matrix has S = diag(1,1,0), so the
-// decomposition needs only the singular vectors. With both U and V made proper rotations and
-// W = [[0,-1,0],[1,0,0],[0,0,1]]:
-//   R1 = U W V^T,  R2 = U W^T V^T,  t = U.col(2)  (unit length).
-// The four physical candidates are (R1, +t), (R1, -t), (R2, +t), (R2, -t).
+// direction, from the SVD of E with both singular-vector matrices made proper rotations.
+// Returns (R1, R2, t) with t unit length; the four physical candidates are (R1, +t),
+// (R1, -t), (R2, +t), (R2, -t).
 std::tuple<Eigen::Matrix3d, Eigen::Matrix3d, Eigen::Vector3d> decompose_essential(
     const Eigen::Matrix3d& E);
 
@@ -91,8 +89,7 @@ Eigen::Matrix4d pnp_refine(const Eigen::MatrixXd& X, const Eigen::MatrixXd& u,
                            const Eigen::Matrix3d& K, const Eigen::Matrix4d& T0);
 
 // Per-correspondence Sampson distance for a fundamental (or essential) matrix M: the
-// first-order geometric error, NOT the raw algebraic residual x2^T M x1. For each pair,
-//   d = |x2^T M x1| / sqrt((M x1)_0^2 + (M x1)_1^2 + (M^T x2)_0^2 + (M^T x2)_1^2).
+// first-order geometric error (pixel units), NOT the raw algebraic residual x2^T M x1.
 // p1, p2 are N x 2 (pixels for F, normalized rays for E); returns an N-vector of distances.
 Eigen::VectorXd sampson_distance(const Eigen::Matrix3d& M, const Eigen::MatrixXd& p1,
                                  const Eigen::MatrixXd& p2);
@@ -107,8 +104,8 @@ std::pair<Eigen::Matrix3d, std::vector<int>> ransac_fundamental(
     unsigned int seed);
 
 // The composed two-view relative-pose front-end: RANSAC F on the pixel correspondences,
-// E = K2^T F K1 (here K1 = K2 = K), recover (R, t) by cheirality on the inlier rays, and
-// triangulate the inliers into 3D points expressed in frame 1. Returns the estimated
+// form the essential matrix from F and K (here K1 = K2 = K), recover (R, t) by cheirality on
+// the inlier rays, and triangulate the inliers into 3D points expressed in frame 1. Returns the estimated
 // T_2_1 (4x4), the triangulated points (M x 3 for M inliers), and the inlier indices. The
 // translation scale is the inherent monocular gauge (|t| = 1).
 std::tuple<Eigen::Matrix4d, Eigen::MatrixXd, std::vector<int>> two_view_relative_pose(

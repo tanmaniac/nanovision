@@ -12,8 +12,8 @@ if you get stuck). Do not import it here; implement the bodies yourself.
 Conventions
 -----------
 Camera frame is OpenCV-style: +x right, +y down, +z forward (into the scene). The
-intrinsic matrix K maps a camera-frame point (X, Y, Z) with Z > 0 to a pixel via
-u = fx*X/Z + cx, v = fy*Y/Z + cy.
+intrinsic matrix K maps a camera-frame point (X, Y, Z) with Z > 0 to a pixel by the
+standard pinhole model (see the README).
 
 SE(3) transforms are 4x4 homogeneous matrices applied on the left: p' = T @ p_homogeneous.
 A transform T_b_a reads "a-to-b": it takes points in frame a and returns them in frame b.
@@ -41,9 +41,7 @@ def project_points(pts_cam: Tensor, K: Tensor) -> Tensor:
     Returns:
         (N, 2) pixel coordinates (u, v).
 
-    Formula:
-        u = fx * X / Z + cx
-        v = fy * Y / Z + cy
+    See the "Pinhole projection" section of the README.
     """
     raise NotImplementedError("implement pinhole project_points")
 
@@ -57,12 +55,9 @@ def unproject(px: Tensor, depth: Tensor, K: Tensor) -> Tensor:
         K: (3, 3) intrinsic matrix.
 
     Returns:
-        (N, 3) points in the camera frame.
+        (N, 3) points in the camera frame. This is the inverse of project_points.
 
-    Formula (the inverse of project_points):
-        X = (u - cx) * d / fx
-        Y = (v - cy) * d / fy
-        Z = d
+    See the "Pinhole projection" section of the README.
     """
     raise NotImplementedError("implement unproject")
 
@@ -80,7 +75,9 @@ def make_transform(R: Tensor, t: Tensor) -> Tensor:
         t: (3,) translation.
 
     Returns:
-        (4, 4) homogeneous transform [[R, t], [0, 1]].
+        (4, 4) homogeneous SE(3) transform.
+
+    See the "The four SE(3) primitives" section of the README.
     """
     raise NotImplementedError("implement make_transform")
 
@@ -93,15 +90,17 @@ def apply_transform(T: Tensor, pts: Tensor) -> Tensor:
         pts: (N, 3) points.
 
     Returns:
-        (N, 3) transformed points, (R @ p) + t via homogeneous coordinates.
+        (N, 3) transformed points.
+
+    See the "The four SE(3) primitives" section of the README.
     """
     raise NotImplementedError("implement apply_transform")
 
 
 def invert_transform(T: Tensor) -> Tensor:
-    """Invert a 4x4 SE(3) transform using its structure (no general inverse).
+    """Invert a 4x4 SE(3) transform using its structure, not a general matrix inverse.
 
-    For T = [[R, t], [0, 1]] the inverse is [[R^T, -R^T t], [0, 1]].
+    See the "The four SE(3) primitives" section of the README.
     """
     raise NotImplementedError("implement invert_transform")
 
@@ -109,7 +108,7 @@ def invert_transform(T: Tensor) -> Tensor:
 def compose_transforms(*Ts: Tensor) -> Tensor:
     """Compose a sequence of 4x4 transforms left-to-right.
 
-    compose_transforms(A, B, C) returns A @ B @ C, so applying the result to a
-    point is the same as applying C, then B, then A.
+    Applying compose_transforms(A, B, C) to a point is the same as applying C, then B,
+    then A. See the "The four SE(3) primitives" section of the README.
     """
     raise NotImplementedError("implement compose_transforms")

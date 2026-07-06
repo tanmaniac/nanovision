@@ -8,21 +8,20 @@
 #include <stdexcept>
 
 Eigen::Matrix4d align_point_to_point(const Eigen::MatrixXd& P, const Eigen::MatrixXd& Q) {
-  // Closed-form orthogonal Procrustes (Umeyama/Kabsch). With p_bar, q_bar the centroids and
-  //   H = sum_i (p_i - p_bar)(q_i - q_bar)^T = U S V^T,
-  // the rotation is R = V diag(1, 1, det(V U^T)) U^T (the determinant correction on the last
-  // singular direction blocks a reflection on planar data) and t = q_bar - R p_bar. Return
-  // T = [[R, t],[0,1]] mapping P onto Q.
+  // Closed-form point-to-point alignment (orthogonal Procrustes, Umeyama/Kabsch): the rigid
+  // transform that best maps matched cloud P onto Q, from the SVD of the centroid-centered
+  // cross-covariance. Include the determinant correction that keeps the rotation proper
+  // (det +1) on planar or degenerate data, where the naive closest orthogonal matrix can be a
+  // reflection. Return T = [[R, t],[0,1]] mapping P onto Q. See the README (point-to-point).
   throw std::logic_error("NOT_IMPLEMENTED: align_point_to_point");
 }
 
 Eigen::Matrix4d point_to_plane_step(const Eigen::MatrixXd& P, const Eigen::MatrixXd& Q,
                                     const Eigen::MatrixXd& N) {
-  // One Gauss-Newton step minimizing sum_i (n_i . (R p_i + t - q_i))^2 over xi = [rho; theta].
-  // Linearizing the retraction, each correspondence contributes
-  //   a_i = [n_i; p_i x n_i]   (6-vector),   b_i = -(p_i - q_i) . n_i,
-  // and the normal equations are (sum_i a_i a_i^T) xi = sum_i a_i b_i. Solve for xi and
-  // return the incremental transform se3_exp(xi).
+  // One Gauss-Newton step of the point-to-plane cost (the residual is the distance along the
+  // target normals N) over the twist xi = [rho; theta]. Assemble and solve the 6x6 normal
+  // equations from the per-correspondence rows, and return the incremental transform
+  // se3_exp(xi). See the README (point-to-plane).
   throw std::logic_error("NOT_IMPLEMENTED: point_to_plane_step");
 }
 

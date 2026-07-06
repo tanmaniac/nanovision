@@ -24,22 +24,11 @@ def tube_masking(x: Tensor, t_prime: int, mask_ratio: float) -> tuple[Tensor, Te
     x: (B, N, D) tubelet tokens, N = t_prime * S' in temporal-outermost order
     (idx = t' * S' + s). Keep n_keep_spatial = round((1 - mask_ratio) * S') spatial
     positions per sample, and apply the SAME spatial keep/drop pattern to every
-    temporal step so the visible tokens form spatiotemporal tubes. Build the indices
-    explicitly so the provided _append_mask_tokens reassembly still works.
+    temporal step so the visible tokens form spatiotemporal tubes. Build the [keep;
+    drop] indices explicitly (not image MAE's per-token shuffle) so the provided
+    _append_mask_tokens reassembly still works.
 
-    Implement:
-        1. S = N // t_prime; n_keep_spatial = round((1 - mask_ratio) * S).
-        2. Per-sample spatial permutation: noise (B, S); ids_spatial = argsort(noise);
-           keep_s = ids_spatial[:, :n_keep_spatial]; drop_s = the rest.
-        3. Lift to full-token indices for every temporal step (idx = t*S + s):
-           t_off = arange(t_prime).view(1, t_prime, 1) * S;
-           ids_keep = (t_off + keep_s[:, None, :]).reshape(B, -1);
-           ids_drop similarly; ids_shuffle = cat([ids_keep, ids_drop], 1);
-           ids_restore = argsort(ids_shuffle, 1).
-        4. x_kept = gather(x, 1, ids_keep[..., None].expand(-1, -1, D)).
-        5. mask: ones (B, N), set the first n_keep shuffled slots to 0, gather by
-           ids_restore into original order (1 = masked).
-        6. return (x_kept, mask, ids_restore).
+    See the tube masking section of the README.
 
     Returns:
         x_kept: (B, n_keep, D) with n_keep = t_prime * n_keep_spatial.
@@ -53,11 +42,10 @@ def video_mae_loss(pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     """MSE on masked tubelets only, per-tubelet-normalized target (Task 3).
 
     pred, target: (B, N, t*p*p*C). target is per-tubelet-normalized pixels. mask:
-    (B, N) with 1 on masked tubelets. This is A3's masked-patch MSE with the patch
-    enlarged from p*p to t*p*p.
+    (B, N) with 1 on masked tubelets. This is the image MAE masked-patch MSE with the
+    patch enlarged from p*p to t*p*p.
 
-    Implement: per_tubelet = ((pred - target) ** 2).mean(dim=-1)  # (B, N)
-               return (per_tubelet * mask).sum() / mask.sum()
+    See the reconstruction and loss section of the README.
     """
     raise NotImplementedError("A3.5 Task 3: implement video_mae_loss")
 

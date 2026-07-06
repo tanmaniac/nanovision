@@ -22,10 +22,9 @@ from torch import Tensor, nn
 def timestep_embedding(t: Tensor, dim: int) -> Tensor:
     """Sinusoidal embedding of a scalar timestep t (B,) into (B, dim).
 
-    Same sin/cos construction as the transformer's positional encoding, but indexed by the
-    diffusion timestep value rather than a sequence position: for frequencies
-    freq_i = 1 / 10000^(2i/dim), return concat(cos(t * freq), sin(t * freq)) over the half
-    dimensions (pad one column if dim is odd).
+    Same sin/cos construction as the transformer's positional encoding, indexed by the
+    diffusion timestep value rather than a sequence position (pad one column if dim is odd).
+    See the network section of the README.
     """
     raise NotImplementedError("implement the sinusoidal timestep embedding")
 
@@ -46,9 +45,9 @@ class ResBlock(nn.Module):
 
     def forward(self, x: Tensor, temb: Tensor) -> Tensor:
         h = self.conv1(F.silu(self.norm1(x)))
-        # AdaGN time injection: project the time+class embedding `temb` to this block's
-        # channels (self.temb_proj, after a SiLU) and add it as a per-channel shift,
-        # broadcast over H and W, into h. Replace the next line with that.
+        # AdaGN time injection: add the time+class embedding `temb` into h as a per-channel
+        # shift, broadcast over H and W. Replace the next line with that. See the network
+        # section of the README.
         raise NotImplementedError("implement the AdaGN time injection")
         h = self.conv2(F.silu(self.norm2(h)))
         return h + self.skip(x)

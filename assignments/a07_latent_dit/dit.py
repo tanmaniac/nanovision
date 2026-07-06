@@ -37,11 +37,10 @@ def timestep_embedding(t: Tensor, dim: int) -> Tensor:
 
 
 def modulate(x: Tensor, shift: Tensor, scale: Tensor) -> Tensor:
-    """adaLN affine: x * (1 + scale) + shift.
+    """adaLN affine modulation of x by a conditioning-derived shift and scale.
 
-    x is (B, N, d); shift and scale arrive as (B, d) and MUST be unsqueezed to (B, 1, d)
-    here so they broadcast over the N token axis. Without the unsqueeze the (B, d) tensors
-    do not broadcast against (B, N, d).
+    x is (B, N, d); shift and scale arrive as (B, d) and must broadcast over the N token
+    axis. See the adaLN-Zero conditioning section of the README.
     """
     raise NotImplementedError("implement the adaLN modulate affine")
 
@@ -49,26 +48,26 @@ def modulate(x: Tensor, shift: Tensor, scale: Tensor) -> Tensor:
 def patchify(z: Tensor, p: int) -> Tensor:
     """(B, C, H, W) -> (B, N, p*p*C), N = (H/p)(W/p), row-major patch order.
 
-    Pure reshape/permute, no projection. Patch (i, j) occupies row-major position
-    i*(W/p) + j, and within a patch the values are ordered (C, p, p) flattened.
-    unpatchify must be the exact inverse.
+    A pure reshape/permute with no learned projection; unpatchify must be the exact inverse.
+    See the diffusion transformer section of the README.
     """
     raise NotImplementedError("implement patchify")
 
 
 def unpatchify(tokens: Tensor, p: int, C: int, H: int, W: int) -> Tensor:
-    """Exact inverse of patchify: (B, N, p*p*C) -> (B, C, H, W)."""
+    """Exact inverse of patchify: (B, N, p*p*C) -> (B, C, H, W).
+
+    See the diffusion transformer section of the README.
+    """
     raise NotImplementedError("implement unpatchify")
 
 
 class DiTBlock(nn.Module):
-    """A transformer block with adaLN-Zero conditioning.
+    """A transformer block with adaLN-Zero conditioning on the vector c (B, d).
 
-    The conditioning vector c (B, d) is mapped by adaLN_modulation to six (B, d) tensors:
-    (shift, scale, gate) for the attention sub-layer and (shift, scale, gate) for the MLP.
-    The final Linear in adaLN_modulation has zero weight AND zero bias, so at init every
-    gate is 0 and both residual branches contribute nothing - the block is the identity
-    regardless of c.
+    The final Linear in adaLN_modulation is zero-initialized (weight and bias), so at init
+    the block is the identity map regardless of c. See the adaLN-Zero conditioning section
+    of the README.
     """
 
     def __init__(self, d: int, n_heads: int, mlp_ratio: int):
@@ -84,13 +83,9 @@ class DiTBlock(nn.Module):
         nn.init.zeros_(self.adaLN_modulation[-1].bias)
 
     def forward(self, x: Tensor, c: Tensor) -> Tensor:
-        """adaLN-Zero block: regress 6 modulation params from c, then gated attn and MLP.
+        """adaLN-Zero block: gated attention and MLP modulated by params regressed from c.
 
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp =
-            self.adaLN_modulation(c).chunk(6, dim=-1)   # each (B, d)
-
-        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
-        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        x is (B, N, d), c is (B, d). See the adaLN-Zero conditioning section of the README.
         """
         raise NotImplementedError("implement the adaLN-Zero DiTBlock forward")
 

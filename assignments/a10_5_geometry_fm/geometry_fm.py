@@ -29,10 +29,9 @@ def depth_to_pointmap(depth: Tensor, K: Tensor) -> Tensor:
         K: (3, 3) pinhole intrinsic.
 
     Returns:
-        (B, H, W, 3) camera-frame points. Pixel (i, j) maps to the point
-        unproject((u, v)=(j, i), depth[b, i, j], K), i.e. the pixel grid uses
-        u = column index, v = row index, with the principal point at ((W-1)/2, (H-1)/2)
-        carried inside K. Reuses `unproject`.
+        (B, H, W, 3) camera-frame points. The pixel grid uses u = column index (j) and
+        v = row index (i), with the principal point at ((W-1)/2, (H-1)/2) carried inside K.
+        See the "The pointmap representation" section of the README.
     """
     raise NotImplementedError("back-project depth to a per-pixel camera-frame pointmap")
 
@@ -53,10 +52,10 @@ def pointmap_to_depth(pts: Tensor) -> Tensor:
 def reproject_pointmap(pts_cam1: Tensor, T_1to2: Tensor, K: Tensor) -> Tensor:
     """Reproject a cam1-frame pointmap into image-2 pixel coordinates.
 
-    Transform the points from camera 1 into camera 2 with the relative pose T_1to2
-    (a 4x4 that takes a cam1 point to cam2), then project with K. This is the cross-view
-    consistency check: image-1 pixels carried as 3D points and reprojected into image 2
-    should land where image 2 observes the same surface.
+    Uses the relative pose T_1to2, a 4x4 that takes a cam1 point to cam2. This is the
+    cross-view consistency check: image-1 pixels carried as 3D points and reprojected into
+    image 2 should land where image 2 observes the same surface. See the "The pointmap
+    representation" section of the README.
 
     Args:
         pts_cam1: (B, H, W, 3) points in camera 1's frame.

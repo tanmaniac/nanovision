@@ -40,9 +40,8 @@ def compute_lambda_returns(rewards: Tensor, values: Tensor, continues: Tensor,
                            gamma: float, lam: float) -> Tensor:
     """DreamerV3 lambda-returns (arXiv:2301.04104 eq. 5), bootstrapping on the NEXT value.
 
-    Backward recursion over the horizon dimension (last axis index t in 0..H-1):
-        R_t = r_t + gamma * c_t * ((1 - lam) * V_{t+1} + lam * R_{t+1}),   R_H = V_H.
-    c_t (= 0 at an episode end) zeros both the bootstrap and the recursion tail at termination.
+    A backward recursion over the horizon that mixes n-step returns; c_t (= 0 at an episode end)
+    zeros both the bootstrap and the recursion tail at termination.
 
     Shapes: rewards, continues are (B, H); values are (B, H + 1) where values[:, H] is the
     bootstrap value V_H at the state after the last reward. Returns (B, H).
@@ -55,6 +54,8 @@ def compute_lambda_returns(rewards: Tensor, values: Tensor, continues: Tensor,
         lam: lambda mixing weight.
     Returns:
         (B, H) lambda-returns R_0..R_{H-1}.
+
+    See the actor-critic in imagination section of the README.
     """
     raise NotImplementedError(
         "implement compute_lambda_returns (DreamerV3 eq. 5): backward over t = H-1..0 with "
@@ -107,25 +108,14 @@ def imagine_dynamics(model, actor, critic, h, z, cfg):
 
     Starting from a (detached) batch of posterior states (h, z), roll the dynamics forward for
     cfg.horizon steps with the actor in the loop, keeping the whole graph attached so the imagined
-    lambda-return is differentiable w.r.t. the actor:
+    lambda-return is differentiable w.r.t. the actor. Collect both the pre-action and the post-action
+    state at each step, then decode rewards, continuation flags, and values off those states and pass
+    them to compute_lambda_returns.
 
-      pre-action state s_t = (h, z); collect it.
-      a_t, ent_t = actor.sample(h, z)            # reparameterized; gradient flows through a_t
-      h = model.rssm.forward_h(h, z, a_t)        # gradient flows through the GRU dynamics
-      _, z, _ = model.rssm.prior(h)              # straight-through categorical; gradient flows
-      post-action state s_{t+1} = (h, z); collect it.
-
-    After the loop, stack the states to (B, horizon+1, .) and decode WITHOUT no_grad (the gradient
-    must reach the actor):
-      rewards = twohot_decode(softmax(reward_head(states[:, 1:])), bins)   # reward of a_t from
-                                                                            # the POST-action state
-      conts   = sigmoid(cont_head(states[:, 1:]))
-      values  = critic.value over all horizon+1 states                     # (B, horizon+1)
-      returns = compute_lambda_returns(rewards, values, conts, gamma, lam) # (B, horizon)
-
-    The reward of action a_t is read from the POST-action state s_{t+1} (the alignment fix), so the
-    states sliced for the reward/cont heads are states[:, 1:], not states[:, :-1]. Do NOT wrap any
-    of the reward / value / cont decode in torch.no_grad: dynamics backprop needs that graph.
+    Two constraints carry the lesson. The reward of action a_t is read from the POST-action state
+    s_{t+1}, not the pre-action state, so the states sliced for the reward/cont heads are
+    states[:, 1:], not states[:, :-1]. And nothing here may be wrapped in torch.no_grad: dynamics
+    backprop needs the reward / value / cont decode to stay in the graph.
 
     Args:
         model: the WorldModel (rssm, reward_head, cont_head, bins).
@@ -138,6 +128,8 @@ def imagine_dynamics(model, actor, critic, h, z, cfg):
         entropies: (B, horizon) per-step policy entropies.
         H_h, H_z: (B, horizon+1, .) the stacked deterministic and latent states (for the critic
                   regression target in _train.py).
+
+    See the imagination section of the README.
     """
     raise NotImplementedError(
         "implement imagine_dynamics: for _ in range(cfg.horizon): a, ent = actor.sample(h, z); "
@@ -157,18 +149,12 @@ def actor_loss_dynbackprop(returns: Tensor, entropies: Tensor, ent_coef: float,
     """Dynamics-backprop actor loss: negative normalized return minus an entropy bonus. This is a hole.
 
     The returns here are DIFFERENTIABLE w.r.t. the actor (imagine_dynamics kept the graph attached
-    through the world model), so the policy gradient is just the gradient of the return - there is no
-    log-prob and no detached advantage. Maximize the return:
+    through the world model), so the policy gradient is just the gradient of the return: there is no
+    log-prob and no detached advantage. The loss maximizes the return, normalized by ret_range so the
+    gradient scale does not depend on the reward magnitude, minus an entropy bonus.
 
-        loss = -(returns / ret_range).mean() - ent_coef * entropies.mean()
-
-    ret_range = max(1, S) is the EMA of the 5-95 percentile return spread (ReturnNormalizer), so the
-    gradient scale does not depend on the reward magnitude.
-
-    Contrast with the discrete REINFORCE form (actor_loss below):
-        REINFORCE: loss = -(logprob * (returns - values).detach() / ret_range).mean() - ent_bonus
-    There the return is treated as a constant weight on the log-prob; here the return itself carries
-    the gradient.
+    This is the contrast with the discrete REINFORCE form (actor_loss below), where the return is a
+    detached weight on the log-prob; here the return itself carries the gradient.
 
     Args:
         returns: (B, horizon) differentiable lambda-returns from imagine_dynamics.
@@ -177,6 +163,8 @@ def actor_loss_dynbackprop(returns: Tensor, entropies: Tensor, ent_coef: float,
         ret_range: scalar (or broadcastable) normalizer max(1, S).
     Returns:
         scalar actor loss.
+
+    See the dynamics backprop vs REINFORCE section of the README.
     """
     raise NotImplementedError(
         "implement actor_loss_dynbackprop: -(returns / ret_range).mean() "
@@ -229,11 +217,9 @@ def actor_loss(logprobs: Tensor, returns: Tensor, values: Tensor, entropies: Ten
                ent_coef: float, ret_range: Tensor) -> Tensor:
     """REINFORCE actor loss on the normalized advantage.
 
-    adv = (returns - values).detach() / ret_range; loss = -(logprobs * adv).mean()
-          - ent_coef * entropies.mean().
-
-    The advantage is detached so only the log-prob carries the policy gradient; ret_range is
-    max(1, S) where S is the EMA of the 5-95 percentile return spread (tracked in _train.py).
+    The score-function estimator: the advantage (return minus value) is DETACHED so only the log-prob
+    carries the policy gradient, and it is normalized by ret_range = max(1, S), the EMA of the 5-95
+    percentile return spread tracked in _train.py. An entropy bonus is subtracted.
 
     Args:
         logprobs: (B, H) log-prob of each imagined action.
@@ -244,6 +230,8 @@ def actor_loss(logprobs: Tensor, returns: Tensor, values: Tensor, entropies: Ten
         ret_range: scalar (or broadcastable) normalizer max(1, S).
     Returns:
         scalar actor loss.
+
+    See the dynamics backprop vs REINFORCE section of the README.
     """
     raise NotImplementedError(
         "implement actor_loss (REINFORCE): adv = (returns - values).detach() / ret_range; "
@@ -260,6 +248,8 @@ def critic_loss(logits: Tensor, returns: Tensor, bins: Tensor) -> Tensor:
         bins: (n_bins,) value-space bin positions.
     Returns:
         scalar critic loss.
+
+    See the actor-critic in imagination section of the README.
     """
     raise NotImplementedError(
         "implement critic_loss: twohot_loss(logits, returns.detach(), bins).mean()"

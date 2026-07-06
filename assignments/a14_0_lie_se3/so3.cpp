@@ -20,35 +20,35 @@ Eigen::Vector3d vee3(const Eigen::Matrix3d& W) {
 }
 
 Eigen::Matrix3d so3_exp(const Eigen::Vector3d& w) {
-  // Rodrigues: R = I + (sin th / th) K + ((1 - cos th)/th^2) K^2, K = hat3(w),
-  // th = |w|. Use the small-angle Taylor branch (I + K + K^2/2) when th < kEps.
+  // Rotation vector -> rotation matrix (SO(3) exponential, Rodrigues). th = |w|; handle the
+  // small-angle case (th < kEps) for numerical stability. See the README (exp/log).
   throw std::logic_error("NOT_IMPLEMENTED: so3_exp");
 }
 
 Eigen::Vector3d so3_log(const Eigen::Matrix3d& R) {
-  // Inverse of so3_exp. th = acos((tr R - 1)/2); w = (th / 2 sin th) vee(R - R^T).
-  // Handle th ~ 0 (w = vee(R - R^T)/2) and th ~ pi (extract axis from R + I).
+  // Rotation matrix -> rotation vector (SO(3) log), the inverse of so3_exp. Handle the
+  // th ~ 0 and th ~ pi cases (both make the naive form ill-conditioned). See the README (exp/log).
   throw std::logic_error("NOT_IMPLEMENTED: so3_log");
 }
 
 Eigen::Matrix3d so3_left_jacobian(const Eigen::Vector3d& w) {
-  // J_l = I + ((1 - cos th)/th^2) K + ((th - sin th)/th^3) K^2, K = hat3(w).
-  // Small-angle branch: I + K/2 + K^2/6.
+  // SO(3) left Jacobian of the exponential map. Handle the small-angle case. See the README
+  // (the Jacobians section).
   throw std::logic_error("NOT_IMPLEMENTED: so3_left_jacobian");
 }
 
 Eigen::Matrix3d so3_left_jacobian_inv(const Eigen::Vector3d& w) {
-  // J_l^-1 = I - K/2 + (1/th^2)(1 - (th/2) cot(th/2)) K^2.
-  // Small-angle branch: I - K/2 + K^2/12.
+  // Inverse of so3_left_jacobian. Handle the small-angle case. See the README, Jacobians section.
   throw std::logic_error("NOT_IMPLEMENTED: so3_left_jacobian_inv");
 }
 
 Eigen::Matrix3d so3_right_jacobian(const Eigen::Vector3d& w) {
-  // J_r(w) = J_l(-w). One line once so3_left_jacobian is done.
+  // SO(3) right Jacobian of the exponential map (the module's downstream convention).
+  // See the README (the Jacobians section).
   throw std::logic_error("NOT_IMPLEMENTED: so3_right_jacobian");
 }
 
 Eigen::Matrix3d so3_right_jacobian_inv(const Eigen::Vector3d& w) {
-  // J_r^-1(w) = J_l^-1(-w).
+  // Inverse of the SO(3) right Jacobian. See the README (the Jacobians section).
   throw std::logic_error("NOT_IMPLEMENTED: so3_right_jacobian_inv");
 }

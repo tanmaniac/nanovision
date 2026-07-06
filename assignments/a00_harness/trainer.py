@@ -29,12 +29,10 @@ class Trainer:
         return tuple(x.to(self.device) if torch.is_tensor(x) else x for x in batch)
 
     def step(self, batch) -> float:
-        """One optimization step.
+        """Run one optimization step on batch = (inputs, targets) and return the
+        scalar loss for that step.
 
-        Given batch = (inputs, targets), implement the rhythm:
-            move to device, model.train(), optimizer.zero_grad(),
-            pred = model(inputs), loss = loss_fn(pred, targets),
-            loss.backward(), optimizer.step(), return loss.item()
+        See the optimization step section of the README.
         """
         inputs, targets = self._to_device(batch)
         self.model.train()

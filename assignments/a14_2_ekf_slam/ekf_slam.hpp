@@ -59,8 +59,8 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> slam_update(
     int j, const Eigen::Matrix2d& R);
 
 // Data association: which mapped landmark does measurement z belong to? Returns the
-// index of the nearest landmark by Mahalanobis distance of the innovation,
-// d^2 = y^T S^-1 y with S = H P H^T + R, if that distance is below the chi-square gate;
-// otherwise -1 (treat z as a new landmark). Returns -1 on an empty map.
+// index of the nearest landmark by Mahalanobis distance of the innovation, if that
+// distance is below the chi-square gate; otherwise -1 (treat z as a new landmark).
+// Returns -1 on an empty map.
 int slam_associate(const Eigen::VectorXd& mu, const Eigen::MatrixXd& P,
                    const Eigen::Vector2d& z, const Eigen::Matrix2d& R, double gate);

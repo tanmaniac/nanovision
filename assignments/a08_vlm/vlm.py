@@ -25,11 +25,11 @@ from resampler import PerceiverResampler
 
 
 def prepend_visual(visual_tokens: Tensor, text_embeds: Tensor) -> Tensor:
-    """Concatenate visual then text along the sequence axis.
+    """Put the visual tokens before the text embeddings along the sequence axis.
 
-    visual_tokens (B, N, d) + text_embeds (B, L, d) -> (B, N + L, d). The order is fixed:
-    visual tokens occupy positions 0..N-1, text follows at N.. This is the LLaVA injection
-    point - the visual tokens are ordinary positions in the LM's context, no LM change.
+    visual_tokens (B, N, d) and text_embeds (B, L, d) -> (B, N + L, d). The order is fixed:
+    visual tokens occupy positions 0..N-1, text follows at N.. See the visual-token interface
+    section of the README.
     """
     raise NotImplementedError("implement prepend_visual: concat visual then text")
 
@@ -40,19 +40,12 @@ def vlm_loss(logits: Tensor, token_ids: Tensor, n_visual: int) -> Tensor:
     logits (B, N+L, V) over the combined sequence [visual_0..visual_{N-1}, text_0..text_{L-1}].
     token_ids (B, L) are the caption tokens (0 = pad). n_visual = N.
 
-    Teacher forcing predicts position i+1 from positions <= i. The supervised targets are
-    the text tokens: the last visual position predicts text_0 (the class token), text_k
-    predicts text_{k+1}, and pad targets are ignored. No BOS or separator is used, because
-    generation also starts from an empty text side, so train and inference agree.
-
-    Build a label tensor of length N+L:
-      1. fill (B, N+L) with -100 (ignore index),
-      2. write the true tokens into the text slice: labels[:, N:N+L] = token_ids,
-      3. re-mask pads WITHIN that slice: labels[:, N:N+L][token_ids == 0] = -100.
-    Do NOT index labels[token_ids == 0] directly - labels has length N+L and token_ids has
-    length L, so the boolean mask would mismatch. Then shift and reduce:
-      F.cross_entropy(logits[:, :-1].reshape(-1, V), labels[:, 1:].reshape(-1),
-                      ignore_index=-100).
+    The supervised targets are the text tokens: the last visual position predicts text_0
+    (the class token), text_k predicts text_{k+1}, and pad targets are ignored. No BOS or
+    separator is used, because generation also starts from an empty text side, so train and
+    inference agree. Pads must be re-masked within the text slice, not by indexing the full
+    length-(N+L) label tensor with a length-L mask (the shapes would not line up). See the
+    caption objective and the loss shift section of the README.
     """
     raise NotImplementedError("implement vlm_loss: build -100 labels, write text slice, shift CE")
 

@@ -66,5 +66,8 @@ class VQVAE(nn.Module):
 
 
 def vq_vae_loss(x: Tensor, x_hat: Tensor, vq_loss: Tensor) -> Tensor:
-    """The total VQ-VAE objective: reconstruction MSE plus the quantizer's vq loss."""
+    """The total VQ-VAE objective: the reconstruction term plus the quantizer's vq loss.
+
+    See the losses section of the README.
+    """
     raise NotImplementedError("implement the total VQ-VAE loss (reconstruction MSE + vq loss)")

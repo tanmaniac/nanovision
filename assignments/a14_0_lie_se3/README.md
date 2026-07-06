@@ -86,7 +86,11 @@ increment on the left. Both have closed forms with $K = \widehat{w}$:
 
 $$J_l(w) = I + \frac{1 - \cos\theta}{\theta^2} K + \frac{\theta - \sin\theta}{\theta^3} K^2, \qquad J_r(w) = J_l(-w) = J_l(w)^\top,$$
 
-each with its own small-angle series, and their inverses likewise. The left-versus-right
+each with its own small-angle series. The inverses also have closed forms,
+
+$$J_l^{-1}(w) = I - \tfrac{1}{2} K + \frac{1}{\theta^2}\Big(1 - \frac{\theta}{2}\cot\frac{\theta}{2}\Big) K^2, \qquad J_r^{-1}(w) = J_l^{-1}(-w),$$
+
+with the small-angle series $J_l^{-1} \approx I - \tfrac{1}{2}K + \tfrac{1}{12}K^2$. The left-versus-right
 choice is not cosmetic: it decides whether a perturbation (and the covariance built around
 it) lives on the left or the right of the group element. This module uses the right
 convention throughout, so $J_r$ and $J_r^{-1}$ are what the pose-graph Jacobians in the

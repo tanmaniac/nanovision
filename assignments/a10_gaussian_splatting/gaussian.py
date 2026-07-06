@@ -4,13 +4,10 @@ A scene is a cloud of 3D Gaussians. Each Gaussian has a center mean in world spa
 anisotropic shape (a 3x3 covariance), an opacity, and a color. The covariance is stored
 in a factored form, scale plus rotation, so it stays a valid (symmetric positive
 semi-definite) covariance for every parameter value and is differentiable everywhere the
-quaternion is nonzero.
+quaternion is nonzero. Storing log-scales keeps the scales positive under unconstrained
+gradient descent.
 
-Factorization: with a rotation R from a unit quaternion and a diagonal scale
-S = diag(exp(log_scales)), the covariance is Sigma = R S S^T R^T. Because S S^T is
-diagonal with non-negative entries and R is orthogonal, Sigma is symmetric PSD by
-construction. Storing log-scales keeps the scales positive under unconstrained gradient
-descent.
+See the "The covariance factorization" section of the README for the factored form.
 
 Assignment-local: A10's renderer is not reused downstream, so nothing here is exported
 through a nanovision shim. Import these names bare.
@@ -23,9 +20,8 @@ from torch import Tensor
 def quat_to_rotmat(q: Tensor) -> Tensor:
     """Convert quaternions to rotation matrices.
 
-    Normalizes each quaternion to unit norm first, so the map is well-defined and
-    differentiable, then builds the standard 3x3 rotation. The quaternion is (w, x, y, z)
-    (real part first).
+    The quaternion is (w, x, y, z), real part first, and may have any nonzero magnitude.
+    See the "The covariance factorization" section of the README.
 
     Args:
         q: (N, 4) quaternions, any nonzero magnitude.
@@ -39,10 +35,10 @@ def quat_to_rotmat(q: Tensor) -> Tensor:
 def build_covariance_3d(quats: Tensor, log_scales: Tensor) -> Tensor:
     """Build per-Gaussian 3D covariances from quaternions and log-scales.
 
-    Sigma = R S S^T R^T with R = quat_to_rotmat(quats) and S = diag(exp(log_scales)).
-    The factorization keeps Sigma symmetric positive semi-definite for any parameter
-    value and differentiable, the standard pure-PyTorch pattern (no eigendecomposition,
-    no constrained optimization).
+    The factorization keeps the covariance symmetric positive semi-definite for any
+    parameter value and differentiable, the standard pure-PyTorch pattern (no
+    eigendecomposition, no constrained optimization). See the "The covariance
+    factorization" section of the README.
 
     Args:
         quats: (N, 4) quaternions.
@@ -51,7 +47,7 @@ def build_covariance_3d(quats: Tensor, log_scales: Tensor) -> Tensor:
     Returns:
         (N, 3, 3) covariance matrices.
     """
-    raise NotImplementedError("build Sigma = R S S^T R^T from quats and log_scales")
+    raise NotImplementedError("build the 3D covariance from quats and log_scales")
 
 
 class GaussianModel(torch.nn.Module):

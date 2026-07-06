@@ -20,18 +20,15 @@ class VectorQuantizer(nn.Module):
         self.codebook.weight.data.uniform_(-1.0 / num_codes, 1.0 / num_codes)
 
     def forward(self, z_e: Tensor) -> tuple[Tensor, Tensor, Tensor]:
-        """Quantize z_e (B, D, H, W) to the nearest codebook vectors.
+        """Quantize z_e (B, D, H, W) to its nearest codebook vectors.
 
-        Steps:
-        1. Move D to the last axis and flatten to (B*H*W, D) (use .contiguous() after the
-           permute so the reshape is valid).
-        2. Squared distance to each of the K codes
-           ||z_e||^2 - 2 z_e . e + ||e||^2; indices = argmin over codes.
-        3. z_q = codebook[indices], reshaped back to (B, D, H, W) (permute back, contiguous).
-        4. codebook loss = ||sg[z_e] - z_q||^2 (mean); commitment = ||z_e - sg[z_q]||^2 (mean);
-           vq_loss = codebook + beta * commitment. (sg = .detach())
-        5. straight-through: z_q_ste = z_e + (z_q - z_e).detach().
-        Return (z_q_ste (B, D, H, W), indices (B, H, W), vq_loss).
+        Returns (z_q_ste (B, D, H, W), indices (B, H, W), vq_loss). z_q_ste carries the
+        straight-through gradient: the decoder sees the hard codebook lookup, but the gradient
+        reaches the encoder as if quantization were the identity. vq_loss combines the codebook
+        term (stop-gradient on the encoder) and the commitment term (stop-gradient on the code,
+        weighted by beta).
+
+        See the straight-through estimator and the losses sections of the README.
         """
         raise NotImplementedError("implement vector quantization with the straight-through estimator")
 

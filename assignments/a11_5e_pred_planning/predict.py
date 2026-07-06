@@ -45,9 +45,9 @@ def roi_align_bev(
     as (x = width, y = height), so the grid's last dim must be (g_w, g_h) = (normalized ny-coord,
     normalized nx-coord). centers are (x_cell, y_cell): x_cell indexes nx (height), y_cell indexes
     ny (width). So the width coordinate comes from y_cell and the height coordinate from x_cell -
-    a SWAP relative to centers' order. Offsets are built in CELL units (linspace over
-    +/- radius), added to the agent cell, then normalized per axis with
-    g = 2 * (cell + 0.5) / S - 1, S = nx or ny, align_corners=False, padding_mode="border".
+    a SWAP relative to centers' order. Sample bilinearly with padding_mode="border" (an edge agent
+    samples the boundary feature) and align_corners=False. See the RoI-align section of the README
+    for the +/- radius sampling window and the per-axis normalization.
 
     Args:
         bev_feat: (C, nx, ny) shared BEV feature grid.
@@ -130,10 +130,10 @@ class MultimodalTrajectoryHead(nn.Module):
     def forward(self, bev_feat: Tensor, centers: Tensor) -> tuple[Tensor, Tensor]:
         """Map a shared BEV grid and N agent centers to K trajectories and K scores per agent.
 
-        Run roi_align_bev to get the per-agent RoI tokens, project them to dim, expand the
-        distinct mode queries over the B = N agents, run the n_layers decoder (mode self-attn ->
-        cross-attn over RoI tokens -> MLP, residual + pre-norm), then map each mode to per-step
-        displacements (Linear -> horizon*2) cumsum-ed to absolute positions and to a score logit.
+        RoI-align the per-agent tokens, expand the distinct mode queries over the B = N agents,
+        run the decoder layers (mode self-attention, cross-attention over the RoI tokens, MLP),
+        then map each mode to a trajectory (per-step displacements integrated to absolute
+        positions) and a score logit. See the mode-query-decoder section of the README.
 
         Args:
             bev_feat: (C, nx, ny) shared BEV feature grid.
@@ -163,22 +163,20 @@ def wta_loss(
 
     The committed (winner) mode per sample is the one whose endpoint is closest to the GT
     endpoint (minFDE selection by Euclidean distance; the endpoint carries most of the
-    uncertainty). The classification term trains the score head to point at that committed mode.
+    uncertainty). See the winner-take-all-loss section of the README for both paths.
 
-    Regression term, selected by temperature:
+    The regression term is selected by temperature:
     - temperature is None (hard WTA, the canonical min-of-N): regress only the winner's full
-      trajectory with mean squared error. The winner index is computed once, detached (argmin has
-      no gradient), so only the winning mode carries regression gradient. Selection uses Euclidean
-      FDE; regression uses squared error - the mismatch is intentional (squared error is smooth at
-      0 for gradcheck). The dead-mode risk: spare modes that never win get no gradient and stay
-      dead.
-    - temperature is a float (soft / annealed min-of-N): per-mode weight
-      w_k = softmax(-FDE_k / temperature); regression = sum_k w_k * MSE_k. Every mode gets
-      gradient, weighted toward the closer ones. Annealing temperature -> 0 recovers the hard loss
-      while having given every mode early gradient, the fix for the dead-mode collapse.
+      trajectory, so only the winning mode carries regression gradient. Spare modes that never win
+      get no gradient and stay dead (the dead-mode risk the soft path fixes).
+    - temperature is a float (soft / annealed min-of-N): every mode gets gradient, weighted toward
+      the closer ones; annealing temperature -> 0 recovers the hard loss.
 
-    The classification term is cross_entropy(scores, hard_winner_index) in both paths, with scores
-    as RAW logits (cross_entropy applies log-softmax internally - do not pre-softmax).
+    Contracts: compute the winner index once and detach it (argmin has no gradient); selection is
+    by Euclidean FDE while the regression is squared error (the mismatch is intentional - squared
+    error is smooth at 0 for gradcheck). The classification term is a cross-entropy of the score
+    logits against the hard winner index in both paths, with scores as RAW logits (cross_entropy
+    applies log-softmax internally - do not pre-softmax).
 
     Args:
         trajs: (B, K, T, 2) predicted absolute agent-centric positions.

@@ -18,7 +18,7 @@ Eigen::Vector3d so3_log(const Eigen::Matrix3d& R);
 
 // Left and right Jacobians of SO(3) and their inverses.
 // Defining property of the right Jacobian: exp(w + dw) ~ exp(w) * exp(J_r(w) dw).
-// Relations: J_r(w) = J_l(-w), J_r(w) = J_l(w)^T.
+// See the README (the Jacobians section) for the closed forms and their relations.
 Eigen::Matrix3d so3_left_jacobian(const Eigen::Vector3d& w);
 Eigen::Matrix3d so3_left_jacobian_inv(const Eigen::Vector3d& w);
 Eigen::Matrix3d so3_right_jacobian(const Eigen::Vector3d& w);

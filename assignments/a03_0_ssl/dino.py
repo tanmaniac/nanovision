@@ -26,18 +26,12 @@ def dino_loss(student_out: list[Tensor], teacher_out: list[Tensor], center: Tens
     teacher_out: a list of (B, K) logits, one per teacher crop (global crops only).
     center: (1, K) running mean subtracted from teacher logits.
 
-    The teacher distribution is softmax((teacher_out - center) / teacher_temp) with
-    stop-gradient; the student log-distribution is log_softmax(student_out /
-    student_temp). For every (teacher global crop, student crop) pair, except the
-    matched same-index pair (a crop is not distilled against itself), accumulate the
-    cross-entropy H(p_teacher, p_student) = -sum_k p_t(k) log p_s(k), and average
-    over the counted pairs. Return a scalar.
+    The teacher branch is centered and sharpened and carries a stop-gradient; the
+    student branch is not. Cross-entropy is accumulated over every (teacher global
+    crop, student crop) pair EXCEPT the matched same-index pair (a crop is not
+    distilled against itself), and averaged over the counted pairs. Returns a scalar.
 
-    Implement:
-        1. teacher_probs[i] = softmax((teacher_out[i] - center) / teacher_temp).detach()
-        2. student_logp[j] = log_softmax(student_out[j] / student_temp)
-        3. for each (ti, si) with ti != si: ce = -(p_t * logp_s).sum(-1).mean();
-           accumulate ce and a pair count; return total / n_pairs
+    See the DINO section of the README.
     """
     raise NotImplementedError("A3 Task 4: implement dino_loss")
 
@@ -46,16 +40,13 @@ def dino_loss(student_out: list[Tensor], teacher_out: list[Tensor], center: Tens
 def ema_update(student: nn.Module, teacher: nn.Module, momentum: float) -> None:
     """Update teacher params and buffers toward the student (Task 5a).
 
-    For every parameter and buffer, teacher <- momentum * teacher +
-    (1 - momentum) * student, under no_grad. The teacher is never touched by
-    backprop; this EMA is the only thing that moves it. Higher momentum means a
-    slower, more stable target.
+    Move every teacher parameter and buffer a momentum-weighted step toward the
+    matching student tensor. Float buffers are mixed the same way as parameters;
+    integer buffers are copied outright. The teacher is never touched by backprop;
+    this EMA is the only thing that moves it, and higher momentum means a slower,
+    more stable target. The function is already decorated @torch.no_grad().
 
-    Implement (this function is already decorated @torch.no_grad()):
-        for ts, ss in zip(teacher.parameters(), student.parameters()):
-            ts.mul_(momentum).add_(ss.detach(), alpha=1 - momentum)
-        for tb, sb in zip(teacher.buffers(), student.buffers()):
-            mix floating buffers the same way; copy integer buffers
+    See the DINO section of the README.
     """
     raise NotImplementedError("A3 Task 5a: implement ema_update")
 
@@ -64,14 +55,12 @@ def ema_update(student: nn.Module, teacher: nn.Module, momentum: float) -> None:
 def update_center(center: Tensor, teacher_out: Tensor, center_momentum: float) -> Tensor:
     """EMA update of the centering buffer toward the batch mean (Task 5b).
 
-    teacher_out: (M, K) stacked teacher logits over the batch (and crops). Return
-    center <- center_momentum * center + (1 - center_momentum) * mean_M(teacher_out),
+    teacher_out: (M, K) stacked teacher logits over the batch (and crops). Move the
+    center a momentum-weighted step toward the mean teacher logit over the M rows,
     keeping center's shape. This running mean is what centering subtracts before the
     teacher softmax; updating it outside the graph keeps it off the autograd path.
 
-    Implement:
-        batch_center = teacher_out.mean(dim=0, keepdim=True)   # (1, K)
-        return center_momentum * center + (1 - center_momentum) * batch_center
+    See the DINO section of the README.
     """
     raise NotImplementedError("A3 Task 5b: implement update_center")
 
@@ -79,15 +68,13 @@ def update_center(center: Tensor, teacher_out: Tensor, center_momentum: float) -
 def teacher_entropy(teacher_out: Tensor, center: Tensor, teacher_temp: float) -> Tensor:
     """Mean entropy of the centered + sharpened teacher distribution (Task 6).
 
-    teacher_out: (M, K) teacher logits. Form p_t = softmax((teacher_out - center) /
-    teacher_temp) and return the mean over the batch of H = -sum_k p_t(k) log p_t(k).
-    This is the instrument the collapse test reads: near 0 means single-prototype
-    collapse, near log K means uniform collapse, mid-range means healthy training.
+    teacher_out: (M, K) teacher logits. Form the same centered + sharpened teacher
+    distribution used in the loss, and return the mean of its entropy over the M
+    rows. This is the instrument the collapse test reads: near 0 means single-
+    prototype collapse, near log K means uniform collapse, mid-range means healthy
+    training.
 
-    Implement:
-        p_t = softmax((teacher_out - center) / teacher_temp, dim=-1)
-        H = -(p_t * torch.log(p_t + 1e-8)).sum(dim=-1)
-        return H.mean()
+    See the DINO section of the README.
     """
     raise NotImplementedError("A3 Task 6: implement teacher_entropy")
 

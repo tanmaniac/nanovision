@@ -49,8 +49,7 @@ def ar_sample(prior: TokenPrior, n: int, grid_hw: tuple[int, int], num_codes: in
               generator: torch.Generator | None = None, device: str = "cpu") -> Tensor:
     """Autoregressively sample a token grid (n, H, W) from the prior.
 
-    Start from [BOS]; at each of the L = H*W steps run the prior, take the last position's
-    logits over the K codes, sample one token (multinomial), and append. Drop BOS and reshape
-    to the grid.
+    Start from the BOS token and sample the L = H*W grid tokens in row-major order, then
+    reshape to the grid. See the autoregressive prior section of the README.
     """
     raise NotImplementedError("implement autoregressive token sampling from the prior")

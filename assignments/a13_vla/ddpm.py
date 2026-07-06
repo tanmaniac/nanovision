@@ -9,9 +9,9 @@ this is the baseline it is measured against.
 RDT-1B (Liu et al. 2024) is a diffusion TRANSFORMER for bimanual manipulation; it is named in the
 README as a reading pointer, not built here, and is not the same thing as this plain DDPM denoiser.
 
-Convention matches the course's diffusion assignment: a_t = sqrt(abar_t) a_chunk + sqrt(1-abar_t)
-eps, the network predicts eps, and the loss is MSE on eps. Shapes: a_chunk, a_t, eps are (B, H, 2);
-the integer timestep is (B,); c is (B, cond_in); alphas_bar is (T,).
+Convention matches the course's diffusion assignment: the network predicts eps (not x0) and the loss
+is MSE on eps. Shapes: a_chunk, a_t, eps are (B, H, 2); the integer timestep is (B,); c is
+(B, cond_in); alphas_bar is (T,). The math is in the DDPM contrast section of the README.
 """
 
 import math
@@ -66,10 +66,11 @@ def ddpm_loss(head: DDPMHead, a_chunk: Tensor, c: Tensor, alphas_bar: Tensor,
               generator: torch.Generator | None = None) -> Tensor:
     """The DDPM epsilon-prediction loss. HOLE.
 
-    Sample an integer t ~ U[0, T) per row and eps ~ N(0, I) the shape of a_chunk. Form the noised
-    chunk a_t = sqrt(abar_t) a_chunk + sqrt(1 - abar_t) eps, predict eps_hat = head(a_t, t, c), and
-    return the MSE between eps_hat and eps (mean over all elements). abar_t = alphas_bar[t] reshaped
-    to (B, 1, 1) so it broadcasts over (H, 2).
+    Noise a_chunk to a random timestep with the forward process, then regress the network's
+    prediction onto the sampled noise eps (predict eps, not x0) by MSE. a_chunk is (B, H, 2), c is
+    (B, cond_in), alphas_bar is (T,).
+
+    See the DDPM contrast section of the README.
     """
     raise NotImplementedError("implement the DDPM epsilon-prediction loss")
 
@@ -78,16 +79,10 @@ def ddpm_sample(head: DDPMHead, c: Tensor, H: int, alphas_bar: Tensor,
                 generator: torch.Generator | None = None) -> Tensor:
     """The ancestral DDPM reverse chain. HOLE.
 
-    Start from a_T ~ N(0, I) of shape (B, H, 2). For t from T-1 down to 0, predict eps_hat, recover
-    the posterior mean, and add noise except at t=0:
+    Start from a_T ~ N(0, I) of shape (B, H, 2) and run the reverse chain from t=T-1 down to 0,
+    recovering the posterior mean at each step and adding Gaussian noise except at t=0. Return the
+    final a (B, H, 2). This is the same ancestral sampler as the course's diffusion topic.
 
-      alpha_t   = abar_t / abar_prev        (abar_prev = abar[t-1], abar[-1] := 1)
-      beta_t    = 1 - alpha_t
-      x0_hat    = (a_t - sqrt(1-abar_t) eps_hat) / sqrt(abar_t)
-      mean      = sqrt(abar_prev) beta_t/(1-abar_t) x0_hat
-                + sqrt(alpha_t) (1-abar_prev)/(1-abar_t) a_t
-      a <- mean + sqrt(beta_tilde_t) z    (z ~ N(0,I) for t>0, beta_tilde_t = (1-abar_prev)/(1-abar_t) beta_t)
-
-    Return the final a (B, H, 2). This is the same ancestral sampler as the diffusion assignment.
+    See the DDPM contrast section of the README.
     """
     raise NotImplementedError("implement the ancestral DDPM sampler")

@@ -14,9 +14,9 @@ Two correctness points the build must respect:
    representation carries. normalize_scale therefore returns one scalar per batch element.
 2. Confidence is C = 1 + exp(logit) >= 1 (the head already applies this); the loss reads C.
 
-The confidence term -alpha * log(C) lets the network lower C on pixels it cannot fit. With a
-fixed residual ell, the per-pixel cost C*ell - alpha*log(C) is minimized at C = alpha/ell, a
-finite confidence, so confidence is learned, not driven to either extreme.
+The confidence term lets the network lower C on pixels it cannot fit, so confidence is
+learned from the data rather than driven to an extreme. See the "The confidence-weighted,
+scale-normalized loss" section of the README for the loss.
 """
 
 import torch
@@ -26,13 +26,9 @@ from torch import Tensor
 def normalize_scale(pts: Tensor, valid: Tensor, eps: float = 1e-8) -> Tensor:
     """One shared scale over the union of both pointmaps' valid points (DUSt3R Eq. 5).
 
-    The scale for batch element b is the mean L2 norm of every valid 3D point across BOTH
-    pointmaps:
-
-        z_b = ( sum over valid points in map 1 of ||X_i|| + sum over valid points in map 2
-                of ||X_i|| ) / ( |valid in map 1| + |valid in map 2| ).
-
-    Both pointmaps stack into pts so they share one scalar; do not compute a scale per map.
+    Both pointmaps stack into pts so they share one scalar per batch element; do not compute
+    a scale per map. See the "The confidence-weighted, scale-normalized loss" section of the
+    README for the scale.
 
     Args:
         pts: (B, 2, h, w, 3) the two pointmaps stacked on dim 1 (index 0 = map 1, 1 = map 2).
@@ -60,18 +56,11 @@ def pointmap_loss(
 ) -> Tensor:
     """Confidence-weighted, scale-normalized pointmap regression loss over both views.
 
-    Scale-normalize the two predicted maps by a single z (their joint scale) and the two GT
-    maps by a single zbar (the GT joint scale), both from normalize_scale. Per valid pixel i
-    of view v, the residual is the L2 distance between the scaled prediction and scaled GT:
-
-        ell_i^v = || pred_pts_i^v / z  -  gt_pts_i^v / zbar ||.
-
-    The total loss sums the confidence-weighted residual over both views and averages over
-    the valid pixels:
-
-        L = mean over valid pixels of ( C_i^v * ell_i^v - alpha * log(C_i^v) ),
-
-    with the mean taken over the count of valid pixels across BOTH views. alpha = 0.2 (paper).
+    Scale-normalize the two predicted maps by a single joint z and the two GT maps by a
+    single joint zbar, both from normalize_scale (one shared scale per side, not per map).
+    The loss weights each valid pixel's residual by its confidence and averages over the
+    valid pixels of BOTH views; alpha = 0.2 (paper). See the "The confidence-weighted,
+    scale-normalized loss" section of the README for the residual and the loss.
 
     Args:
         pred_pts1, pred_pts2: (B, h, w, 3) predicted pointmaps, both in cam1 frame.

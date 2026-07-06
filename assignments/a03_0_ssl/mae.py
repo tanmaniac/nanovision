@@ -25,16 +25,10 @@ def random_masking(x: Tensor, mask_ratio: float) -> tuple[Tensor, Tensor, Tensor
     sample, chosen by a random permutation. Return:
         x_kept: (B, n_keep, D) the visible tokens, gathered in shuffled order.
         mask: (B, N) binary in ORIGINAL patch order, 0 = kept, 1 = masked.
-        ids_restore: (B, N) the argsort of the shuffle, so that gathering a tensor
+        ids_restore: (B, N) the inverse permutation, so that gathering a tensor
             in shuffled order by ids_restore puts it back into original order.
 
-    Implement:
-        1. n_keep = round((1 - mask_ratio) * N)
-        2. noise = torch.rand(B, N); ids_shuffle = argsort(noise, dim=1);
-           ids_restore = argsort(ids_shuffle, dim=1)
-        3. ids_keep = ids_shuffle[:, :n_keep]; gather x by ids_keep -> x_kept
-        4. mask is [0]*n_keep + [1]*(N-n_keep) in shuffled order; gather by
-           ids_restore to put it in original patch order
+    See the MAE section of the README.
     """
     raise NotImplementedError("A3 Task 1: implement random_masking")
 
@@ -52,10 +46,7 @@ def append_mask_tokens(x_enc: Tensor, ids_restore: Tensor, mask_token: Tensor) -
     patch order. Return (B, N, D_dec). The decoder positional embedding is added by
     the caller after this assembly.
 
-    Implement:
-        1. n_mask = N - n_keep; masks = mask_token.expand(B, n_mask, D_dec)
-        2. x_full = torch.cat([x_enc, masks], dim=1)        # shuffled order
-        3. x_full = torch.gather(x_full, 1, ids_restore[..., None].expand(-1, -1, D))
+    See the MAE section of the README.
     """
     raise NotImplementedError("A3 Task 2: implement append_mask_tokens")
 
@@ -68,9 +59,7 @@ def mae_loss(pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     over the pixel dim), then average over the masked patches only, using mask as
     the weight. Visible patches do not contribute to the loss.
 
-    Implement:
-        per_patch = ((pred - target) ** 2).mean(dim=-1)   # (B, N)
-        return (per_patch * mask).sum() / mask.sum()
+    See the MAE section of the README.
     """
     raise NotImplementedError("A3 Task 3: implement mae_loss")
 
