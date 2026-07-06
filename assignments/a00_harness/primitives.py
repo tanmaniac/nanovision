@@ -16,7 +16,7 @@ def gelu(x: Tensor) -> Tensor:
     Implement: GELU(x) = x * 0.5 * (1 + erf(x / sqrt(2)))
     Input/output shape: same as x. Use torch.erf.
     """
-    raise NotImplementedError("A0 Task 1: implement exact erf GELU")
+    return x * 0.5 * (1 + torch.erf(x / math.sqrt(2)))
 
 
 class LayerNorm(nn.Module):
@@ -36,8 +36,10 @@ class LayerNorm(nn.Module):
         self.bias = nn.Parameter(torch.zeros(dim))
 
     def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError("A0 Task 2: implement LayerNorm.forward")
-
+        mean = x.mean(-1, keepdim=True)
+        var = x.var(-1, keepdim=True, unbiased=False)
+        y = (x - mean) / torch.sqrt(var + self.eps) * self.weight + self.bias
+        return y
 
 class MLP(nn.Module):
     """Two-layer MLP: Linear -> act -> dropout -> Linear.
@@ -54,4 +56,5 @@ class MLP(nn.Module):
         self.act = act
 
     def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError("A0 Task 3: implement MLP.forward")
+        y = self.fc2(self.drop(self.act(self.fc1(x))))
+        return y

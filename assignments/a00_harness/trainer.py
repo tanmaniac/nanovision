@@ -36,7 +36,14 @@ class Trainer:
             pred = model(inputs), loss = loss_fn(pred, targets),
             loss.backward(), optimizer.step(), return loss.item()
         """
-        raise NotImplementedError("A0 Task 4: implement the optimization step")
+        inputs, targets = self._to_device(batch)
+        self.model.train()
+        self.optimizer.zero_grad()
+        pred = self.model(inputs)
+        loss = self.loss_fn(pred, targets)
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
 
     def _log(self, step: int, loss: float) -> None:
         self.history.append((step, loss))
