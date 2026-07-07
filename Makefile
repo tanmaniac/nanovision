@@ -9,6 +9,13 @@
 #   make viz     A=a00_harness   # render the result to assignments/<A>/out/
 #   make test-all / make verify-all
 #
+# Iterating on one function (test / verify accept these):
+#   make test A=a01_transformer K="sdpa"            # -k filter: only tests whose name matches
+#   make test A=a01_transformer K="attention and not gradcheck"
+#   make test A=a01_transformer SKIP_HOLES=1        # unfilled holes become skips, not failures
+#   make test A=a01_transformer ARGS="-x -q"        # ARGS is passed through to pytest verbatim
+# K, SKIP_HOLES, and ARGS combine, e.g. make test A=a01_transformer K=sdpa ARGS=-x
+#
 # There is no install step. The repo runs from its root: pytest gets the root via
 # `pythonpath = ["."]` (pyproject.toml) and scripts run as modules (`python -m`).
 # The student edits the top-level files in each assignment dir; solution/ is the
@@ -30,11 +37,11 @@ A ?=
 
 test:
 	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make test A=a00_harness" && exit 1)
-	$(PYTEST) assignments/$(A)/tests -v
+	$(PYTEST) assignments/$(A)/tests -v $(if $(K),-k "$(K)") $(if $(SKIP_HOLES),--skip-holes) $(ARGS)
 
 verify:
 	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make verify A=a00_harness" && exit 1)
-	NANOVISION_IMPL=solution $(PYTEST) assignments/$(A)/tests -v
+	NANOVISION_IMPL=solution $(PYTEST) assignments/$(A)/tests -v $(if $(K),-k "$(K)") $(ARGS)
 
 viz:
 	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make viz A=a00_harness" && exit 1)
