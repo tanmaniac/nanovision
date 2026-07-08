@@ -151,10 +151,18 @@ the position $m$:
 
 $$q' = q\odot\cos + \operatorname{rotate-half}(q)\odot\sin,$$
 
-where rotate-half splits the last dimension into two halves $(x_1, x_2)$ and returns $(-x_2, x_1)$,
-and the cosine and sine angles come from an outer product of the positions with the inverse
-frequencies $\theta_i = \text{base}^{-i/(\text{half})}$. The head dimension must be even so the
-channels pair up.
+where rotate-half acts on adjacent channel pairs, following the paper's eq. 34: it sends
+$[x_1, x_2, x_3, x_4, \dots]$ to $[-x_2, x_1, -x_4, x_3, \dots]$. The cosine and sine angles come
+from an outer product of the positions with the inverse frequencies $\theta_i = \text{base}^{-i/\text{half}}$,
+each repeated across its pair so both channels of a pair rotate by the same angle. The head
+dimension must be even so the channels pair up.
+
+Transcribe the paper directly: pair channel $2i$ with channel $2i+1$, which is the form the
+provided `_rotate_half` helper implements. Many production implementations (Llama, GPT-NeoX,
+HuggingFace) instead pair channel $i$ with channel $i+\text{half}$ and split rotate-half into two
+contiguous halves $(x_1, x_2)\to(-x_2, x_1)$. The two are the same rotation up to a fixed
+permutation of the channels, so both are correct, but the frequency layout has to match whichever
+rotate-half you use. Match your $\theta$ layout to the adjacent-pair helper here.
 
 The reason it works is the dot product. A query at position $m$ and a key at position $n$, each
 rotated by their own position, have a dot product that depends only on the relative offset $m - n$.

@@ -75,15 +75,17 @@ def _rope_freqs(seq_len: int, head_dim: int, base: float, device, dtype) -> tupl
     inv_freq = 1.0 / (base ** (torch.arange(0, half, device=device, dtype=torch.float) / half))
     pos = torch.arange(seq_len, device=device, dtype=torch.float)
     angles = torch.outer(pos, inv_freq)  # (seq_len, half)
-    angles = torch.cat([angles, angles], dim=-1)  # (seq_len, head_dim)
+    # Repeat each frequency across its adjacent pair so both channels of a pair rotate by the
+    # same angle, matching the paper's (eq. 34) adjacent-pair _rotate_half below.
+    angles = angles.repeat_interleave(2, dim=-1)  # (seq_len, head_dim)
     return angles.cos().to(dtype), angles.sin().to(dtype)
 
 
 def _rotate_half(x: Tensor) -> Tensor:
-    """Rotate the two halves of the last dim: (x1, x2) -> (-x2, x1)."""
-    half = x.shape[-1] // 2
-    x1, x2 = x[..., :half], x[..., half:]
-    return torch.cat([-x2, x1], dim=-1)
+    """Rotate adjacent channel pairs (Su et al. 2021, eq. 34): [x1, x2, x3, x4, ...] -> [-x2, x1, -x4, x3, ...]."""
+    x1 = x[..., 0::2]
+    x2 = x[..., 1::2]
+    return torch.stack((-x2, x1), dim=-1).flatten(-2)
 
 
 def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Tensor]:

@@ -28,7 +28,8 @@ def build_causal_mask(seq_len: int) -> Tensor:
     attending to later positions. Entry (i, j) is 0 for j <= i and -inf for j > i.
     See the causal mask section of the README.
     """
-    raise NotImplementedError("A1 Task 3: implement build_causal_mask")
+    mask = torch.triu(torch.ones([seq_len, seq_len]) * float("-inf"), diagonal=1)
+    return mask
 
 
 def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Tensor]:
@@ -46,7 +47,17 @@ def apply_rope(q: Tensor, k: Tensor, base: float = 10000.0) -> tuple[Tensor, Ten
     The module-level _rotate_half helper is provided for you.
     See the rotary position embedding section of the README.
     """
-    raise NotImplementedError("A1 Task 4: implement apply_rope")
+    _, _, S, d = q.shape
+    half = d // 2
+    thetas = base ** (-2 * torch.linspace(0, half - 1, steps=half) / half)
+    thetas = thetas.unsqueeze(1).repeat([1, 2]).flatten()
+    m = torch.linspace(0, S - 1, steps=S)
+    cos = torch.cos(m.outer(thetas))
+    sin = torch.sin(m.outer(thetas))
+    q_rot = q * cos + _rotate_half(q) * sin
+    k_rot = k * cos + _rotate_half(k) * sin
+
+    return q_rot, k_rot
 
 
 class SinusoidalPositionalEncoding(nn.Module):
@@ -62,7 +73,9 @@ class SinusoidalPositionalEncoding(nn.Module):
         super().__init__()
         pe = torch.zeros(max_len, dim)
         pos = torch.arange(max_len, dtype=torch.float).unsqueeze(1)
-        div = torch.exp(torch.arange(0, dim, 2, dtype=torch.float) * (-math.log(10000.0) / dim))
+        div = torch.exp(
+            torch.arange(0, dim, 2, dtype=torch.float) * (-math.log(10000.0) / dim)
+        )
         pe[:, 0::2] = torch.sin(pos * div)
         pe[:, 1::2] = torch.cos(pos * div)
         self.register_buffer("pe", pe, persistent=False)
@@ -87,9 +100,11 @@ class LearnedPositionalEncoding(nn.Module):
 
 
 def _rotate_half(x: Tensor) -> Tensor:
-    half = x.shape[-1] // 2
-    x1, x2 = x[..., :half], x[..., half:]
-    return torch.cat([-x2, x1], dim=-1)
+    # Su et al. (2021) eq. 34 convention: rotate adjacent channel pairs.
+    # [x1, x2, x3, x4, ...] -> [-x2, x1, -x4, x3, ...]
+    x1 = x[..., 0::2]
+    x2 = x[..., 1::2]
+    return torch.stack((-x2, x1), dim=-1).flatten(-2)
 
 
 class _RoPEAttention(nn.Module):
@@ -99,7 +114,13 @@ class _RoPEAttention(nn.Module):
     apply_rope above. Supports GQA via n_kv_heads.
     """
 
-    def __init__(self, dim: int, n_heads: int, causal: bool = False, n_kv_heads: Optional[int] = None):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        causal: bool = False,
+        n_kv_heads: Optional[int] = None,
+    ):
         super().__init__()
         assert dim % n_heads == 0
         self.n_heads = n_heads
@@ -113,7 +134,9 @@ class _RoPEAttention(nn.Module):
         self.v_proj = nn.Linear(dim, self.n_kv_heads * self.head_dim, bias=False)
         self.out_proj = nn.Linear(n_heads * self.head_dim, dim, bias=False)
 
-    def forward(self, x: Tensor, kv: Optional[Tensor] = None, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, x: Tensor, kv: Optional[Tensor] = None, mask: Optional[Tensor] = None
+    ) -> Tensor:
         B, Sq, _ = x.shape
         src = x if kv is None else kv
         Sk = src.shape[1]
@@ -167,14 +190,20 @@ class TransformerBlock(nn.Module):
 
         def make_attn(causal_: bool) -> nn.Module:
             if pos == "rope":
-                return _RoPEAttention(dim, n_heads, causal=causal_, n_kv_heads=n_kv_heads)
-            return MultiHeadAttention(dim, n_heads, causal=causal_, n_kv_heads=n_kv_heads)
+                return _RoPEAttention(
+                    dim, n_heads, causal=causal_, n_kv_heads=n_kv_heads
+                )
+            return MultiHeadAttention(
+                dim, n_heads, causal=causal_, n_kv_heads=n_kv_heads
+            )
 
         self.norm1 = make_norm()
         self.attn = make_attn(causal)
         if cross_attn:
             self.norm_cross = make_norm()
-            self.cross = MultiHeadAttention(dim, n_heads, causal=False, n_kv_heads=n_kv_heads)
+            self.cross = MultiHeadAttention(
+                dim, n_heads, causal=False, n_kv_heads=n_kv_heads
+            )
         self.norm2 = make_norm()
 
         if ffn == "swiglu":
@@ -184,7 +213,9 @@ class TransformerBlock(nn.Module):
         else:
             self.ffn = MLP(dim, int(mlp_ratio * dim))
 
-    def forward(self, x: Tensor, kv: Optional[Tensor] = None, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, x: Tensor, kv: Optional[Tensor] = None, mask: Optional[Tensor] = None
+    ) -> Tensor:
         """Pre-norm residual sub-layers: self-attention, optional cross-attention,
         then the feed-forward, each wrapped in a residual.
 
@@ -196,15 +227,34 @@ class TransformerBlock(nn.Module):
 class TransformerEncoder(nn.Module):
     """Stack of N non-causal pre-norm blocks (bidirectional self-attention)."""
 
-    def __init__(self, dim: int, n_heads: int, depth: int, mlp_ratio: float = 4,
-                 norm: str = "rms", ffn: str = "swiglu", pos: str = "rope",
-                 n_kv_heads: Optional[int] = None):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        depth: int,
+        mlp_ratio: float = 4,
+        norm: str = "rms",
+        ffn: str = "swiglu",
+        pos: str = "rope",
+        n_kv_heads: Optional[int] = None,
+    ):
         super().__init__()
-        self.blocks = nn.ModuleList([
-            TransformerBlock(dim, n_heads, mlp_ratio, causal=False, cross_attn=False,
-                             norm=norm, ffn=ffn, pos=pos, n_kv_heads=n_kv_heads)
-            for _ in range(depth)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TransformerBlock(
+                    dim,
+                    n_heads,
+                    mlp_ratio,
+                    causal=False,
+                    cross_attn=False,
+                    norm=norm,
+                    ffn=ffn,
+                    pos=pos,
+                    n_kv_heads=n_kv_heads,
+                )
+                for _ in range(depth)
+            ]
+        )
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         for block in self.blocks:
@@ -215,18 +265,39 @@ class TransformerEncoder(nn.Module):
 class TransformerDecoder(nn.Module):
     """Stack of N causal pre-norm blocks, optionally cross-attending to memory."""
 
-    def __init__(self, dim: int, n_heads: int, depth: int, mlp_ratio: float = 4,
-                 cross_attn: bool = False, norm: str = "rms", ffn: str = "swiglu",
-                 pos: str = "rope", n_kv_heads: Optional[int] = None):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        depth: int,
+        mlp_ratio: float = 4,
+        cross_attn: bool = False,
+        norm: str = "rms",
+        ffn: str = "swiglu",
+        pos: str = "rope",
+        n_kv_heads: Optional[int] = None,
+    ):
         super().__init__()
-        self.blocks = nn.ModuleList([
-            TransformerBlock(dim, n_heads, mlp_ratio, causal=True, cross_attn=cross_attn,
-                             norm=norm, ffn=ffn, pos=pos, n_kv_heads=n_kv_heads)
-            for _ in range(depth)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TransformerBlock(
+                    dim,
+                    n_heads,
+                    mlp_ratio,
+                    causal=True,
+                    cross_attn=cross_attn,
+                    norm=norm,
+                    ffn=ffn,
+                    pos=pos,
+                    n_kv_heads=n_kv_heads,
+                )
+                for _ in range(depth)
+            ]
+        )
 
-    def forward(self, x: Tensor, memory: Optional[Tensor] = None,
-                mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, x: Tensor, memory: Optional[Tensor] = None, mask: Optional[Tensor] = None
+    ) -> Tensor:
         for block in self.blocks:
             x = block(x, kv=memory, mask=mask)
         return x
