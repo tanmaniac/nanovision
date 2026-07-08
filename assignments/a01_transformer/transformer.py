@@ -87,9 +87,11 @@ class LearnedPositionalEncoding(nn.Module):
 
 
 def _rotate_half(x: Tensor) -> Tensor:
-    half = x.shape[-1] // 2
-    x1, x2 = x[..., :half], x[..., half:]
-    return torch.cat([-x2, x1], dim=-1)
+    # Su et al. (2021) eq. 34 convention: rotate adjacent channel pairs.
+    # [x1, x2, x3, x4, ...] -> [-x2, x1, -x4, x3, ...]
+    x1 = x[..., 0::2]
+    x2 = x[..., 1::2]
+    return torch.stack((-x2, x1), dim=-1).flatten(-2)
 
 
 class _RoPEAttention(nn.Module):
