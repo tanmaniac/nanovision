@@ -172,6 +172,7 @@ assignment adds beyond that, with `—` for none. The extra groups:
 | a11_5c_bevformer | BEVFormer attention | Spatial cross-attention, temporal self-attention, the dense BEV query grid | code: a01, a11_5a; concept: a11_5b, a03_5 | av + dataset |
 | a11_5d_occupancy | 3D occupancy | Render-supervised occupancy from the BEV features | code: a09; concept: a11_5a, a11_5b, a11_5c | av + dataset |
 | a11_5e_pred_planning | Prediction and planning | A motion-prediction head feeding a planning objective (leaf assignment) | code: a01; concept: a11_5b, a11_5c, a11_5d | av + dataset |
+| a11_5f_sensor_fusion | Multi-modal sensor fusion | PointPainting point decoration, a PointPillars-lite LiDAR BEV encoder, the BEVFusion concat-and-conv core, and a TransFuser attention-fusion block | code: a01, a11_5b; concept: a11_5a, a11, a11_5c | av + dataset |
 | a12_world_models | World models | A DreamerV3-style RSSM trained on cartpole-from-pixels, with a dynamics-backprop actor | code: a00; concept: a01, a03_5 | — |
 | a13_vla | VLA capstone | A vision-language-action model with a flow-matching action head (leaf assignment) | code: a00; concept: a05, a06_0, a08, a12 | — |
 | a14_0_lie_se3 | Lie groups for state estimation (C++) | SO(3)/SE(3) exp/log, hat/vee, left/right Jacobians, the adjoint, box-plus/box-minus | concept: a11_5a | C++ |
@@ -187,11 +188,11 @@ The seven modules:
 - visual representations - a02, a03_0, a03_5, a04
 - generative - a05, a06_0, a06_5, a07
 - multimodal and 3D - a08, a09, a10, a10_5, a11
-- autonomous-driving perception on nuScenes-mini - a11_5a through a11_5e
+- autonomous-driving perception on nuScenes-mini - a11_5a through a11_5f
 - action and dynamics - a12, a13
 - classical SLAM in C++ - a14_0 through a14_5
 
-The autonomous-driving chain (a11_5a through a11_5e) runs on the nuScenes-mini
+The autonomous-driving chain (a11_5a through a11_5f) runs on the nuScenes-mini
 dataset (~4GB). The camera-geometry assignment documents the account click-through
 and download as step zero; the loader fails with a clear message if the dataset path
 is unset.
@@ -247,6 +248,7 @@ graph TD
     a11_5c[a11_5c BEVFormer]
     a11_5d[a11_5d occupancy]
     a11_5e[a11_5e pred/planning]
+    a11_5f[a11_5f sensor fusion]
   end
   subgraph M4["Action and dynamics"]
     a12[a12 world models]
@@ -287,6 +289,8 @@ graph TD
   a11_5a --> a11_5c
   a09 --> a11_5d
   a01 --> a11_5e
+  a01 --> a11_5f
+  a11_5b --> a11_5f
   a00 --> a12
   a00 --> a13
   a14_0 --> a14_1
@@ -315,6 +319,9 @@ graph TD
   a11_5b -.-> a11_5e
   a11_5c -.-> a11_5e
   a11_5d -.-> a11_5e
+  a11_5a -.-> a11_5f
+  a11 -.-> a11_5f
+  a11_5c -.-> a11_5f
   a01 -.-> a12
   a03_5 -.-> a12
   a05 -.-> a13
