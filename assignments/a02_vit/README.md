@@ -198,26 +198,13 @@ classes.
 
 ## The assignment
 
-Implement five mechanism bodies and let the provided ViT assembly tie them together. Each task maps
-to one `NotImplementedError` in a top-level file and to one test. The docstrings in each file give the
-exact signatures, shapes, and step-by-step recipes; read those in the files rather than here.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`convnext.py` holds the one new shared-library primitive. Implement `ConvNeXtBlock.forward` (the
-depthwise convolution, the channels-last inverted-bottleneck MLP, the layer scale, and the residual
-add from the ConvNeXt section). It is exposed as `nanovision.primitives.ConvNeXtBlock`.
-
-`vit.py` holds the rest. Implement `PatchEmbed.forward` (the strided convolution then flatten and
-transpose from the patch-embedding section), `ViT._assemble_tokens` (prepend the class token, add the
-positional embedding, append the register tokens from the token-sequence section),
-`ViT._pool` (class-token versus mean pooling from the pooling section), and `interpolate_pos_embed`
-(the bicubic resize from the interpolation section). The module construction, the parameter
-initialization, the classic-ViT encoder import (layer norm, GELU MLP, no rotary position), and
-`forward` are provided.
-
-The CIFAR-10 wiring in `train_cifar.py` is provided for an optional real run and has no holes; the
-gating signal is overfit-one-batch.
+1. [`ConvNeXtBlock.forward()`](convnext.py) in `convnext.py`
+2. [`PatchEmbed.forward()`](vit.py) in `vit.py`
+3. [`ViT._assemble_tokens()`](vit.py) in `vit.py`
+4. [`ViT._pool()`](vit.py) in `vit.py`
+5. [`interpolate_pos_embed()`](vit.py) in `vit.py`
 
 ### Running and validating
 

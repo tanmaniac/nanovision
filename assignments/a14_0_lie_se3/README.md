@@ -128,24 +128,25 @@ $T_0 \boxplus \big(s\,(T_1 \boxminus T_0)\big)$.
 
 ## The assignment
 
-Implement the SO(3) and SE(3) Lie-group operations in C++. Everything else - the pybind11
-bindings, the CMake build, the tests, and the Rerun visualization - is provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
+1. [`hat3()`](so3.cpp) in `so3.cpp`
+2. [`vee3()`](so3.cpp) in `so3.cpp`
+3. [`so3_exp()`](so3.cpp) in `so3.cpp`
+4. [`so3_log()`](so3.cpp) in `so3.cpp`
+5. [`so3_left_jacobian()`](so3.cpp) in `so3.cpp`
+6. [`so3_left_jacobian_inv()`](so3.cpp) in `so3.cpp`
+7. [`so3_right_jacobian()`](so3.cpp) in `so3.cpp`
+8. [`so3_right_jacobian_inv()`](so3.cpp) in `so3.cpp`
+9. [`hat6()`](se3.cpp) in `se3.cpp`
+10. [`vee6()`](se3.cpp) in `se3.cpp`
+11. [`se3_exp()`](se3.cpp) in `se3.cpp`
+12. [`se3_log()`](se3.cpp) in `se3.cpp`
+13. [`se3_adjoint()`](se3.cpp) in `se3.cpp`
+14. [`se3_boxplus()`](se3.cpp) in `se3.cpp`
+15. [`se3_boxminus()`](se3.cpp) in `se3.cpp`
 
-`so3.cpp` holds the rotation group. Fill `hat3`/`vee3`, `so3_exp`/`so3_log`, and the four
-Jacobians `so3_left_jacobian`, `so3_left_jacobian_inv`, `so3_right_jacobian`,
-`so3_right_jacobian_inv`. Each function's contract (inputs, outputs, the formula, and which
-small-angle branch it needs) is in the comment at its hole; the math is in the lecture notes
-above. The header `so3.hpp` is shared with the reference and is not edited.
-
-`se3.cpp` holds the rigid transforms: `hat6`/`vee6`, `se3_exp`/`se3_log`, `se3_adjoint`, and
-the retraction `se3_boxplus`/`se3_boxminus`. These call the SO(3) functions, so finish
-`so3.cpp` first.
-
-The reference implementation for both files is in `solution/`, in plain sight - write your
-own and read it when stuck. You may not include an existing Lie-group or solver library
-(Sophus, manif, Ceres, GTSAM, g2o); a test enforces this by scanning the sources.
+You may not include an existing Lie-group or solver library (Sophus, manif, Ceres, GTSAM, g2o); a test enforces this by scanning the sources.
 
 ### Building and running
 

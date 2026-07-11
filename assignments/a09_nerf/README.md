@@ -275,47 +275,19 @@ a ray.
 
 ## The assignment
 
-Implement the base camera-geometry primitives, the Fourier positional encoding, the discretized
-volume renderer, and pinhole ray generation. The radiance-field MLP, the config, the toy scene,
-and the visualization script are provided. Each file's docstrings give the exact signatures,
-shapes, and sampling conventions (the near-to-far ordering of samples along a ray and the
-camera-to-world axis convention). Read those in the files; this section maps each file to the
-concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`geometry.py` is the base camera-geometry toolkit. Implement `project_points` and `unproject`
-(the pinhole model and its inverse from the pinhole-projection section) and the four SE(3)
-primitives `make_transform`, `apply_transform`, `invert_transform`, and `compose_transforms`
-(including the structured inverse $[[R^\top, -R^\top t], [0, 1]]$ rather than a general matrix
-inverse). Ray generation uses `unproject`, and the downstream 3D and autonomous-driving
-assignments import all six through the `nanovision.geometry` shim, so this is shared,
-autograd-compatible code with float64 gradchecks on the differentiable pieces.
-
-`encoding.py` is the Fourier encoding. Implement `PositionalEncoding.forward`, the $\gamma(p)$
-feature map from the spectral-bias section, with the `include_input` option and no learnable
-parameters. The frequency bands $2^k$ are a registered buffer.
-
-`render.py` is the volume renderer. Implement `volume_render`: the per-segment opacity
-$\alpha_i = 1 - \exp(-\sigma_i\delta_i)$, the exclusive transmittance
-$T_i = \prod_{j<i}(1-\alpha_j)$ with $T_0 = 1$, the weights $w_i = T_i\alpha_i$, the weighted
-color $\hat{C} = \sum_i w_i \mathbf{c}_i$, and the optional white background that composites the
-leftover transmittance onto white. The MLP has already applied softplus to $\sigma$, so this
-function receives raw non-negative densities and must not re-activate them. Build the exclusive
-cumulative product as a leading column of ones (for $T_0$) followed by the running product of
-all but the last $(1-\alpha)$. There is no epsilon inside the cumprod, which would break the
-exact-equality tests, and no inclusive cumprod followed by a shift, which double-counts.
-
-`rays.py` is ray generation. Implement `stratified_sample_rays` (pinhole ray directions rotated
-to world and unit-normalized, with stratified depth samples), `sample_along_rays` (the points
-$\mathbf{o} + z\mathbf{d}$ on each ray), and `deltas_from_z` (consecutive-difference segment
-lengths with the large final delta).
-
-`geometry.py`, `render.py`, and `rays.py` are shared files: the downstream Gaussian-splatting,
-geometry-foundation-model, occupancy/neural-SDF, and autonomous-driving assignments import their
-symbols through the `nanovision.geometry` and `nanovision.volume` shims. The MLP (`model.py`),
-`config.py`, the toy scene (`nanovision.data.toy.nerf_synthetic_scene`), and `viz.py` are
-provided.
+1. [`project_points()`](geometry.py) in `geometry.py`
+2. [`unproject()`](geometry.py) in `geometry.py`
+3. [`make_transform()`](geometry.py) in `geometry.py`
+4. [`apply_transform()`](geometry.py) in `geometry.py`
+5. [`invert_transform()`](geometry.py) in `geometry.py`
+6. [`compose_transforms()`](geometry.py) in `geometry.py`
+7. [`PositionalEncoding.forward()`](encoding.py) in `encoding.py`
+8. [`volume_render()`](render.py) in `render.py`
+9. [`stratified_sample_rays()`](rays.py) in `rays.py`
+10. [`sample_along_rays()`](rays.py) in `rays.py`
+11. [`deltas_from_z()`](rays.py) in `rays.py`
 
 ### Running and validating
 

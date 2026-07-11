@@ -155,31 +155,24 @@ step you do more of.
 
 ## The assignment
 
-Implement the four filters in C++. The pybind11 bindings, the CMake build, the tests, and
-the Rerun visualization are provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
+1. [`kf_predict()`](kalman.cpp) in `kalman.cpp`
+2. [`kf_update()`](kalman.cpp) in `kalman.cpp`
+3. [`ekf_f()`](kalman.cpp) in `kalman.cpp`
+4. [`ekf_h()`](kalman.cpp) in `kalman.cpp`
+5. [`ekf_F_x()`](kalman.cpp) in `kalman.cpp`
+6. [`ekf_H()`](kalman.cpp) in `kalman.cpp`
+7. [`ekf_predict()`](kalman.cpp) in `kalman.cpp`
+8. [`ekf_update()`](kalman.cpp) in `kalman.cpp`
+9. [`ukf_sigma_points()`](kalman.cpp) in `kalman.cpp`
+10. [`ukf_unscented_transform()`](kalman.cpp) in `kalman.cpp`
+11. [`ukf_cross_covariance()`](kalman.cpp) in `kalman.cpp`
+12. [`moments_to_information()`](kalman.cpp) in `kalman.cpp`
+13. [`information_to_moments()`](kalman.cpp) in `kalman.cpp`
+14. [`information_update()`](kalman.cpp) in `kalman.cpp`
 
-`kalman.cpp` holds every hole, in four groups:
-
-- Linear KF: `kf_predict` and `kf_update` (Joseph form).
-- EKF: the models `ekf_f` and `ekf_h` and their analytic Jacobians `ekf_F_x` and `ekf_H`,
-  then the filter steps `ekf_predict` and `ekf_update` that wire them together with the
-  angle-wrapped residual.
-- UKF: `ukf_sigma_points` (the $2n+1$ points and the weights, including the
-  $(1-\alpha^2+\beta)$ term), `ukf_unscented_transform` (the weighted mean and covariance),
-  and `ukf_cross_covariance`. The loop that pushes each sigma point through $f$ or $h$ is
-  provided in `_helpers.py` (`ukf_predict` / `ukf_update`), so your C++ is the transform
-  math, and the same helper drives the UKF with an arbitrary linear model to compare against
-  the KF.
-- Information form: `moments_to_information`, `information_to_moments`, and the additive
-  `information_update`.
-
-Each function's contract (inputs, outputs, formula) is in the comment at its hole; the math
-is in the lecture notes above. The header `kalman.hpp` is shared with the reference and is
-not edited; `wrap_angle` lives there, provided. The reference is in `solution/kalman.cpp`,
-in plain sight. You may not include an existing estimation or solver library; a test scans
-the sources.
+You may not include an existing estimation or solver library; a test scans the sources.
 
 ### Building and running
 

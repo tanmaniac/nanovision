@@ -119,28 +119,11 @@ still local methods that need an initialization.
 
 ## The assignment
 
-Implement the two solvers and the registration loop in C++. The SE(3) retraction, the skew
-operator, the nearest-neighbor search, the pybind11 bindings, the CMake build, the synthetic
-clouds, the tests, and the Rerun visualization are provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
-
-`icp.cpp` holds three holes:
-
-- `align_point_to_point` - the closed-form Umeyama/Kabsch solve, including the determinant
-  correction that keeps the rotation proper.
-- `point_to_plane_step` - one Gauss-Newton step of the point-to-plane cost: assemble the
-  $6 \times 6$ normal equations from the $[n_i; p_i \times n_i]$ rows and return the
-  incremental transform.
-- `icp` - the outer loop: transform, find and gate correspondences, solve (point-to-point or
-  point-to-plane), compose, iterate.
-
-`models.cpp` (the SE(3) `se3_exp`, the skew `hat3`, and the brute-force `nearest_neighbors`,
-carried over from the Lie-group assignment and standing in for a kd-tree) is provided and
-compiled in both builds; call those, do not reimplement them. Each hole's contract is in the
-comment at the hole and in `icp.hpp`; the math is in the lecture notes. The reference is in
-`solution/icp.cpp`. You may not include an existing registration or solver library in the C++;
-a test scans the sources (Open3D is allowed only as the Python oracle below).
+1. [`align_point_to_point()`](icp.cpp) in `icp.cpp`
+2. [`point_to_plane_step()`](icp.cpp) in `icp.cpp`
+3. [`icp()`](icp.cpp) in `icp.cpp`
 
 ### Building and running
 

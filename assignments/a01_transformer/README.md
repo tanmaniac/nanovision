@@ -252,31 +252,16 @@ weights are $(\text{batch}, \text{heads}, \text{seq}_q, \text{seq}_k)$.
 
 ## The assignment
 
-Implement seven mechanism bodies and let the provided language-model assembly tie them together. Each
-task maps to one `NotImplementedError` in a top-level file and to one test. The docstrings in each
-file give the exact signatures, shapes, and step-by-step recipes; read those in the files rather than
-here.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in
+each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`attention.py` holds the attention core. Implement `scaled_dot_product_attention` (the gather and the
-stable softmax from the attention section) and `MultiHeadAttention.forward` (the head split and
-merge, the self-versus-cross choice, and the grouped-query head repeat from the multi-head section).
-
-`transformer.py` holds the block and the positional schemes. Implement `build_causal_mask` (the
-additive mask from the causal-mask section), `apply_rope` (the rotation from the RoPE section), and
-`TransformerBlock.forward` (the pre-norm residual sub-layers from the pre-norm section, two for an
-encoder block and three with cross-attention). The encoder and decoder stacks, the provided
-RoPE-attention wrapper that calls `apply_rope`, and the sinusoidal and learned absolute encodings are
-given.
-
-`primitives.py` holds the two LLaMA-style primitives. Implement `RMSNorm.forward` (the RMSNorm
-section) and `SwiGLU.forward` (the SwiGLU section). Layer norm, GELU, and the MLP come from the
-harness assignment through `nanovision.primitives`.
-
-The character language model in `charlm.py` is a token embedding, a stack of causal RoPE/RMSNorm/
-SwiGLU blocks, a final norm, and a projection to vocabulary logits. It is provided; once the seven
-holes are filled it overfits a single batch as the end-to-end integration check.
+1. [`scaled_dot_product_attention()`](attention.py) in `attention.py`
+2. [`MultiHeadAttention.forward()`](attention.py) in `attention.py`
+3. [`build_causal_mask()`](transformer.py) in `transformer.py`
+4. [`apply_rope()`](transformer.py) in `transformer.py`
+5. [`RMSNorm.forward()`](primitives.py) in `primitives.py`
+6. [`SwiGLU.forward()`](primitives.py) in `primitives.py`
+7. [`TransformerBlock.forward()`](transformer.py) in `transformer.py`
 
 ### Running and validating
 

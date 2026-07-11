@@ -134,28 +134,12 @@ large-scale structure-from-motion and BA feasible.
 
 ## The assignment
 
-Implement the four operations in C++. The SE(3) machinery, the pybind11 bindings, the CMake
-build, the synthetic pose graphs, the tests, and the Rerun visualization are provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
-
-`factor_graph.cpp` holds four holes:
-
-- `between_residual` - the relative-pose residual $\mathrm{Log}(T_{\text{meas}}^{-1} T_i^{-1}
-  T_j)$.
-- `between_jacobians` - its two analytic edge Jacobians, with the minus sign and the adjoint
-  argument from the published form.
-- `optimize_pose_graph` - the Gauss-Newton loop: assemble $H$ and $g$ over all edges, anchor
-  pose 0, solve, retract, iterate.
-- `schur_solve` - marginalize the block-diagonal landmark block and back-substitute, giving the
-  same answer as the dense solve.
-
-`models.cpp` (the SE(3) `se3_exp`, `se3_log`, `se3_adjoint`, `se3_right_jacobian_inv`, and
-`hat3`, carried over from the Lie-group assignment) is provided and compiled in both builds;
-call those, do not reimplement them. Each hole's contract is in the comment at the hole and in
-`factor_graph.hpp`; the math is in the lecture notes. The reference is in
-`solution/factor_graph.cpp`. You may not include an existing SLAM or solver library in the C++;
-a test scans the sources (GTSAM is allowed only as the Python oracle below).
+1. [`between_residual()`](factor_graph.cpp) in `factor_graph.cpp`
+2. [`between_jacobians()`](factor_graph.cpp) in `factor_graph.cpp`
+3. [`optimize_pose_graph()`](factor_graph.cpp) in `factor_graph.cpp`
+4. [`schur_solve()`](factor_graph.cpp) in `factor_graph.cpp`
 
 ### Building and running
 

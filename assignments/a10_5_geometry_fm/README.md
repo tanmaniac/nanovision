@@ -222,34 +222,14 @@ shared-frame trick applied to a vehicle's cameras instead of a stereo pair.
 
 ## The assignment
 
-Implement the pointmap head's forward pass, the two loss functions, and the three geometry
-utilities. The Siamese ViT encoder, the cross-attending decoders, the closed-form toy
-ground-truth generator, the config, and the viz are provided. Each file's docstrings give the
-exact signatures, shapes, and conventions, including the pixel-center convention the toy uses
-(principal point at $((W-1)/2, (H-1)/2)$ inside $K$, and pixel $(i, j)$ mapping to
-$(u, v) = (j, i)$); getting it wrong shifts the depth round-trip by half a pixel. Read those in
-the files; this section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`geometry_fm.py` is the depth/pointmap geometry. Implement `depth_to_pointmap` (back-project a
-depth map to a per-pixel camera-frame pointmap), `pointmap_to_depth` (read the $z$ channel back
-off a pointmap), and `reproject_pointmap` (carry a cam1-frame pointmap into camera 2 and project
-to image-2 pixels, the cross-view consistency check). These three are shared and re-exported
-through `nanovision.geometry`, so the file must import (it does, with the holes raising only when
-called).
-
-`head.py` is the pointmap head. Implement `PointmapHead.forward`: run the provided MLP, split the
-four outputs into the XYZ point and the confidence logit, reshape the tokens to the patch grid,
-and map the logit to $C = 1 + \exp(\text{logit})$ from the confidence section.
-
-`loss.py` is the DUSt3R loss. Implement `normalize_scale` (the single joint scale over both
-pointmaps' valid points, DUSt3R Eq. 5) and `pointmap_loss` (scale-normalize the predicted and
-ground-truth maps each by their own joint scale, take the per-pixel L2 residual, weight by the
-confidence, subtract $\alpha\log C$, and average over the valid pixels of both views).
-
-The model (`model.py`), the closed-form toy ground truth (`toy_scene.py`), `config.py`, and
-`viz.py` are provided.
+1. [`depth_to_pointmap()`](geometry_fm.py) in `geometry_fm.py`
+2. [`pointmap_to_depth()`](geometry_fm.py) in `geometry_fm.py`
+3. [`reproject_pointmap()`](geometry_fm.py) in `geometry_fm.py`
+4. [`PointmapHead.forward()`](head.py) in `head.py`
+5. [`normalize_scale()`](loss.py) in `loss.py`
+6. [`pointmap_loss()`](loss.py) in `loss.py`
 
 ### Running and validating
 

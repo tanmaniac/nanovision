@@ -186,33 +186,14 @@ target.
 
 ## The assignment
 
-Implement the six holes in `occupancy.py`. The config, the toy box-scene generator, and the
-provided `Conv2d` for pillar extrusion are given; the alpha-compositing kernel is reused from the
-NeRF assignment through `nanovision.volume.volume_render`, not re-implemented. The file docstrings
-give the exact signatures, shapes, and the pinned trilinear axis order; read those, this section
-maps each hole to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-All six holes are in `occupancy.py`, an assignment-local file imported bare by the tests.
-
-`bev_to_voxel` is pillar extrusion from the lifting section: the provided 1x1 conv to $C n_z$
-channels, reshaped to $[B, C, n_z, Y, X]$.
-
-`OccupancyHead.forward` is the two-conv per-voxel classifier to $[B, n_{\text{classes}}, Z, Y, X]$
-logits.
-
-`inverse_frequency_weights` and `weighted_ce_loss` are the class-imbalance fix from that section:
-per-class weights $\propto 1/(\text{count} + \varepsilon)$ normalized to mean 1, and the
-weighted-mean cross-entropy that matches `F.cross_entropy(weight=...)`.
-
-`occupancy_iou` is the mean occupied-class IoU, free excluded, empty-union classes excluded.
-
-`render_occupancy_rays` is the rendering supervision: trilinear sampling with the pinned axis order,
-the density bridge, the reused `volume_render` for the weights, and the depth and semantics
-accumulation with the leftover-transmittance depth term. The forbidden-imports scan rejects a
-hand-rolled $(1-\alpha)$ `cumprod`/`cumsum` inside `occupancy.py`; `grid_sample` and `affine_grid`
-are allowed.
+1. [`bev_to_voxel()`](occupancy.py) in `occupancy.py`
+2. [`OccupancyHead.forward()`](occupancy.py) in `occupancy.py`
+3. [`inverse_frequency_weights()`](occupancy.py) in `occupancy.py`
+4. [`weighted_ce_loss()`](occupancy.py) in `occupancy.py`
+5. [`occupancy_iou()`](occupancy.py) in `occupancy.py`
+6. [`render_occupancy_rays()`](occupancy.py) in `occupancy.py`
 
 ### Running and validating
 

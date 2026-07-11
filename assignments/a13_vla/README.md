@@ -235,26 +235,17 @@ encoder is the four-conv 64x64 pixel encoder from the world-models assignment.
 
 ## The assignment
 
-Implement the flow-matching head, the behavior-cloning baseline with action chunking, and the DDPM
-head; the network bodies, the sinusoidal time embedding, the noise schedule, the CNN encoder, the
-reacher wrapper with the analytic expert, the training loops, and the visualizations are provided.
-The docstrings in each file give the signatures, shapes, and conventions; read those in the files.
-This section says which file maps to which concept from the notes. The heads condition on a vector of
-width `cond_in`; on the reacher the encoder's 128-wide embedding is that width.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`flow.py` is the flow-matching head, the build target. Implement `cfm_target` (the straight-path
-interpolant and the constant velocity target), `flow_loss` (the velocity-regression loss), and
-`flow_sample` (the Euler ODE integrator from noise at $t = 0$ to the action at $t = 1$).
-
-`bc.py` is the behavior-cloning baseline and the chunking utilities. Implement `bc_loss` (the plain
-regression loss, the compounding-error baseline), and `chunk_actions` / `de_chunk` /
-`receding_horizon_indices` (the overlapping chunking, its exact inverse, and the open-loop start
-indices from the action-chunking section).
-
-`ddpm.py` is the diffusion contrast. Implement `ddpm_loss` (the epsilon-prediction loss) and
-`ddpm_sample` (the ancestral reverse chain), re-conditioned on $c$.
+1. [`cfm_target()`](flow.py) in `flow.py`
+2. [`flow_loss()`](flow.py) in `flow.py`
+3. [`flow_sample()`](flow.py) in `flow.py`
+4. [`bc_loss()`](bc.py) in `bc.py`
+5. [`chunk_actions()`](bc.py) in `bc.py`
+6. [`de_chunk()`](bc.py) in `bc.py`
+7. [`receding_horizon_indices()`](bc.py) in `bc.py`
+8. [`ddpm_loss()`](ddpm.py) in `ddpm.py`
+9. [`ddpm_sample()`](ddpm.py) in `ddpm.py`
 
 ### Running and validating
 

@@ -137,19 +137,11 @@ transformer for referring-expression detection.
 
 ## The assignment
 
-Implement three mechanism bodies. The dual encoder (`model.py`), the L2 normalization, the
-learnable temperature and bias, the EOS pooling, and the toy (image, caption) data are provided;
-the towers are tiny stand-ins because the objective transfers and the encoder is the ViT and
-transformer built earlier. Each hole's docstring gives the exact signatures and shapes; read those
-in the files. This section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-`losses.py` holds the two contrastive losses. Write `clip_loss` (symmetric InfoNCE, with the
-cross-entropy built by hand from a log-softmax so the in-batch-negative denominator is explicit;
-do not call `F.cross_entropy` or `F.log_softmax`) and `siglip_loss` (the per-pair sigmoid loss with
-the learnable bias).
-
-`inference.py` holds `zero_shot_classify`, the cosine-similarity argmax against class-prompt
-embeddings.
+1. [`clip_loss()`](losses.py) in `losses.py`
+2. [`siglip_loss()`](losses.py) in `losses.py`
+3. [`zero_shot_classify()`](inference.py) in `inference.py`
 
 ### Running and validating
 

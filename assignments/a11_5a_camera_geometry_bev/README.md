@@ -177,26 +177,15 @@ propagate.
 
 ## The assignment
 
-Implement the multi-camera rig and the flat-ground IPM warp on top of the base camera primitives
-(pinhole projection and the SE(3) toolkit) imported from `nanovision.geometry`. The file
-docstrings give the exact signatures, shapes, and formulas (the OpenCV camera axes, the
-$T_{\text{cam}\_\text{ego}}$ extrinsic convention, the grid_sample normalization). Read those;
-this section maps each piece to the concept above. Everything is autograd-compatible float
-tensors, and the tests are float64 gradchecks on the differentiable pieces.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
+1. [`CameraRig.world_to_cam()`](geometry.py) in `geometry.py`
+2. [`CameraRig.cam_to_world()`](geometry.py) in `geometry.py`
+3. [`CameraRig.world_to_pixel()`](geometry.py) in `geometry.py`
+4. [`ipm_to_bev()`](geometry.py) in `geometry.py`
 
-Both tasks are in `geometry.py`, marked with `raise NotImplementedError("A11.5a Task N: ...")`.
 `project_points`, `unproject`, and the four SE(3) primitives are imported at the top of the file
 from `nanovision.geometry` (built in the NeRF assignment); you do not reimplement them here.
-
-Task 1, `CameraRig.world_to_cam`, `cam_to_world`, and `world_to_pixel`, is the multi-camera rig.
-`world_to_pixel` projects ego points into a named camera and returns the in-front ($z > 0$) and
-in-bounds visibility mask, the back half of the projection chain.
-
-Task 2, `ipm_to_bev`, is the flat-ground IPM warp: for each BEV cell, project its ground point
-into each camera and bilinearly sample the image with `grid_sample`, last-camera-wins on
-overlap.
 
 The `BEVGrid` dataclass and the `nanovision.data.nuscenes_mini` loader (the devkit plumbing,
 image downsampling, and calibration parsing) are provided.

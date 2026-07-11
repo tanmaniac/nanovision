@@ -127,26 +127,11 @@ flowchart LR
 
 ## The assignment
 
-Implement the quantizer, the total loss, and autoregressive sampling. Each file's docstrings
-give the exact steps, shapes, the channel-last flatten convention, and the BOS index
-convention. Read those in the files; this section says which file maps to which concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`quantize.py` is the vector quantizer, the shared `nanovision.quantize.VectorQuantizer`.
-Implement `VectorQuantizer.forward`: the nearest-code lookup (the squared-distance argmin from
-the VQ-VAE section), the straight-through estimator, and the codebook and commitment losses.
-The `codebook_perplexity` collapse diagnostic is provided.
-
-`vqvae.py` is the VQ-VAE wiring. Implement `vq_vae_loss`, the reconstruction MSE plus the
-quantizer's vq loss. The encoder, decoder, and the `VQVAE` module are provided.
-
-`prior.py` is the autoregressive prior. Implement `ar_sample`, the autoregressive token
-sampling from the prior described in the prior section. The `TokenPrior` transformer and its
-teacher-forced `ar_nll` loss are provided.
-
-The config, the toy shape-image data (`nanovision.data.toy.diffusion_image_batch`), and
-`viz.py` are provided.
+1. [`VectorQuantizer.forward()`](quantize.py) in `quantize.py`
+2. [`vq_vae_loss()`](vqvae.py) in `vqvae.py`
+3. [`ar_sample()`](prior.py) in `prior.py`
 
 ### Running and validating
 
