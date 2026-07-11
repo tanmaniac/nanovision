@@ -221,7 +221,9 @@ class TransformerBlock(nn.Module):
 
         See the pre-norm block section of the README.
         """
-        raise NotImplementedError("A1 Task 7: implement TransformerBlock.forward")
+        block1 = x + self.attn(self.norm1(x))
+        block2 = block1 + self.ffn(self.norm2(block1))
+        return block2
 
 
 class TransformerEncoder(nn.Module):

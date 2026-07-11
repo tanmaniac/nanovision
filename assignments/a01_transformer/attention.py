@@ -34,9 +34,15 @@ def scaled_dot_product_attention(
     Use a numerically stable softmax. Do NOT use F.scaled_dot_product_attention.
     See the scaled dot-product attention section of the README.
     """
-    raise NotImplementedError(
-        "A1 Task 1: implement scaled dot-product attention (stable softmax)"
-    )
+    matmul = q @ k.transpose(-2, -1)
+    print(f"{q.shape=}, {k.shape=}, {matmul.shape=}")
+    matmul = matmul / math.sqrt(q.shape[-1])
+    if mask is not None:
+        print(f"{mask.shape=}, {matmul.shape=}")
+        matmul += mask
+    softmax = torch.softmax(matmul, -1)
+    attention = softmax @ v
+    return attention, softmax
 
 
 class MultiHeadAttention(nn.Module):
@@ -76,6 +82,30 @@ class MultiHeadAttention(nn.Module):
         When mask is None and self.causal, build the causal mask internally.
         See the multi-head attention section of the README.
         """
-        raise NotImplementedError(
-            "A1 Task 2: implement MultiHeadAttention.forward (self/cross/GQA)"
-        )
+        if mask is None and self.causal:
+            # build the mask by the size of x
+            s = x.shape[-2]
+            mask = torch.triu(torch.ones([s, s]) * float("-inf"), diagonal=1)
+
+        B, Sq, dim = x.shape
+        src = kv if kv is not None else x
+        _, Sk, _ = src.shape
+
+        q = self.q_proj(x).view(B, Sq, self.n_heads, self.head_dim).transpose(1, 2)
+        k = self.k_proj(src).view(B, Sk, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        v = self.v_proj(src).view(B, Sk, self.n_kv_heads, self.head_dim).transpose(1, 2)
+
+        if self.n_kv_heads < self.n_heads:
+            # is GQA
+            repeats = self.n_heads // self.n_kv_heads
+            k = torch.repeat_interleave(k, repeats, dim=1)
+            v = torch.repeat_interleave(v, repeats, dim=1)
+
+        attentions, _ = scaled_dot_product_attention(q, k, v, mask=mask)
+
+        # concat along H dimension
+        splits = torch.split(attentions, 1, dim=1)
+        multihead = torch.concat(splits, dim=-1).squeeze(dim=1)
+        multihead = self.out_proj(multihead)
+
+        return multihead

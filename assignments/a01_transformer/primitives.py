@@ -26,7 +26,11 @@ class RMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(dim))
 
     def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError("A1 Task 5: implement RMSNorm.forward")
+        d = x.shape[-1]
+        rms = torch.sqrt(1 / d * torch.sum(x**2, dim=-1, keepdim=True) + self.eps)
+        print(f"{x.shape=}, {rms.shape=}")
+        y = x / rms * self.weight
+        return y
 
 
 class SwiGLU(nn.Module):
@@ -45,4 +49,7 @@ class SwiGLU(nn.Module):
         self.w_down = nn.Linear(hidden, dim, bias=False)
 
     def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError("A1 Task 6: implement SwiGLU.forward (gated SiLU)")
+        def _silu(z: Tensor) -> Tensor:
+            return z * torch.sigmoid(z)
+
+        return self.w_down(_silu(self.w_gate(x)) * (self.w_up(x)))
