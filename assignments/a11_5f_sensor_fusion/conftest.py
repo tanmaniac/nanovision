@@ -1,11 +1,13 @@
 """Put the assignment-local code on sys.path so the tests can import it by name.
 
-Local files (config.py) are imported with a bare name; they resolve to the top-level files the
-student edits. The owned mechanism file lift_splat.py is NOT imported bare - it comes through
-nanovision.lift_splat, which nanovision/_student.py routes to the top-level (default) or
-solution/ copy keyed on NANOVISION_IMPL. The top-level dir is always on the path (config.py
-lives only there); solution/ is added first under NANOVISION_IMPL=solution so its lift_splat.py
-shadows the holed top-level one for the shim.
+The holed mechanism files (fusion.py, transfuser.py) and the provided helpers (config.py,
+compare.py, viz.py) are imported by bare name. In solution mode the solution/ dir is inserted
+ahead of the top-level dir, so solution/fusion.py and solution/transfuser.py shadow the holed
+top-level copies while the provided helpers, which live only at the top level, still resolve.
+The shared primitives this assignment reuses (nanovision.lift_splat, nanovision.geometry,
+nanovision.transformer) are NOT imported bare - they come through their nanovision.* shims, which
+nanovision/_student.py routes to each owner's top-level (default) or solution/ copy keyed on
+NANOVISION_IMPL.
 """
 
 import os
