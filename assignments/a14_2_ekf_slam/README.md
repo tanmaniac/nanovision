@@ -146,28 +146,14 @@ poses and relinearizes, and it exploits sparsity instead of fighting a dense cov
 
 ## The assignment
 
-Implement the four EKF-SLAM operations in C++. The motion and measurement primitives, the
-pybind11 bindings, the CMake build, the simulator, the tests, and the Rerun visualization
-are provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
+1. [`slam_predict()`](ekf_slam.cpp) in `ekf_slam.cpp`
+2. [`slam_add_landmark()`](ekf_slam.cpp) in `ekf_slam.cpp`
+3. [`slam_update()`](ekf_slam.cpp) in `ekf_slam.cpp`
+4. [`slam_associate()`](ekf_slam.cpp) in `ekf_slam.cpp`
 
-`ekf_slam.cpp` holds four holes:
-
-- `slam_predict` - move the robot through the motion model and propagate the covariance,
-  including the robot-map cross blocks.
-- `slam_add_landmark` - the inverse measurement model and the covariance augmentation that
-  grows the state by two when a landmark is first seen.
-- `slam_update` - the EKF measurement update for a known landmark, assembling the sparse $H$
-  and running the Joseph-form update over the full joint state.
-- `slam_associate` - nearest-neighbor data association with the chi-square Mahalanobis gate.
-
-`models.cpp` (the unicycle `robot_f`/`robot_F_x` and the range-bearing
-`range_bearing`/`range_bearing_H_robot`/`range_bearing_H_land`, carried over from the Kalman
-assignment) is provided and compiled in both builds; call those, do not reimplement them.
-Each hole's contract is in the comment at its hole and in `ekf_slam.hpp`; the math is in the
-lecture notes. The reference is in `solution/ekf_slam.cpp`. You may not include an existing
-SLAM or solver library; a test scans the sources.
+You may not include an existing SLAM or solver library; a test scans the sources.
 
 ### Building and running
 

@@ -237,26 +237,12 @@ vision side affects the result. This assignment keeps the ViT frozen, the simple
 
 ## The assignment
 
-Implement four mechanism bodies, the interface itself. The frozen ViT wiring, the token embedding,
-the decoder-only language model, the output head, the stage toggle, greedy generation, the AnyRes
-functions, the config, and the viz are provided. The ViT comes from `nanovision.vit`, the decoder
-and causal mask from `nanovision.transformer`, and the multi-head attention the resampler uses from
-`nanovision.attention`. Each hole's docstring gives the exact signatures, shapes, and the label-build
-recipe; read those in the files. This section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-`projector.py` holds `MLPProjector.forward`, the per-patch 2-layer MLP from the connector-families
-section ($\text{Linear} \to \text{GELU} \to \text{Linear}$, one visual token per patch).
-
-`resampler.py` holds `PerceiverResampler.forward`, the single cross-attention resampler ($Q$ learned
-queries attend once over the projected patch features, output length $Q$ for any $N$).
-
-`vlm.py` holds the two interface holes. Write `prepend_visual` (concatenate visual tokens then text
-embeddings along the sequence axis, the LLaVA injection point) and `vlm_loss` (masked next-token
-cross-entropy over the text positions only, via the fill-$(-100)$, write-text-slice, re-mask-pads,
-shift-and-reduce recipe).
-
-`anyres.py` is provided (the token-count arithmetic and the tiling reshape); no hole, but the AnyRes
-section above explains the count the test checks.
+1. [`MLPProjector.forward()`](projector.py) in `projector.py`
+2. [`PerceiverResampler.forward()`](resampler.py) in `resampler.py`
+3. [`prepend_visual()`](vlm.py) in `vlm.py`
+4. [`vlm_loss()`](vlm.py) in `vlm.py`
 
 ### Running and validating
 

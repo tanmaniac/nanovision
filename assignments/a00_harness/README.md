@@ -157,22 +157,12 @@ estimate of its gradient magnitude.
 
 ## The assignment
 
-Implement the three primitives and one optimization step. Each task maps to one
-`NotImplementedError` in a top-level file and to one test. The gradient checker, the shape helper,
-the determinism helpers, the toy datasets, the rest of the trainer, and the plotting are provided.
-The docstrings in each file give the exact formulas, shapes, and conventions; read those in the
-files rather than here.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`primitives.py` holds the three primitives. Implement `gelu` (the exact error-function GELU from the
-GELU section), `LayerNorm.forward` (the normalize-then-scale from the layer-normalization section,
-built from mean and biased-variance operations rather than `nn.LayerNorm`), and `MLP.forward` (the
-two-layer position-wise feed-forward from the MLP section).
-
-`trainer.py` holds the training loop. Implement `Trainer.step`, the single optimization step from the
-optimization-step section. The provided `overfit_one_batch` and `fit` both call `step`, so a correct
-step is what lets either of them drive a loss down.
+1. [`gelu()`](primitives.py) in `primitives.py`
+2. [`LayerNorm.forward()`](primitives.py) in `primitives.py`
+3. [`MLP.forward()`](primitives.py) in `primitives.py`
+4. [`Trainer.step()`](trainer.py) in `trainer.py`
 
 ### Running and validating
 

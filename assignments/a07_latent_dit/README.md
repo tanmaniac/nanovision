@@ -204,27 +204,15 @@ flowchart LR
 
 ## The assignment
 
-Implement the VAE's stochastic pieces and the DiT's conditioning block. Each file's docstrings
-give the exact signatures, shapes, reduction conventions, and the $t=0$ noise / $t=1$ data flow
-convention (do not flip it). Read those in the files; this section says which file maps to which
-concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`vae.py` is the KL-VAE. Implement `reparameterize` (the reparameterization trick from the KL-VAE
-section), `kl_divergence` (the closed-form diagonal-Gaussian KL), and `vae_loss` (the per-image
-reconstruction plus $\beta\cdot\text{KL}$). The encoder, decoder, and the `KLVAE` module are
-provided.
-
-`dit.py` is the diffusion transformer. Implement `modulate` (the adaLN affine, with the
-broadcast unsqueeze), `patchify` and `unpatchify` (the exact-inverse latent-to-token reshape from
-the DiT section), and `DiTBlock.forward` (the adaLN-Zero block with its two gated residual
-branches). The timestep embedding, the block wiring with its zero-init conditioning MLP, and the
-full `DiT` module are provided.
-
-The flow-matching loss and Euler sampler (`flow.py`, the linear-interpolant objective from the
-flow-matching assignment with a class label added), the config, the toy shape-image data
-(`nanovision.data.toy.diffusion_image_batch`), and `viz.py` are provided.
+1. [`reparameterize()`](vae.py) in `vae.py`
+2. [`kl_divergence()`](vae.py) in `vae.py`
+3. [`vae_loss()`](vae.py) in `vae.py`
+4. [`modulate()`](dit.py) in `dit.py`
+5. [`patchify()`](dit.py) in `dit.py`
+6. [`unpatchify()`](dit.py) in `dit.py`
+7. [`DiTBlock.forward()`](dit.py) in `dit.py`
 
 ### Running and validating
 

@@ -214,28 +214,13 @@ back-ends.
 
 ## The assignment
 
-Implement the covariance factorization, the EWA projection, and the rasterizer. The
-`GaussianModel` parameter container (with its sigmoid opacity and color and its random
-initializer), the projection wiring, the opacity prune, the config, and the viz are provided.
-Each file's docstrings give the exact signatures, shapes, and conventions (the quaternion order
-$(w,x,y,z)$ with the real part first, the dilation value, and which transform's rotation block to
-use). Read those in the files; this section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`gaussian.py` is the representation. Implement `quat_to_rotmat` (normalize the quaternion, build
-the $3\times3$ rotation) and `build_covariance_3d` (the $\Sigma = RSS^\top R^\top$ factorization
-from the covariance section).
-
-`project.py` is the EWA projection. Implement `perspective_jacobian` (the $2\times3$ Jacobian of
-the pinhole projection, per Gaussian, at the camera-space mean) and `project_cov_to_2d` (the EWA
-covariance projection $JW\Sigma W^\top J^\top + \lambda I$, with $W$ the world-to-camera
-rotation).
-
-`render.py` is the rasterizer. Implement `splat_render`: depth-sort the Gaussians and gather the
-per-Gaussian tensors, invert each conic once, evaluate the 2D Gaussian per pixel with $\alpha$
-clamped at $0.99$, and composite front to back with the exclusive transmittance. Keep the depth
-sort out of the gradient path; gradients flow through the gathered values.
+1. [`quat_to_rotmat()`](gaussian.py) in `gaussian.py`
+2. [`build_covariance_3d()`](gaussian.py) in `gaussian.py`
+3. [`perspective_jacobian()`](project.py) in `project.py`
+4. [`project_cov_to_2d()`](project.py) in `project.py`
+5. [`splat_render()`](render.py) in `render.py`
 
 The rasterizer is assignment-local and not reused downstream, so these files are imported by bare
 name rather than through a `nanovision` shim.

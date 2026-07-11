@@ -184,33 +184,17 @@ drifts out of alignment.
 
 ## The assignment
 
-Implement the reference pillars, their projection, the spatial cross-attention (both paths), the
-ego-motion warp, the temporal self-attention, and the assembled encoder and segmentation head. The
-config, the module skeletons, the shared reduction helper, and the toy scene generator are
-provided. The file docstrings give the exact signatures, shapes, and conventions (the BEV tensor is
-$(C, n_x, n_y)$ with $n_x$ along ego forward; the grid_sample coords are $(g_x, g_y)$); read those,
-this section maps each piece to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
+1. [`bev_reference_points()`](bevformer.py) in `bevformer.py`
+2. [`project_reference_points()`](bevformer.py) in `bevformer.py`
+3. [`SpatialCrossAttention.forward()`](bevformer.py) in `bevformer.py`
+4. [`warp_bev()`](bevformer.py) in `bevformer.py`
+5. [`TemporalSelfAttention.forward()`](bevformer.py) in `bevformer.py`
+6. [`BEVFormerEncoder.forward()`](bevformer.py) in `bevformer.py`
+7. [`BEVFormerSeg.forward()`](bevformer.py) in `bevformer.py`
 
 Everything is in `bevformer.py`; the shared library re-exports these through `nanovision.bevformer`.
-
-`bev_reference_points` builds the ego-frame pillars from the reference-pillars section.
-
-`project_reference_points` projects the pillars to grid_sample coords and the in-frame mask from
-the projection section, reusing the camera-geometry `world_to_pixel` and normalizing by the full
-image size.
-
-`SpatialCrossAttention.forward` is the query-pull view transform from the spatial-cross-attention
-section: the simplified bilinear-sample path and the deformable-offset path, both through the
-shared height/hit-view reduction helper.
-
-`warp_bev` is the ego-motion affine warp from the ego-motion-warp section, with the $+2k/n$ sign.
-
-`TemporalSelfAttention.forward` is the 2-key attention over query and warped history.
-
-`BEVFormerEncoder.forward` and `BEVFormerSeg.forward` stack the layers (temporal self-attention,
-spatial cross-attention, feed-forward) and add the seg head.
 
 The `BEVFormerConfig`, the module `__init__`s, the shared `_reduce_over_heights_and_views` helper,
 and the `bev_multicam_scene` generator are provided.

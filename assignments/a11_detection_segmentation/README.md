@@ -273,31 +273,12 @@ loss built here are the core of all of these.
 
 ## The assignment
 
-Implement generalized IoU, the Hungarian matching cost, and the set-prediction loss. The ViT
-backbone, the query decoder, and the output heads are provided, since the lesson is the
-cost-versus-loss separation and the one-to-one matching, not the network. Each file's
-docstrings give the exact signatures, shapes, and the index conventions (boxes are normalized
-cxcywh in $[0, 1]$, the model emits $N = 10$ query slots over $C+1$ classes with the last as
-no-object). Read those in the files; this section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`boxes.py` holds the box geometry. Write `box_xyxy_to_cxcywh` (the format inverse, the center
-is the corner midpoint and the width/height the corner differences) and `generalized_iou`
-(the GIoU score from the generalized-IoU section, with the clamped intersection and the
-$\varepsilon$ in both denominators). `box_cxcywh_to_xyxy` is provided.
-
-`matcher.py` is the cost side. Write `HungarianMatcher.forward`, which builds the per-image
-cost matrix from the three terms in the matching-cost section and solves the one-to-one
-assignment with `scipy.optimize.linear_sum_assignment` on the detached numpy matrix. The whole
-call runs under `torch.no_grad()` and returns index tensors, so no gradient flows through it.
-
-`loss.py` is the loss side. Write `detr_loss`, the differentiable objective from the
-set-prediction-loss section: the weighted cross-entropy with the no-object downweight over all
-queries, plus L1 and $1 - \mathrm{GIoU}$ on the matched pairs only.
-
-`model.py` (`DETR`, the ViT backbone, query decoder, and heads), `config.py`, `viz.py`, and
-the colored-squares toy (`nanovision.data.toy.detection_batch`) are provided.
+1. [`box_xyxy_to_cxcywh()`](boxes.py) in `boxes.py`
+2. [`generalized_iou()`](boxes.py) in `boxes.py`
+3. [`HungarianMatcher.forward()`](matcher.py) in `matcher.py`
+4. [`detr_loss()`](loss.py) in `loss.py`
 
 ### Running and validating
 

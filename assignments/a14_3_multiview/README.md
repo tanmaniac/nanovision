@@ -206,32 +206,18 @@ assignment is the back-end that refines many poses and points jointly.
 
 ## The assignment
 
-Implement the multi-view estimators in C++. The SE(3) retraction and the pinhole helpers, the
-pybind11 bindings, the CMake build, the synthetic scenes, the tests, and the Rerun
-visualization are provided.
+Fill these holes, in order. Each is one `NOT_IMPLEMENTED` throw with a matching test; the declaration and comments in each file give the signature and shapes.
 
-### Files to modify
-
-`multiview.cpp` holds the estimators:
-
-- `triangulate_dlt` and `triangulate_refine` - linear triangulation and its Gauss-Newton
-  refinement.
-- `eight_point` - the normalized eight-point algorithm (Hartley normalization, the null
-  vector, rank-2 enforcement, denormalization), returning $F$ on pixels or $E$ on rays.
-- `decompose_essential` and `recover_pose` - the four-fold decomposition of $E$ and the
-  cheirality test that picks the physical pose.
-- `pnp_dlt` and `pnp_refine` - the DLT pose initialization and the SE(3) Gauss-Newton
-  refinement.
-- `sampson_distance` - the per-correspondence first-order geometric error.
-- `ransac_fundamental` and `two_view_relative_pose` - the robust fundamental-matrix estimator
-  and the composed two-view front-end.
-
-`models.cpp` (the SE(3) `se3_exp`, the skew operator `hat3`, and the pinhole
-`pinhole_project`/`pinhole_jacobian`, carried over from the Lie-group and camera-geometry
-assignments) is provided and compiled in both builds; call those, do not reimplement them.
-Each hole's contract is in the comment at the hole and in `multiview.hpp`; the math is in the
-lecture notes. The reference is in `solution/multiview.cpp`. You may not include an existing
-vision or solver library; a test scans the sources.
+1. [`triangulate_dlt()`](multiview.cpp) in `multiview.cpp`
+2. [`triangulate_refine()`](multiview.cpp) in `multiview.cpp`
+3. [`eight_point()`](multiview.cpp) in `multiview.cpp`
+4. [`decompose_essential()`](multiview.cpp) in `multiview.cpp`
+5. [`recover_pose()`](multiview.cpp) in `multiview.cpp`
+6. [`pnp_dlt()`](multiview.cpp) in `multiview.cpp`
+7. [`pnp_refine()`](multiview.cpp) in `multiview.cpp`
+8. [`sampson_distance()`](multiview.cpp) in `multiview.cpp`
+9. [`ransac_fundamental()`](multiview.cpp) in `multiview.cpp`
+10. [`two_view_relative_pose()`](multiview.cpp) in `multiview.cpp`
 
 ### Building and running
 

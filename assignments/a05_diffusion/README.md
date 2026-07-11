@@ -234,36 +234,19 @@ flowchart TD
 
 ## The assignment
 
-Implement the diffusion math and two pieces of the denoiser; the U-Net body, the config,
-the toy data, and the visualization script are provided. Each file's docstrings give the exact
-signatures, shapes, and index conventions, including the schedule convention (length-$T$
-arrays, `alphas_bar[0]` the least noised level, `alphas_bar[T-1]` $\approx 0$ pure noise, with
-$\bar\alpha_{-1} := 1$ for the clean image at the $t=0$ boundary). Read those in the files; this
-section says which file maps to which concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`schedule.py` builds the noise schedules. Write `cosine_alpha_bar`, the cosine schedule
-from the noise-schedules section; `linear_alpha_bar` and the `gather` indexing helper are
-provided.
-
-`diffusion.py` is the diffusion core. Write `q_sample` (the closed-form forward process),
-`v_target` (the $v$ target from the three-targets table), `to_x0_eps` (the three
-parameterization conversions in that table), `score_from_eps` (the Tweedie score), and
-`diffusion_loss` (the MSE objective with classifier-free-guidance label dropout and the
-parameterization-specific Min-SNR weighting).
-
-`sampling.py` is the samplers. Write `classifier_free_guidance` (the guidance combine),
-`ddpm_sample` (the ancestral sampler with its posterior mean and $\tilde\beta_t$/$\beta_t$
-variance), and `ddim_sample` (the DDIM step with $\sigma_t(\eta)$). The two-pass guidance call
-and the $\hat x_0$ clamping live in the provided `_predict`, so the sampler holes are only the
-update equations.
-
-`unet.py` is the denoiser. Write `timestep_embedding` (the sinusoidal embedding) and the
-AdaGN injection line in `ResBlock.forward` (project the time+class embedding to the block's
-channels and add it as a per-channel shift). The U-Net body, `config.py`, the toy data
-(`nanovision.data.toy.diffusion_image_batch`, three shape classes with wide intra-class
-position and size variation, values in $[-1,1]$), and `viz.py` are provided.
+1. [`cosine_alpha_bar()`](schedule.py) in `schedule.py`
+2. [`q_sample()`](diffusion.py) in `diffusion.py`
+3. [`v_target()`](diffusion.py) in `diffusion.py`
+4. [`to_x0_eps()`](diffusion.py) in `diffusion.py`
+5. [`score_from_eps()`](diffusion.py) in `diffusion.py`
+6. [`diffusion_loss()`](diffusion.py) in `diffusion.py`
+7. [`classifier_free_guidance()`](sampling.py) in `sampling.py`
+8. [`ddpm_sample()`](sampling.py) in `sampling.py`
+9. [`ddim_sample()`](sampling.py) in `sampling.py`
+10. [`timestep_embedding()`](unet.py) in `unet.py`
+11. [`ResBlock.forward()`](unet.py) in `unet.py`
 
 ### Running and validating
 

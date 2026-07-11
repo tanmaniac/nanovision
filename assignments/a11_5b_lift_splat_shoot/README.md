@@ -171,12 +171,6 @@ metric-precision gap BEVDepth's supervision closes.
 
 ## The assignment
 
-Implement the depth-and-context lift, the frustum, the sort-and-cumsum splat, the assembled
-model, and the BEVDepth depth loss. The backbone, BEV encoder, segmentation head, the precomputed
-pixel-center grid, and the toy-scene generator are provided. The file docstrings give the exact
-signatures, shapes, and index conventions; read those, this section maps each piece to the
-concept above.
-
 The toy fixes the config so the geometry stays small and exactly checkable. Depth bin centers are
 `arange(d_min, d_max, d_step)` exclusive of `d_max`, so $d_{\min}=1$, $d_{\max}=9$,
 $d_{\text{step}}=1$ gives $D=8$ centers $[1, \dots, 8]$ and the deepest reachable point is 8 m
@@ -187,25 +181,18 @@ cell at $(i, j)$ corresponds to image pixel $((j+0.5)s, (i+0.5)s)$ for backbone 
 index $ix\cdot n_y + iy$ and the reshape $(n_x n_y, C)\to(C, n_x, n_y)$ are used everywhere, so
 the ground truth and the seg head are both $(n_x, n_y)$.
 
-### Files to modify
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
+
+1. [`DepthLift.forward()`](lift_splat.py) in `lift_splat.py`
+2. [`DepthLift.lift()`](lift_splat.py) in `lift_splat.py`
+3. [`frustum_points()`](lift_splat.py) in `lift_splat.py`
+4. [`pillar_index()`](lift_splat.py) in `lift_splat.py`
+5. [`cumsum_pool()`](lift_splat.py) in `lift_splat.py`
+6. [`LiftSplatShoot.forward()`](lift_splat.py) in `lift_splat.py`
+7. [`bevdepth_depth_loss()`](lift_splat.py) in `lift_splat.py`
 
 Everything is in `lift_splat.py`; the shared library re-exports these through
 `nanovision.lift_splat`.
-
-`DepthLift.forward` and `DepthLift.lift` are the two conv heads and the outer-product lift from
-the lift section.
-
-`frustum_points` is the per-cell, per-depth frustum into ego-frame 3-D points from the frustum
-section, reusing the camera-geometry primitives and the $E^{-1}$ inverse.
-
-`pillar_index` and `cumsum_pool` are the splat: the ego $(x, y)$ to flat BEV index ($-1$ out of
-bounds) and the sort-and-cumsum pooling from the splat section.
-
-`LiftSplatShoot.forward` assembles backbone, lift, frustum, splat, and the BEV head for one
-camera (batch handled as 1).
-
-`bevdepth_depth_loss` is the BEVDepth depth-supervision cross-entropy from the supervised-depth
-section, over the labeled cells, $0$ when no cell is labeled.
 
 The `LSSConfig`, the backbone / BEV encoder / seg-head modules, the precomputed pixel-center grid,
 and the `bev_toy_scene` generator are provided.

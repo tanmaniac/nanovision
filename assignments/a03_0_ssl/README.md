@@ -198,19 +198,15 @@ what CLIP buys by paying for paired text.
 
 ## The assignment
 
-Implement six mechanism bodies, three in `mae.py` and three in `dino.py`. The ViT backbone, the
-patchify and unpatchify helpers, the MAE module wiring, the DINO student/teacher construction,
-the multi-crop augmentation, the projection head, and the training-step wiring are provided in
-`backbone.py` and the module classes. Each hole's docstring gives the exact signatures, shapes,
-and index conventions; read those in the files. This section maps each file to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-`mae.py` holds the three MAE mechanisms. Write `random_masking` (the shuffle-keep-unshuffle
-masking from the MAE section), `append_mask_tokens` (the decoder-side reassembly that inverts the
-shuffle), and `mae_loss` (MSE on masked patches only, per-patch-normalized target).
-
-`dino.py` holds the three DINO mechanisms. Write `dino_loss` (the cross-view distillation loss
-with centering and sharpening), the pair `ema_update` and `update_center` (the EMA teacher and
-the centering-buffer update), and `teacher_entropy` (the collapse instrument the test reads).
+1. [`random_masking()`](mae.py) in `mae.py`
+2. [`append_mask_tokens()`](mae.py) in `mae.py`
+3. [`mae_loss()`](mae.py) in `mae.py`
+4. [`dino_loss()`](dino.py) in `dino.py`
+5. [`ema_update()`](dino.py) in `dino.py`
+6. [`update_center()`](dino.py) in `dino.py`
+7. [`teacher_entropy()`](dino.py) in `dino.py`
 
 ### Running and validating
 

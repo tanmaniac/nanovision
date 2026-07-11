@@ -201,31 +201,14 @@ trajectories in exchange for following instructions and explaining themselves.
 
 ## The assignment
 
-Implement the RoI-align, the mode-query decoder, the winner-take-all loss (both paths), and the
-three oracle metrics. The attention comes from the transformer assignment via
-`nanovision.attention`, never from `torch.nn` high-level modules; the config and the toy scene
-generator are provided. The file docstrings give the exact signatures, shapes, and the pinned
-`grid_sample` axis swap; read those, this section maps each hole to the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-All the holes are in `predict.py`, an assignment-local file imported bare by the tests.
-
-`roi_align_bev` is the RoI-align from the RoI-align section, including the
-$(g_w{=}n_y, g_h{=}n_x)$ axis swap and the border padding.
-
-`MultimodalTrajectoryHead.forward` is the mode-query decoder from that section: RoI-align, project,
-expand the distinct mode queries over the agents, run the decoder layers (mode self-attention,
-cross-attention over RoI tokens, MLP), then the displacement-cumsum trajectory head and the score
-head.
-
-`wta_loss` is the winner-take-all loss from the loss and dead-mode sections: the hard min-of-N path,
-the soft/annealed path, and the shared classification term.
-
-`min_ade`, `min_fde`, and `miss_rate` are the oracle metrics from that section, all best-of-K by
-minFDE.
-
-The `PredConfig`, the `_train.py` training harness, and the `pred_toy_scene` generator are provided.
+1. [`roi_align_bev()`](predict.py) in `predict.py`
+2. [`MultimodalTrajectoryHead.forward()`](predict.py) in `predict.py`
+3. [`wta_loss()`](predict.py) in `predict.py`
+4. [`min_ade()`](predict.py) in `predict.py`
+5. [`min_fde()`](predict.py) in `predict.py`
+6. [`miss_rate()`](predict.py) in `predict.py`
 
 ### Running and validating
 

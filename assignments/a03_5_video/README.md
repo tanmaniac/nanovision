@@ -126,21 +126,11 @@ tokenization.
 
 ## The assignment
 
-Implement three mechanism bodies, one shared and two local. The tubelet helpers
-(`tubeletify`/`untubeletify`/`per_tubelet_normalize`), the video ViT encoder, the mask-token
-reassembly (`_append_mask_tokens`, the same contract as the image MAE), and the `VideoMAE` module
-wiring are provided in `backbone.py` and `video_mae.py`. Each hole's docstring gives the exact
-signatures, shapes, and index conventions; read those in the files. This section maps each file to
-the concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-`tubelet.py` holds `TubeletEmbedding.forward`, the tubelet embedding from the first lecture-note
-section. It is the one shared-library symbol this assignment adds, exposed as
-`nanovision.transformer.TubeletEmbedding`. Applying a time axis is one more strided convolution
-dimension, not a new mechanism.
-
-`video_mae.py` holds the two video-specific holes. Write `tube_masking` (the structured tube mask
-that drops whole spatiotemporal tubes, the centerpiece) and `video_mae_loss` (the masked-tubelet
-MSE, which is the image MAE loss on a bigger patch).
+1. [`TubeletEmbedding.forward()`](tubelet.py) in `tubelet.py`
+2. [`tube_masking()`](video_mae.py) in `video_mae.py`
+3. [`video_mae_loss()`](video_mae.py) in `video_mae.py`
 
 ### Running and validating
 

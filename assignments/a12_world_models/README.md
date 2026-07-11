@@ -302,36 +302,23 @@ interface a world model for control needs.
 
 ## The assignment
 
-Implement the RSSM cell, the world-model ELBO, and the imagined actor-critic; the CNN
-encoder/decoder, the network bodies, the collect-fit-imagine training loop, the dm_control
-environment wrapper, and the visualization script are provided. The docstrings in each file give the
-signatures, shapes, and index conventions (length-$T$ arrays, the action-as-float convention, the
-state layout); read those in the files. This section says which file maps to which concept from the
-notes.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`nets.py` carries the scalar-target encodings and the categorical sampler. Implement `symlog` /
-`symexp` (the scale-invariant transform), `twohot_encode` / `twohot_decode` (the two-hot encoding
-over symlog-space bins), and `categorical_sample` (the unimix blend plus the straight-through
-estimate).
-
-`rssm.py` is the RSSM cell. Implement `forward_h` (the GRU recurrence, one-hotting an integer action
-and passing a continuous $(B, 1)$ float through unchanged), `prior` (the transition prior head), and
-`posterior` (the observation-conditioned head). These three are the deterministic-plus-stochastic
-latent split from the notes.
-
-`world_model.py` is the sequence-VAE objective. Implement `kl_loss` (the two-term DreamerV3 KL with
-free bits on the summed-over-heads scalar) and `WorldModel.loss` (the ELBO assembly: reconstruction
-against `symlog(obs)`, the two-hot reward loss, the Bernoulli continuation loss, and the KL).
-
-`actor_critic.py` is behavior learning in imagination. Implement `compute_lambda_returns` (the
-backward recursion bootstrapping on $V_{t+1}$), `critic_loss` (two-hot regression onto the detached
-returns), `imagine_dynamics` (the differentiable prior-only rollout that reads the reward of $a_t$
-from the post-action state and keeps the whole graph attached, with no `no_grad`), and
-`actor_loss_dynbackprop` (the negative normalized return minus the entropy bonus, with no log-prob).
-The discrete `Actor` and its REINFORCE `actor_loss` stay in the file as the labeled contrast that
-motivates the continuous gradient.
+1. [`symlog()`](nets.py) in `nets.py`
+2. [`symexp()`](nets.py) in `nets.py`
+3. [`twohot_encode()`](nets.py) in `nets.py`
+4. [`twohot_decode()`](nets.py) in `nets.py`
+5. [`categorical_sample()`](nets.py) in `nets.py`
+6. [`RSSMCell.forward_h()`](rssm.py) in `rssm.py`
+7. [`RSSMCell.prior()`](rssm.py) in `rssm.py`
+8. [`RSSMCell.posterior()`](rssm.py) in `rssm.py`
+9. [`kl_loss()`](world_model.py) in `world_model.py`
+10. [`WorldModel.loss()`](world_model.py) in `world_model.py`
+11. [`compute_lambda_returns()`](actor_critic.py) in `actor_critic.py`
+12. [`critic_loss()`](actor_critic.py) in `actor_critic.py`
+13. [`imagine_dynamics()`](actor_critic.py) in `actor_critic.py`
+14. [`actor_loss_dynbackprop()`](actor_critic.py) in `actor_critic.py`
+15. [`actor_loss()`](actor_critic.py) in `actor_critic.py`
 
 ### Running and validating
 

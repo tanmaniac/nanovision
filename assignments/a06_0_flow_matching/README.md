@@ -164,34 +164,16 @@ special cases.
 
 ## The assignment
 
-Implement the flow-matching mechanism, tested on a 2D velocity MLP (provided) where the field
-and trajectories are visible. Each file's docstrings give the exact signatures, shapes, and
-the $t=0$ noise / $t=1$ data convention. Read those in the files; this section says which file
-maps to which concept above.
+Fill these holes, in order. Each is one `NotImplementedError` with a matching test; the docstring in each file gives the signature, shapes, and constraints.
 
-### Files to modify
-
-`path.py` is the linear conditional path. Implement `linear_path` (the straight line
-$x_t = (1-t)x_0 + t x_1$) and `linear_velocity` (its constant velocity $x_1 - x_0$) from the
-linear-path section.
-
-`timesteps.py` is timestep sampling. Implement `sample_timesteps` with both the uniform and
-the logit-normal cases from the logit-normal-timesteps section.
-
-`flow.py` is the training objective and the diffusion bridge. Implement `cfm_loss` (the
-unweighted MSE against $x_1 - x_0$) and `score_from_velocity` (the score-velocity relation
-$\text{score} = (t v - x_t)/(1-t)$).
-
-`coupling.py` is the optimal-transport pairing. Implement `ot_coupling`: build the squared-L2
-cost, solve the assignment with the Hungarian algorithm
-(`scipy.optimize.linear_sum_assignment`), and reorder $x_1$.
-
-`sampling.py` is the sampler and the metric. Implement `euler_sample` (the forward-Euler
-integration) and `straightness` (the rectified-flow straightness over the Euler trajectory).
-
-The 2D velocity MLP (`model.py`), the reflow-pair generation (`reflow.py`, just `euler_sample`
-plus pairing), the config, the toy 2D data (`nanovision.data.toy.eight_gaussians` and
-`two_moons`), and `viz.py` are provided.
+1. [`linear_path()`](path.py) in `path.py`
+2. [`linear_velocity()`](path.py) in `path.py`
+3. [`sample_timesteps()`](timesteps.py) in `timesteps.py`
+4. [`cfm_loss()`](flow.py) in `flow.py`
+5. [`score_from_velocity()`](flow.py) in `flow.py`
+6. [`ot_coupling()`](coupling.py) in `coupling.py`
+7. [`euler_sample()`](sampling.py) in `sampling.py`
+8. [`straightness()`](sampling.py) in `sampling.py`
 
 ### Running and validating
 
