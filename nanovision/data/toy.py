@@ -3,6 +3,7 @@
 """
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 
 
@@ -780,6 +781,232 @@ def bev_multicam_scene(
         "vehicles": veh_ego.to(device),
         "occluded_cells": occluded_cells.to(device),
     }
+
+
+def bev_fusion_scene(
+    n_vehicles: int = 3,
+    n_clutter: int = 3,
+    bev_x: tuple[float, float] = (0.0, 8.0),
+    bev_y: tuple[float, float] = (-8.0, 8.0),
+    res: float = 1.0,
+    img: int = 32,
+    stride: int = 4,
+    d_min: float = 1.0,
+    d_max: float = 9.0,
+    focal: float | None = None,
+    cam_height: float = 1.5,
+    vehicle_z: float = 0.75,
+    points_per_blob: int = 40,
+    n_ground: int = 80,
+    seg_temp: float = 1.5,
+    seg_noise: float = 0.2,
+    smear: int = 0,
+    seed: int = 0,
+    device: str = "cpu",
+) -> dict:
+    """A single-camera + LiDAR scene for multi-modal fusion (A11.5f).
+
+    The scene is built so neither modality alone recovers vehicle occupancy, and their
+    complementary failures are the fusion lesson:
+
+    - Vehicle blobs are the ground-truth occupancy. Each has a LiDAR point cluster and a
+      vehicle-class image blob, and the camera BEV feature places its vehicle score at the
+      vehicle cell but SMEARED forward by ``smear`` cells (a stand-in for the camera's depth
+      ambiguity). So camera alone knows a vehicle is present but not its exact forward cell.
+    - Clutter blobs are non-vehicle objects with the SAME LiDAR footprint and the SAME point
+      count as vehicles (matched density), rendered in a distinct color that the segmenter reads
+      as background. So LiDAR alone cannot separate a clutter cell from a vehicle cell (identical
+      geometry and density), while the camera can (clutter carries no vehicle score).
+    - ``seg_scores`` are degraded (label noise, boundary blur, a softmax temperature) so the
+      camera signal is imperfect, not a clean copy of the answer.
+
+    A LiDAR-only head over-predicts the clutter cells; a camera-only head over-predicts the smear
+    cells; a fused head that keeps LiDAR geometry (occupied vs empty) and camera semantics
+    (vehicle vs background) can reject both. Whether fusion beats each single modality by a
+    reliable margin is measured on disk across seeds before any test pins it.
+
+    Conventions match ``bev_toy_scene``: ego frame x forward, y left, z up; camera frame OpenCV
+    x right, y down, z forward; the extrinsic E is T_cam_ego (ego -> camera). The forward camera
+    makes camera-frame depth equal the ego forward coordinate x, so blobs are placed with
+    x in [d_min, d_max) to stay in the image. LiDAR points are returned already in the EGO frame
+    (the nuScenes loader instead returns lidar-frame points plus lidar_to_ego; move them with
+    apply_transform before use).
+
+    Args:
+        n_vehicles: number of vehicle blobs (the ground-truth occupancy).
+        n_clutter: number of clutter blobs (matched LiDAR, background class).
+        bev_x, bev_y: ego BEV extent (meters); bev_x forward extent must lie within [d_min, d_max].
+        res: BEV cell size (meters), square cells. Grid is (nx, ny), nx along x, ny along y.
+        img: square image side (pixels).
+        stride: backbone downsample; the feature grid is (img // stride) per side (unused here,
+            kept for parity with the config).
+        d_min, d_max: reachable forward-depth band for placing blobs.
+        focal: pinhole focal (pixels); defaults to img / 2 (~90 degree FOV).
+        cam_height: camera height above the ego origin (meters).
+        vehicle_z: blob centroid height (meters); LiDAR points spread from the ground to it.
+        points_per_blob: LiDAR points per blob, identical for vehicles and clutter.
+        n_ground: sparse ground points spread over the grid at z ~ 0.
+        seg_temp: softmax temperature for seg_scores (>1 softens the class scores).
+        seg_noise: std of Gaussian logit noise added before the softmax (label-noise degradation).
+        smear: camera-BEV column extent in cells around each vehicle (0 = the full forward
+            column, the depth-ambiguity stand-in; a positive value bounds it to +/- smear cells).
+        seed: RNG seed (deterministic placement).
+        device: target device for returned tensors.
+
+    Returns:
+        dict with:
+            image: (1, 3, img, img) in [0, 1].
+            K: (3, 3) pinhole intrinsic.
+            E: (4, 4) T_cam_ego extrinsic (ego -> camera).
+            seg_scores: (C, img, img) soft per-pixel class scores; C = 2 (background, vehicle),
+                degraded and summing to 1 over the class axis.
+            lidar: (N, 3) ego-frame LiDAR points (vehicle + clutter + ground).
+            bev_gt: (nx, ny) float in {0, 1}, vehicle occupancy on the BEV grid.
+            cam_bev: (C, nx, ny) camera BEV feature: the per-class score splatted to BEV with the
+                forward depth smear (the camera-only branch input, and the camera side of the fuse).
+            vehicle_cells: (n_vehicles, 2) long (ix, iy) of each vehicle cell.
+            clutter_cells: (n_clutter, 2) long (ix, iy) of each clutter cell.
+            image_hw: (2,) long (H, W) of the image.
+            C: int, number of seg classes (2).
+    """
+    g = torch.Generator().manual_seed(seed)
+    f = float(focal) if focal is not None else img / 2.0
+    cx = cy = (img - 1) / 2.0
+    K = torch.tensor([[f, 0.0, cx], [0.0, f, cy], [0.0, 0.0, 1.0]])
+
+    # E = T_cam_ego for a forward camera (identical to bev_toy_scene): cam x = ego -y,
+    # cam y = ego -z, cam z = ego +x.
+    R_ec = torch.tensor([[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]])
+    t_ec = -R_ec @ torch.tensor([0.0, 0.0, cam_height])
+    E = torch.eye(4)
+    E[:3, :3] = R_ec
+    E[:3, 3] = t_ec
+
+    nx = int(round((bev_x[1] - bev_x[0]) / res))
+    ny = int(round((bev_y[1] - bev_y[0]) / res))
+    C = 2  # background, vehicle
+
+    def project(x: float, y: float, z: float):
+        p_cam = R_ec @ torch.tensor([x, y, z]) + t_ec
+        depth = float(p_cam[2])
+        u = float(f * p_cam[0] / p_cam[2] + cx)
+        v = float(f * p_cam[1] / p_cam[2] + cy)
+        return u, v, depth
+
+    # Place vehicle and clutter blobs on distinct in-frame cells. Both kinds are drawn from the
+    # same spatial distribution so a clutter cell is geometrically indistinguishable from a
+    # vehicle cell; only the class differs. Vehicle and clutter use DISJOINT lateral columns (iy)
+    # so a clutter cell never shares a vehicle's camera column (see the camera BEV feature below).
+    x_lo = max(bev_x[0], float(d_min))
+    x_hi = min(bev_x[1], float(d_max))
+    used: set[tuple[int, int]] = set()
+
+    def place(n: int, forbid_cols: set[int]) -> list[tuple[int, int, float, float]]:
+        out: list[tuple[int, int, float, float]] = []
+        for _ in range(4000):
+            if len(out) == n:
+                break
+            x = x_lo + float(torch.rand(1, generator=g)) * (x_hi - x_lo)
+            y = bev_y[0] + float(torch.rand(1, generator=g)) * (bev_y[1] - bev_y[0])
+            u, v, depth = project(x, y, vehicle_z)
+            if not (0.0 <= u < img and 0.0 <= v < img and d_min <= depth <= d_max):
+                continue
+            ix = int((x - bev_x[0]) / res)
+            iy = int((y - bev_y[0]) / res)
+            if not (0 <= ix < nx and 0 <= iy < ny) or (ix, iy) in used or iy in forbid_cols:
+                continue
+            used.add((ix, iy))
+            out.append((ix, iy, x, y))
+        if len(out) < n:
+            raise ValueError(
+                f"placed only {len(out)}/{n} blobs; widen the focal or the BEV extent"
+            )
+        return out
+
+    veh = place(n_vehicles, set())
+    veh_cols = {iy for (_, iy, _, _) in veh}
+    clut = place(n_clutter, veh_cols)
+
+    # LiDAR points. Vehicle and clutter blobs share one point-generator, so their per-pillar
+    # geometry and density are identical; ground points are a thin, near-flat sprinkle.
+    def blob_points(x0: float, y0: float) -> Tensor:
+        px = x0 + (torch.rand(points_per_blob, generator=g) - 0.5) * 0.8 * res
+        py = y0 + (torch.rand(points_per_blob, generator=g) - 0.5) * 0.8 * res
+        pz = torch.rand(points_per_blob, generator=g) * vehicle_z
+        return torch.stack([px, py, pz], dim=1)
+
+    pts = []
+    for (_, _, x0, y0) in veh + clut:
+        pts.append(blob_points(x0, y0))
+    if n_ground > 0:
+        gx = bev_x[0] + torch.rand(n_ground, generator=g) * (bev_x[1] - bev_x[0])
+        gy = bev_y[0] + torch.rand(n_ground, generator=g) * (bev_y[1] - bev_y[0])
+        gz = (torch.rand(n_ground, generator=g) - 0.5) * 0.1
+        pts.append(torch.stack([gx, gy, gz], dim=1))
+    lidar = torch.cat(pts, dim=0)
+
+    # Image: vehicles in the vehicle color, clutter in a distinct color the segmenter reads as
+    # background. The vehicle probability map is the union of the vehicle blobs.
+    image = torch.full((3, img, img), 0.3)
+    veh_color = torch.tensor([1.0, 0.6, 0.2])
+    clut_color = torch.tensor([0.2, 0.4, 1.0])
+    vs, us = torch.meshgrid(
+        torch.arange(img, dtype=torch.float32),
+        torch.arange(img, dtype=torch.float32),
+        indexing="ij",
+    )
+    veh_map = torch.zeros(img, img)
+    for (_, _, x0, y0) in veh:
+        u, v, depth = project(x0, y0, vehicle_z)
+        sigma = float(min(max(8.0 / depth, 1.0), 6.0))
+        blob = torch.exp(-((us - u) ** 2 + (vs - v) ** 2) / (2.0 * sigma * sigma))
+        image = torch.maximum(image, veh_color[:, None, None] * blob[None])
+        veh_map = torch.maximum(veh_map, blob)
+    for (_, _, x0, y0) in clut:
+        u, v, depth = project(x0, y0, vehicle_z)
+        sigma = float(min(max(8.0 / depth, 1.0), 6.0))
+        blob = torch.exp(-((us - u) ** 2 + (vs - v) ** 2) / (2.0 * sigma * sigma))
+        image = torch.maximum(image, clut_color[:, None, None] * blob[None])
+
+    # seg_scores: a degraded soft class map. Blur the vehicle map (boundary blur), add Gaussian
+    # logit noise (label noise), and soften with a temperature before the softmax. The result
+    # carries an imperfect vehicle signal, not the exact answer.
+    blurred = F.avg_pool2d(veh_map[None, None], kernel_size=3, stride=1, padding=1)[0, 0]
+    veh_logit = blurred * 4.0 + torch.randn(img, img, generator=g) * seg_noise
+    bg_logit = (1.0 - blurred) * 4.0 + torch.randn(img, img, generator=g) * seg_noise
+    logits = torch.stack([bg_logit, veh_logit], dim=0) / seg_temp
+    seg_scores = F.softmax(logits, dim=0)  # (C, img, img)
+
+    # bev_gt and the camera BEV feature. A camera pixel back-projects to a BEV ray of unknown
+    # range, so the camera localizes a vehicle to its lateral column (iy) but not its forward
+    # cell (ix). cam_bev therefore spreads the vehicle score over the WHOLE forward column at each
+    # vehicle's lateral position - the depth-ambiguity stand-in. Clutter contributes only
+    # background, and clutter columns are disjoint from vehicle columns, so the vehicle score
+    # never leaks onto a clutter cell. `smear` bounds the column extent (default the full column).
+    bev_gt = torch.zeros(nx, ny)
+    cam_bev = torch.zeros(C, nx, ny)
+    cam_bev[0] = 1.0  # background prior everywhere
+    for (ix, iy, _, _) in veh:
+        bev_gt[ix, iy] = 1.0
+        lo = 0 if smear <= 0 else max(0, ix - smear)
+        hi = nx - 1 if smear <= 0 else min(nx - 1, ix + smear)
+        cam_bev[1, lo:hi + 1, iy] = 1.0
+        cam_bev[0, lo:hi + 1, iy] = 0.0
+
+    out = {
+        "image": image.clamp(0.0, 1.0)[None].to(device),
+        "K": K.to(device),
+        "E": E.to(device),
+        "seg_scores": seg_scores.to(device),
+        "lidar": lidar.to(device),
+        "bev_gt": bev_gt.to(device),
+        "cam_bev": cam_bev.to(device),
+        "vehicle_cells": torch.tensor([[c[0], c[1]] for c in veh], dtype=torch.long).to(device),
+        "clutter_cells": torch.tensor([[c[0], c[1]] for c in clut], dtype=torch.long).to(device),
+        "image_hw": torch.tensor([img, img], dtype=torch.long).to(device),
+        "C": C,
+    }
+    return out
 
 
 def occupancy_toy_scene(
