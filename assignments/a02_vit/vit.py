@@ -33,6 +33,7 @@ class PatchEmbed(nn.Module):
 
     def __init__(self, in_chans: int, dim: int, patch: int):
         super().__init__()
+        self.dim = dim
         self.patch = patch
         self.proj = nn.Conv2d(in_chans, dim, kernel_size=patch, stride=patch)
 
@@ -41,7 +42,9 @@ class PatchEmbed(nn.Module):
 
         See the patch embedding section of the README.
         """
-        raise NotImplementedError("A2 Task 2: implement PatchEmbed.forward")
+        batch_size = x.shape[0]
+        y = self.proj(x).reshape((batch_size, self.dim, -1)).permute((0, 2, 1))
+        return y
 
 
 def interpolate_pos_embed(pos_embed: Tensor, old_grid: int, new_grid: int) -> Tensor:
@@ -57,7 +60,13 @@ def interpolate_pos_embed(pos_embed: Tensor, old_grid: int, new_grid: int) -> Te
 
     See the positional-embedding interpolation section of the README.
     """
-    raise NotImplementedError("A2 Task 5: implement interpolate_pos_embed")
+    b, _, d = pos_embed.shape
+    spatial = pos_embed[:, 1 : 1 + old_grid**2]
+    spatial = spatial.reshape([b, old_grid, old_grid, d]).permute([0, 3, 1, 2])
+    spatial = F.interpolate(spatial, (new_grid, new_grid), mode="bicubic")
+    out = spatial.permute([0, 2, 3, 1]).reshape([b, -1, d])
+    out = torch.concat([pos_embed[:, 0].unsqueeze(1), out], dim=1)
+    return out
 
 
 class ViT(nn.Module):
@@ -107,7 +116,13 @@ class ViT(nn.Module):
 
         # Classic ViT block: LayerNorm + GELU MLP + non-causal; PE added above.
         self.encoder = TransformerEncoder(
-            dim, n_heads, depth, mlp_ratio=mlp_ratio, norm="layer", ffn="mlp", pos="none"
+            dim,
+            n_heads,
+            depth,
+            mlp_ratio=mlp_ratio,
+            norm="layer",
+            ffn="mlp",
+            pos="none",
         )
         self.norm = LayerNorm(dim)
         self.head = nn.Linear(dim, num_classes)
@@ -121,7 +136,12 @@ class ViT(nn.Module):
 
         See the token sequence section of the README.
         """
-        raise NotImplementedError("A2 Task 3: assemble CLS + PE + register tokens")
+        b = patches.shape[0]
+        y = torch.cat([patches, self.cls_token.expand([b, -1, -1])], dim=1)
+        y = torch.cat(
+            [y + self.pos_embed, self.register_tokens.expand([b, -1, -1])], dim=1
+        )
+        return y
 
     def _pool(self, tokens: Tensor) -> Tensor:
         """Reduce encoder output (B, 1 + N + n_reg, dim) to (B, dim).
@@ -131,7 +151,10 @@ class ViT(nn.Module):
 
         See the pooling section of the README.
         """
-        raise NotImplementedError("A2 Task 4: implement _pool (cls vs mean)")
+        if self.pool == "cls":
+            return tokens[:, 0]
+        else:
+            return torch.mean(tokens[:, 1 : 1 + self.n_patches], dim=1)
 
     def forward_features(self, x: Tensor) -> Tensor:
         """Patch-grid features for downstream use (VLM visual tokens, dense prediction).
@@ -149,7 +172,7 @@ class ViT(nn.Module):
         return tokens[:, 1 : 1 + self.n_patches]
 
     def forward(self, x: Tensor) -> Tensor:
-        patches = self.patch_embed(x)        # (B, N, dim)
+        patches = self.patch_embed(x)  # (B, N, dim)
         tokens = self._assemble_tokens(patches)
         self.seq_len = tokens.shape[1]
         tokens = self.encoder(tokens)

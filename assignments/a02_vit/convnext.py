@@ -48,4 +48,13 @@ class ConvNeXtBlock(nn.Module):
         The layer-scale gain is applied only when self.gamma is not None. See the
         ConvNeXt block section of the README.
         """
-        raise NotImplementedError("A2 Task 1: implement ConvNeXtBlock.forward")
+        y = self.dwconv(x)
+        y = torch.permute(y, [0, 2, 3, 1])
+        y = self.norm(y)
+        y = self.pw1(y)
+        y = torch.nn.functional.gelu(y)
+        y = self.pw2(y)
+        if self.gamma is not None:
+            y = y * self.gamma
+        y = torch.permute(y, [0, 3, 1, 2])
+        return y + x
