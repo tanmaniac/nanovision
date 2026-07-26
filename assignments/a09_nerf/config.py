@@ -2,7 +2,8 @@
 
 The toy is one colored solid sphere imaged from a ring of cameras at 16x16 resolution. The
 defaults keep every test on CPU in seconds: 32 samples per ray, a 128-wide MLP, 6 position
-bands. The full Lego scene (800x800, 20k+ steps, ~22 dB PSNR) is out of scope; see the README.
+bands. The full Lego scene (800x800, 100k-300k steps, 32.5 dB PSNR) is out of scope; see the
+README.
 """
 
 from dataclasses import dataclass
