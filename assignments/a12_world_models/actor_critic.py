@@ -164,7 +164,7 @@ def actor_loss_dynbackprop(returns: Tensor, entropies: Tensor, ent_coef: float,
     Returns:
         scalar actor loss.
 
-    See the dynamics backprop vs REINFORCE section of the README.
+    See the two ways to get a policy gradient section of the README.
     """
     raise NotImplementedError(
         "implement actor_loss_dynbackprop: -(returns / ret_range).mean() "
@@ -231,7 +231,7 @@ def actor_loss(logprobs: Tensor, returns: Tensor, values: Tensor, entropies: Ten
     Returns:
         scalar actor loss.
 
-    See the dynamics backprop vs REINFORCE section of the README.
+    See the two ways to get a policy gradient section of the README.
     """
     raise NotImplementedError(
         "implement actor_loss (REINFORCE): adv = (returns - values).detach() / ret_range; "

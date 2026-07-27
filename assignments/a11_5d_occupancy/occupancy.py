@@ -78,7 +78,7 @@ def inverse_frequency_weights(target: Tensor, n_classes: int, eps: float = 1.0) 
 
     Free voxels dominate the grid (often >90%), so an unweighted cross-entropy collapses to
     predicting the majority class. Inverse-frequency weighting counters this: rarer classes get
-    larger weights. See the class-imbalance section of the README.
+    larger weights. See the class imbalance and the free-class collapse section of the README.
 
     Contract: normalize the weights to mean 1 (equivalently sum to n_classes); the normalization
     is scale-only and does not change the ordering.
@@ -119,7 +119,7 @@ def occupancy_iou(
     """Mean intersection-over-union over the occupied classes.
 
     Per-class IoU averaged over the occupied classes. Two conventions this metric follows (see
-    the mIoU section of the README): class 0 = free is excluded from the mean when ignore_free,
+    the measuring occupancy section of the README): class 0 = free is excluded from the mean when ignore_free,
     so the ~95% free voxels do not dominate; and a class absent from both prediction and target
     (empty union) is excluded from the mean, the standard mIoU convention.
 
@@ -149,7 +149,7 @@ def render_occupancy_rays(
     The rendering-supervision step. Sample points along each ray, trilinearly sample the
     occupancy and semantic grids at those points, convert occupancy to density so the reused
     NeRF kernel produces the exact compositing weights, then accumulate depth and semantics.
-    See the NeRF-and-occupancy-duality section of the README (including trilinear sampling and
+    See the rendering supervision section of the README (including trilinear sampling and
     the axis order).
 
     Trilinear sampling axis order (the highest-risk line). The grid is fed to F.grid_sample as

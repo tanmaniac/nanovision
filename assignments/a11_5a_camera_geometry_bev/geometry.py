@@ -109,7 +109,7 @@ class CameraRig:
                 when image_sizes[name] is known, inside the image bounds (0 <= u < w,
                 0 <= v < h).
 
-        See the four-step lidar-to-camera-chain section of the README.
+        See the four-step lidar-to-camera chain section of the README.
         """
         raise NotImplementedError("A11.5a Task 1: implement world_to_pixel")
 
@@ -149,7 +149,7 @@ def ipm_to_bev(
     Returns:
         (C, nx, ny) BEV image. Cells with no camera coverage are zero.
 
-    See the flat-ground-IPM section of the README for the per-cell data flow (ground point,
+    See the flat-ground IPM and why it breaks section of the README for the per-cell data flow (ground point,
     projection, sample). Sampling conventions this file pins (not spelled out in the README):
     pixels are mapped to grid_sample's [-1, 1] extent with the align_corners=True map
     gx = 2u/(W-1) - 1, gy = 2v/(H-1) - 1; sampling is bilinear with zero padding; where cameras

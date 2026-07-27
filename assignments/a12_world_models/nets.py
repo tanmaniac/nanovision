@@ -115,7 +115,7 @@ def categorical_sample(logits: Tensor, unimix: float, n_cat: int, n_cls: int, gr
         z: (B, n_cat * n_cls) straight-through one-hot sample.
         probs: (B, n_cat, n_cls) the unimix-blended probabilities (used by the KL).
 
-    See the categorical latents and the straight-through estimator section of the README.
+    See the logits, one-hot samples, and the straight-through estimator section of the README.
     """
     raise NotImplementedError(
         "implement categorical_sample: reshape logits to (B, n_cat, n_cls), softmax, blend "

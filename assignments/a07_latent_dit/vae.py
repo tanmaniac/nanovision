@@ -24,7 +24,7 @@ def reparameterize(mu: Tensor, logvar: Tensor) -> Tensor:
     """Sample a latent from the encoder's Gaussian via the reparameterization trick.
 
     Routing the randomness through an external noise draw keeps the sample differentiable in
-    mu and logvar. See the KL-VAE section of the README.
+    mu and logvar. See the reparameterization trick section of the README.
     """
     raise NotImplementedError("implement the reparameterization trick")
 
@@ -32,7 +32,7 @@ def reparameterize(mu: Tensor, logvar: Tensor) -> Tensor:
 def kl_divergence(mu: Tensor, logvar: Tensor) -> Tensor:
     """KL( N(mu, sigma^2) || N(0, I) ), summed over latent dims and averaged over the batch.
 
-    Sum over the (C, H, W) latent dims, then mean over the batch. See the KL-VAE section of
+    Sum over the (C, H, W) latent dims, then mean over the batch. See the Kullback-Leibler divergence section of
     the README for the closed form.
     """
     raise NotImplementedError("implement the closed-form KL divergence")
@@ -43,7 +43,7 @@ def vae_loss(x: Tensor, x_hat: Tensor, mu: Tensor, logvar: Tensor, beta: float):
 
     Reconstruction uses the same per-image-sum, batch-mean reduction as the flow-matching
     loss. Return the three scalars (total, recon, kl) so the test and viz can see the split.
-    See the KL-VAE section of the README.
+    See the VAE loss and the KL weight section of the README.
     """
     raise NotImplementedError("implement the VAE loss (recon + beta * KL)")
 

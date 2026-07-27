@@ -8,7 +8,7 @@ backward pass - no gradient flows through the matcher. The loss (loss.py) is the
 differentiable objective computed AFTER these indices are fixed.
 
 The per-pair cost sums a class term, an L1 box term, and a GIoU term with fixed weights; see
-the bipartite-matching section of the README for the cost. The class term uses the raw
+the bipartite matching and the Hungarian algorithm section of the README for the cost. The class term uses the raw
 predicted probability of the true class (higher probability lowers the cost) while the loss
 uses cross-entropy; L1 and GIoU are the same function in both the cost and the loss.
 """
@@ -42,7 +42,7 @@ class HungarianMatcher:
         gradient (this whole call runs under no_grad and goes through numpy).
 
         Build the per-image (N, M) cost matrix from the three weighted terms (see the
-        bipartite-matching section of the README) and solve the one-to-one assignment with the
+        bipartite matching and the Hungarian algorithm section of the README) and solve the one-to-one assignment with the
         Hungarian algorithm. An image with no ground-truth objects (M_b == 0) returns two empty
         long tensors.
 

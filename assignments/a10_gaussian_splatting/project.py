@@ -10,7 +10,7 @@ Convention: OpenCV camera frame, +z forward, matching nanovision.geometry. The p
 projection is the same project_points the camera-geometry assignment uses, so the Jacobian
 below matches d(project_points)/d(x,y,z) at the mean by construction.
 
-See the "The EWA projection" section of the README for the projection.
+See the Projecting a Gaussian into the image section of the README for the projection.
 
 Assignment-local. Import bare.
 """
@@ -25,7 +25,7 @@ def perspective_jacobian(means_cam: Tensor, K: Tensor) -> Tensor:
     """The 2x3 Jacobian of the pinhole projection at each camera-space mean.
 
     This is d(project_points)/d(pts_cam) evaluated at each camera-space mean. See the
-    "The EWA projection" section of the README.
+    Projecting a Gaussian into the image section of the README.
 
     Args:
         means_cam: (N, 3) Gaussian means in the camera frame (+z forward).
@@ -49,7 +49,7 @@ def project_cov_to_2d(cov3d: Tensor, W: Tensor, J: Tensor, *, dilation: float = 
     pixel, so the closed-form 2x2 inverse used by the rasterizer is safe (the determinant
     is bounded away from zero). The original 3D Gaussian splatting uses dilation ~= 0.3.
 
-    See the "The EWA projection" section of the README.
+    See the Projecting a Gaussian into the image section of the README.
 
     Args:
         cov3d: (N, 3, 3) world-space covariances.

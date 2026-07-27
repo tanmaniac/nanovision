@@ -11,7 +11,7 @@ README as a reading pointer, not built here, and is not the same thing as this p
 
 Convention matches the course's diffusion assignment: the network predicts eps (not x0) and the loss
 is MSE on eps. Shapes: a_chunk, a_t, eps are (B, H, 2); the integer timestep is (B,); c is
-(B, cond_in); alphas_bar is (T,). The math is in the DDPM contrast section of the README.
+(B, cond_in); alphas_bar is (T,). The math is in the diffusion as an action head section of the README.
 """
 
 import math
@@ -70,7 +70,7 @@ def ddpm_loss(head: DDPMHead, a_chunk: Tensor, c: Tensor, alphas_bar: Tensor,
     prediction onto the sampled noise eps (predict eps, not x0) by MSE. a_chunk is (B, H, 2), c is
     (B, cond_in), alphas_bar is (T,).
 
-    See the DDPM contrast section of the README.
+    See the diffusion as an action head section of the README.
     """
     raise NotImplementedError("implement the DDPM epsilon-prediction loss")
 
@@ -83,6 +83,6 @@ def ddpm_sample(head: DDPMHead, c: Tensor, H: int, alphas_bar: Tensor,
     recovering the posterior mean at each step and adding Gaussian noise except at t=0. Return the
     final a (B, H, 2). This is the same ancestral sampler as the course's diffusion topic.
 
-    See the DDPM contrast section of the README.
+    See the diffusion as an action head section of the README.
     """
     raise NotImplementedError("implement the ancestral DDPM sampler")
