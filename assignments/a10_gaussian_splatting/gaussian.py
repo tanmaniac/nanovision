@@ -7,7 +7,7 @@ semi-definite) covariance for every parameter value and is differentiable everyw
 quaternion is nonzero. Storing log-scales keeps the scales positive under unconstrained
 gradient descent.
 
-See the "The covariance factorization" section of the README for the factored form.
+See the Keeping the parameters valid section of the README for the factored form.
 
 Assignment-local: A10's renderer is not reused downstream, so nothing here is exported
 through a nanovision shim. Import these names bare.
@@ -21,7 +21,7 @@ def quat_to_rotmat(q: Tensor) -> Tensor:
     """Convert quaternions to rotation matrices.
 
     The quaternion is (w, x, y, z), real part first, and may have any nonzero magnitude.
-    See the "The covariance factorization" section of the README.
+    See the Keeping the parameters valid section of the README.
 
     Args:
         q: (N, 4) quaternions, any nonzero magnitude.
@@ -37,8 +37,7 @@ def build_covariance_3d(quats: Tensor, log_scales: Tensor) -> Tensor:
 
     The factorization keeps the covariance symmetric positive semi-definite for any
     parameter value and differentiable, the standard pure-PyTorch pattern (no
-    eigendecomposition, no constrained optimization). See the "The covariance
-    factorization" section of the README.
+    eigendecomposition, no constrained optimization). See the Keeping the parameters valid section of the README.
 
     Args:
         quats: (N, 4) quaternions.

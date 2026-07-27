@@ -3,7 +3,7 @@
 Computed AFTER the matcher fixes the assignment indices. The indices are treated as
 constants here; no gradient flows back through the matching. The loss sums three terms (a
 classification cross-entropy over all queries, a box L1, and a GIoU loss) with fixed weights.
-See the set-prediction-loss section of the README for the terms and weights.
+See the set-prediction loss section of the README for the terms and weights.
 
 The no-object class is downweighted (eos_coef) to counter class imbalance: on a 1-2 object
 image most of the N queries match nothing, so without the downweight the no-object term
@@ -40,7 +40,7 @@ def detr_loss(
     Classification is a cross-entropy over all N queries with the no-object class downweighted
     by eos_coef; box L1 and the GIoU loss are computed on the matched (query, gt) pairs only.
     The three terms are summed with weight_class / weight_l1 / weight_giou. See the
-    set-prediction-loss section of the README for the exact terms.
+    set-prediction loss section of the README for the exact terms.
 
     components is the dict {"class", "l1", "giou"} of the three unweighted terms.
 

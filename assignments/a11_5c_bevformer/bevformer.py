@@ -46,7 +46,7 @@ def bev_reference_points(
     Each cell center ``(x, y)`` (from ``BEVGrid.cell_centers``) is repeated at ``n_heights``
     z-values spaced uniformly over ``[z_min, z_max]`` with inclusive endpoints. These pillars
     are the anchor 3D points the BEV query later projects into the cameras. See the
-    reference-pillars section of the README.
+    reference pillars section of the README.
 
     Args:
         bev_grid: the centered BEV grid contract.
@@ -68,7 +68,7 @@ def project_reference_points(
     Each ego point is projected with ``rig.world_to_pixel``, which returns pixel ``(u, v)`` and
     a combined mask of points in front of the camera and inside the image bounds. The pixels are
     normalized to grid_sample's ``[-1, 1]`` extent (align_corners=False); see the
-    projection-to-grid_sample-coordinates section of the README for the map. The last grid dim
+    projection to grid_sample coordinates section of the README for the map. The last grid dim
     is ordered ``(gx, gy)`` = (width, height), because ``F.grid_sample`` reads the last grid dim
     as x=width first.
 
@@ -177,7 +177,7 @@ class SpatialCrossAttention(nn.Module):
         Both paths (the simplified ``offsets=False`` bilinear sample and the ``offsets=True``
         deformable path) sample the camera value maps, reduce with the shared
         ``_reduce_over_heights_and_views``, apply out_proj, and residual-add to the query while
-        leaving no_hit cells unchanged. See the spatial-cross-attention section of the README.
+        leaving no_hit cells unchanged. See the spatial cross-attention section of the README.
         """
         raise NotImplementedError("SpatialCrossAttention.forward")
 
@@ -192,7 +192,7 @@ def warp_bev(prev_bev: Tensor, ego_delta: Tensor, bev_grid: BEVGrid) -> Tensor:
     last dim is ``(x=W, y=H)``.
 
     ``affine_grid`` builds a SAMPLING (inverse) warp: for output cell p it gives the source cell
-    to read. See the ego-motion-warp section of the README for ``theta``; the subtle part is the
+    to read. See the resampling and the ego-motion warp section of the README for ``theta``; the subtle part is the
     SIGN of the translation, since affine_grid already inverts once (getting it backwards is the
     double-inverse bug). Zero ego motion is the identity warp.
 
@@ -230,7 +230,7 @@ class TemporalSelfAttention(nn.Module):
 
         Each BEV cell attends over the key/value set {query, warped history} when history is
         present, or {query} alone on the first frame, then the output is residual-added to the
-        input query. See the temporal-self-attention section of the README.
+        input query. See the temporal self-attention section of the README.
 
         Args:
             query: (nx, ny, C) current BEV queries.
@@ -303,7 +303,7 @@ class BEVFormerEncoder(nn.Module):
         Project the reference pillars into the cameras, warp the previous BEV grid by the ego
         motion (None on the first frame), then start from ``self.query_embed`` and run each layer
         in order (temporal self-attention, spatial cross-attention, feed-forward). Returns the
-        final query as ``(C, nx, ny)``. See the assembling-the-encoder section of the README.
+        final query as ``(C, nx, ny)``. See the assembling the encoder section of the README.
 
         Args:
             feats: (n_cam, C, Hf, Wf) per-camera feature maps for the current frame.

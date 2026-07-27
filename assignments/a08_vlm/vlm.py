@@ -45,7 +45,7 @@ def vlm_loss(logits: Tensor, token_ids: Tensor, n_visual: int) -> Tensor:
     separator is used, because generation also starts from an empty text side, so train and
     inference agree. Pads must be re-masked within the text slice, not by indexing the full
     length-(N+L) label tensor with a length-L mask (the shapes would not line up). See the
-    caption objective and the loss shift section of the README.
+    captions, teacher forcing, and the loss shift section of the README.
     """
     raise NotImplementedError("implement vlm_loss: build -100 labels, write text slice, shift CE")
 

@@ -31,7 +31,7 @@ def cosine_alpha_bar(T: int, s: float = 0.008) -> tuple[Tensor, Tensor]:
 
     The small offset s keeps beta_t from getting too tiny near t=0. Clip betas to <= 0.999
     to avoid singular values near t=T. Returns (betas (T,), alphas_bar (T,)). See the
-    noise-schedules section of the README.
+    forward process section of the README.
     """
     raise NotImplementedError("implement the cosine schedule")
 

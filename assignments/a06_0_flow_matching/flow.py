@@ -29,6 +29,6 @@ def score_from_velocity(v: Tensor, x_t: Tensor, t: Tensor) -> Tensor:
     """The exact score-velocity relation for the linear path.
 
     Defined only for t < 1: the score is singular at t=1, where the conditional path collapses
-    to a point mass at x1. See the diffusion-flow equivalence section of the README.
+    to a point mass at x1. See the what flow matching and diffusion do and do not share section of the README.
     """
     raise NotImplementedError("implement the score from the velocity")

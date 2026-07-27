@@ -15,7 +15,7 @@ def q_sample(x0: Tensor, t: Tensor, eps: Tensor, alphas_bar: Tensor) -> Tensor:
     """Closed-form forward process q(x_t | x_0) (Ho et al. 2020).
 
     t is (B,) integer timesteps; eps is standard normal noise the same shape as x0.
-    See the forward-process section of the README.
+    See the forward process section of the README.
     """
     raise NotImplementedError("implement the closed-form q_sample")
 
@@ -44,7 +44,7 @@ def score_from_eps(eps: Tensor, abar_t: Tensor) -> Tensor:
     """The score grad_{x_t} log p_t(x_t) via Tweedie's formula.
 
     A network trained to predict eps is, up to a scaling, a score estimator. See the
-    score-connection section of the README.
+    training objective section of the README.
     """
     raise NotImplementedError("implement the score from eps")
 
@@ -62,7 +62,7 @@ def diffusion_loss(model, x0: Tensor, alphas_bar: Tensor, *, kind: str = "v",
     and cfg_drop_prob > 0, replace each label by the null index `num_classes` with that
     probability. If min_snr_gamma is set, weight each sample's MSE by the Min-SNR weight in
     that loss's native space, applied per-sample BEFORE the batch mean; the weight formula
-    differs per parameterization (the eps-space form is WRONG for v). See the Min-SNR section
+    differs per parameterization (the eps-space form is WRONG for v). See the training objective section
     of the README.
     """
     raise NotImplementedError("implement the diffusion training loss")

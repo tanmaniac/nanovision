@@ -46,7 +46,7 @@ def roi_align_bev(
     normalized nx-coord). centers are (x_cell, y_cell): x_cell indexes nx (height), y_cell indexes
     ny (width). So the width coordinate comes from y_cell and the height coordinate from x_cell -
     a SWAP relative to centers' order. Sample bilinearly with padding_mode="border" (an edge agent
-    samples the boundary feature) and align_corners=False. See the RoI-align section of the README
+    samples the boundary feature) and align_corners=False. See the pooling BEV features around an agent section of the README
     for the +/- radius sampling window and the per-axis normalization.
 
     Args:
@@ -133,7 +133,7 @@ class MultimodalTrajectoryHead(nn.Module):
         RoI-align the per-agent tokens, expand the distinct mode queries over the B = N agents,
         run the decoder layers (mode self-attention, cross-attention over the RoI tokens, MLP),
         then map each mode to a trajectory (per-step displacements integrated to absolute
-        positions) and a score logit. See the mode-query-decoder section of the README.
+        positions) and a score logit. See the mode queries and the decoder section of the README.
 
         Args:
             bev_feat: (C, nx, ny) shared BEV feature grid.
@@ -163,7 +163,7 @@ def wta_loss(
 
     The committed (winner) mode per sample is the one whose endpoint is closest to the GT
     endpoint (minFDE selection by Euclidean distance; the endpoint carries most of the
-    uncertainty). See the winner-take-all-loss section of the README for both paths.
+    uncertainty). See the winner-take-all loss section of the README for both paths.
 
     The regression term is selected by temperature:
     - temperature is None (hard WTA, the canonical min-of-N): regress only the winner's full

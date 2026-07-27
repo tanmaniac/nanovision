@@ -45,7 +45,7 @@ def video_mae_loss(pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
     (B, N) with 1 on masked tubelets. This is the image MAE masked-patch MSE with the
     patch enlarged from p*p to t*p*p.
 
-    See the reconstruction and loss section of the README.
+    See the reconstruction and the masked-tubelet loss section of the README.
     """
     raise NotImplementedError("A3.5 Task 3: implement video_mae_loss")
 

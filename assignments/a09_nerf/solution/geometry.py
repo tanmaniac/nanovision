@@ -35,7 +35,8 @@ def project_points(pts_cam: Tensor, K: Tensor) -> Tensor:
     """Project camera-frame points to pixels with the pinhole model.
 
     Args:
-        pts_cam: (N, 3) points in the camera frame (OpenCV axes, +z forward).
+        pts_cam: (..., 3) points in the camera frame (OpenCV axes, +z forward);
+            leading batch dimensions pass through.
         K: (3, 3) intrinsic matrix.
 
     Returns:
@@ -61,8 +62,8 @@ def unproject(px: Tensor, depth: Tensor, K: Tensor) -> Tensor:
     """Back-project pixels at a given depth to camera-frame points.
 
     Args:
-        px: (N, 2) pixel coordinates (u, v).
-        depth: (N,) or scalar depth along +z (meters).
+        px: (..., 2) pixel coordinates (u, v); leading batch dimensions pass through.
+        depth: broadcastable to px's leading dimensions, or scalar. Along +z (meters).
         K: (3, 3) intrinsic matrix.
 
     Returns:
@@ -112,7 +113,7 @@ def apply_transform(T: Tensor, pts: Tensor) -> Tensor:
 
     Args:
         T: (4, 4) transform.
-        pts: (N, 3) points.
+        pts: (..., 3) points; leading batch dimensions pass through.
 
     Returns:
         (N, 3) transformed points, computed as (R @ p) + t via homogeneous

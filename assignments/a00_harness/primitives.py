@@ -22,7 +22,7 @@ class LayerNorm(nn.Module):
     """Layer normalization over the last dimension, computed from mean/var ops.
 
     Shapes: x is (..., dim); output is the same shape. No nn.LayerNorm.
-    See the layer normalization section of the README.
+    See the normalization and the scale of activations section of the README.
     """
 
     def __init__(self, dim: int, eps: float = 1e-5):

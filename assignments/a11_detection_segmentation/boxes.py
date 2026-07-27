@@ -36,7 +36,7 @@ def generalized_iou(boxes1: Tensor, boxes2: Tensor, eps: float = 1e-7) -> Tensor
     """Pairwise GIoU between two sets of cxcywh boxes.
 
     boxes1 is (N1, 4), boxes2 is (N2, 4), both cxcywh in [0, 1]. Returns (N1, N2) with
-    GIoU[i, j] in (-1, 1]. See the generalized-IoU section of the README for the definition.
+    GIoU[i, j] in (-1, 1]. See the generalized IoU section of the README for the definition.
 
     Correctness contracts: clamp the intersection width/height to >= 0 so disjoint boxes give
     zero intersection, not a spurious negative one; add eps to BOTH denominators (the union and

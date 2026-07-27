@@ -35,11 +35,13 @@ def project_points(pts_cam: Tensor, K: Tensor) -> Tensor:
     """Project camera-frame points to pixels with the pinhole model.
 
     Args:
-        pts_cam: (N, 3) points in the camera frame (OpenCV axes, +z forward).
+        pts_cam: (..., 3) points in the camera frame (OpenCV axes, +z forward).
+            Usually (N, 3), but any leading batch dimensions must pass through: the
+            geometry foundation models assignment calls this with (B, H, W, 3).
         K: (3, 3) intrinsic matrix.
 
     Returns:
-        (N, 2) pixel coordinates (u, v).
+        (..., 2) pixel coordinates (u, v), matching pts_cam's leading dimensions.
 
     See the "Pinhole projection" section of the README.
     """
@@ -50,12 +52,16 @@ def unproject(px: Tensor, depth: Tensor, K: Tensor) -> Tensor:
     """Back-project pixels at a given depth to camera-frame points.
 
     Args:
-        px: (N, 2) pixel coordinates (u, v).
-        depth: (N,) or scalar depth along +z (meters).
+        px: (..., 2) pixel coordinates (u, v). Usually (N, 2), but any leading batch
+            dimensions must pass through: the geometry foundation models assignment
+            calls this with (B, H, W, 2).
+        depth: broadcastable to px's leading dimensions, or scalar. Depth along
+            +z (meters).
         K: (3, 3) intrinsic matrix.
 
     Returns:
-        (N, 3) points in the camera frame. This is the inverse of project_points.
+        (..., 3) points in the camera frame, matching px's leading dimensions. This is
+        the inverse of project_points.
 
     See the "Pinhole projection" section of the README.
     """
@@ -77,7 +83,7 @@ def make_transform(R: Tensor, t: Tensor) -> Tensor:
     Returns:
         (4, 4) homogeneous SE(3) transform.
 
-    See the "The four SE(3) primitives" section of the README.
+    See the Rigid transforms and SE(3) section of the README.
     """
     raise NotImplementedError("implement make_transform")
 
@@ -87,12 +93,14 @@ def apply_transform(T: Tensor, pts: Tensor) -> Tensor:
 
     Args:
         T: (4, 4) transform.
-        pts: (N, 3) points.
+        pts: (..., 3) points. Usually (N, 3), but any leading batch dimensions must
+            pass through: the geometry foundation models assignment calls this with
+            (B, H, W, 3).
 
     Returns:
-        (N, 3) transformed points.
+        (..., 3) transformed points, matching pts' leading dimensions.
 
-    See the "The four SE(3) primitives" section of the README.
+    See the Rigid transforms and SE(3) section of the README.
     """
     raise NotImplementedError("implement apply_transform")
 
@@ -100,7 +108,7 @@ def apply_transform(T: Tensor, pts: Tensor) -> Tensor:
 def invert_transform(T: Tensor) -> Tensor:
     """Invert a 4x4 SE(3) transform using its structure, not a general matrix inverse.
 
-    See the "The four SE(3) primitives" section of the README.
+    See the Rigid transforms and SE(3) section of the README.
     """
     raise NotImplementedError("implement invert_transform")
 
@@ -109,6 +117,6 @@ def compose_transforms(*Ts: Tensor) -> Tensor:
     """Compose a sequence of 4x4 transforms left-to-right.
 
     Applying compose_transforms(A, B, C) to a point is the same as applying C, then B,
-    then A. See the "The four SE(3) primitives" section of the README.
+    then A. See the Rigid transforms and SE(3) section of the README.
     """
     raise NotImplementedError("implement compose_transforms")
