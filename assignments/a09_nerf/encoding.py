@@ -7,9 +7,9 @@ high-frequency detail (sharp object boundaries) early in training.
 
 Input-range contract: the geometric frequency schedule is only well-behaved when inputs
 are normalized to roughly [-1, 1] first. The caller (NeRFMLP) divides sample positions by a
-scene-bound constant before encoding and feeds unit-length directions. An unnormalized
-position hit with the highest-frequency band aliases badly, so this module assumes the
-caller has normalized.
+scene-bound constant before encoding and feeds unit-length directions. Unnormalized
+positions scale every band frequency up (a narrower kernel than L was chosen for) and make
+the lowest band repeat inside the scene, so this module assumes the caller has normalized.
 """
 
 import torch

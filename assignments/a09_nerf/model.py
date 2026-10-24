@@ -11,8 +11,11 @@ Two details the renderer depends on:
 
 Input normalization: sample positions are divided by `scene_bound` (roughly the scene's
 half-extent) before the Fourier encoding, mapping the object into about [-1, 1]. The
-encoding's 2^k frequency schedule is only valid on that range; feeding raw positions of
-magnitude ~4 would alias the top band. Directions are already unit length.
+encoding's 2^k frequency schedule is chosen for that range. Feeding raw positions of
+magnitude ~4 would multiply every band frequency by 4, making the effective kernel narrower
+than L was chosen for (fits the training samples, noisy in between), and the lowest band
+would repeat inside the scene so points 2 units apart get identical sinusoids. Directions
+are already unit length.
 
 The pedagogy of A9 is the positional encoding and the volume renderer, not this MLP plumbing,
 so it is provided rather than holed.
