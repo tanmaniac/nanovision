@@ -7,6 +7,8 @@ pm1_trajectories.png. Left panel: the straight conditional paths x_t = (1-t) x0 
 u_t(x) = (tanh(t x / (1-t)^2) - x) / (1-t) (Exercise 1) from the same x0, integrated with fine
 Euler steps.
 
+blends.png. Points on the straight line from a noise image to a training picture.
+
 pm1_path.png. The probability path p_t = 0.5 N(-t, (1-t)^2) + 0.5 N(+t, (1-t)^2) at several t.
 
 Run from this directory:
@@ -76,3 +78,21 @@ ax.legend(fontsize=8)
 fig2.tight_layout()
 fig2.savefig("pm1_path.png", dpi=120)
 print("sign preserved:", bool(np.all(np.sign(traj[-1]) == np.sign(x0))))
+
+# Blends between noise and a training picture along the straight line, for the motivation section.
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # repo root, for nanovision
+from nanovision.data import toy  # noqa: E402
+
+imgs, _ = toy.diffusion_image_batch(8, seed=0)
+img = imgs[0, 0].numpy()
+noise = np.random.default_rng(1).standard_normal(img.shape)
+fig3, axes = plt.subplots(1, 5, figsize=(9, 2.2))
+for ax, tt in zip(axes, (0.0, 0.25, 0.5, 0.75, 1.0)):
+    ax.imshow((1 - tt) * noise + tt * img, cmap="gray", vmin=-2, vmax=2)
+    ax.set_title(f"t = {tt}")
+    ax.axis("off")
+fig3.tight_layout()
+fig3.savefig("blends.png", dpi=120)

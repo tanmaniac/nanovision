@@ -1,7 +1,8 @@
 # A6 - Flow matching and rectified flow
 
-Flow matching is a way to train a generative model. The model is a neural network $v_\theta(x, t)$
-that outputs a velocity: for any point $x$ and time $t \in [0, 1]$, it says which direction and how
+Flow matching is a way to train a generative model: a model that produces new samples, such as
+new images, that resemble a training set without copying it. The model is a neural network
+$v_\theta(x, t)$ that outputs a velocity: for any point $x$ and time $t \in [0, 1]$, it says which direction and how
 fast a particle at $x$ should move. To generate a sample, draw Gaussian noise and move it along
 that velocity from $t = 0$ to $t = 1$, which means numerically solving an ordinary differential
 equation (ODE). If the network is trained well, the point where the noise ends up is a sample from
@@ -22,8 +23,7 @@ data (choosing which noise sample goes with which data sample so that paths cros
 logit-normal sampling of training times (a distribution that favors the middle of the path), an
 Euler ODE sampler, a metric for how straight the generated paths are, and the conversion from a
 flow-matching velocity to the score (the gradient of the log-density) that a diffusion model
-learns. An
-image-scale demo reuses the diffusion U-Net with the loss swapped to flow matching. All graded
+learns. An image-scale demo reuses the diffusion U-Net with the loss swapped to flow matching. All graded
 tests run on CPU in seconds.
 
 Required reading before starting:
@@ -36,10 +36,104 @@ Required reading before starting:
 
 ## Lecture notes
 
-### Overview
+### What flow matching is for
 
-The notes follow one line of argument, and most of its steps are ideas from estimation and
-dynamics applied to a new problem.
+#### The task
+
+The image demo at the end of this assignment trains on 16x16 grayscale pictures of
+three shapes (a filled disk, a square, and a plus sign) drawn at random positions and sizes. Every
+pixel is either $-1$ (background) or $+1$ (shape). A generative model for this dataset should
+produce new pictures of the same kind, for example a disk at a position and size that no training
+picture has, rather than copies of the training pictures. A 16x16 picture is a list of 256
+numbers, so it is a point in $\mathbb{R}^{256}$, and the training set is a cloud of points in that
+space. The model's job is to produce new points from the same cloud. The same task at larger scale
+is text-to-image generation (a 1024x1024 color image is about 3 million numbers), video
+generation, and, later in this course, generating the next second of a robot's motor commands.
+
+#### Why start from noise
+
+Nobody can write down a formula for "the set of pictures of disks,
+squares, and plus signs" and sample from it. What a computer can sample easily is Gaussian noise:
+256 independent standard normal numbers. So the plan is to learn a function that turns a noise
+vector into a picture. Drawing new noise and applying the function gives a new picture, and
+different noise gives a different picture.
+
+#### Why that function is hard to learn directly
+
+Training a network by regression needs
+input-output pairs. Here the outputs (pictures) exist, but the inputs do not: nothing says which
+noise vector should produce which picture. Generative adversarial networks (GANs) avoided the need
+for pairs by training a second network to judge whether outputs look real, but that two-network
+game is unstable to train.
+
+#### The idea, made-up pairs and small steps
+
+Pair each training picture with a noise vector drawn at random, and draw the straight line between them
+in $\mathbb{R}^{256}$. Points along the line are blends of the two. At $t = 0$ the blend is pure
+noise, at $t = 0.5$ it is half noise and half picture (the shape faintly visible through static),
+and at $t = 1$ it is the clean picture. The figure shows five points on one such line, from a
+noise image to a training picture of a plus sign. Show the network a blend and its time $t$, and train it to
+output the direction of the line, picture minus noise: for each pixel, which way and how far it
+has to change to arrive at the picture. That is an ordinary regression problem with a known
+target. To generate a new picture, start from fresh noise and repeatedly take a small step in the
+direction the network predicts. The static fades and a shape appears.
+
+![Five points on the straight line from a noise image (t = 0) to a training picture of a plus sign (t = 1)](assets/blends.png)
+
+#### Why made-up pairs still work
+
+The pairing is arbitrary. A given noisy blend
+could have come from a disk at the top left or a square at the bottom right, so the network cannot
+know which picture its line was heading to. Trained with squared error, it outputs the average of
+the directions toward all the pictures that are plausible given the blend. The central result of
+flow matching, proved below, is that following this averaged direction carries the noise
+distribution exactly onto the data distribution. Early in generation, many pictures are plausible
+and the average points toward a vague mixture of them. As a shape emerges, fewer pictures remain
+plausible, the average sharpens, and the steps head to one specific picture.
+
+#### Why it matters
+
+Diffusion models, the subject of the previous assignment, also generate by
+turning noise into data in many small steps, and they produce excellent images, but sampling takes
+tens to hundreds of network evaluations per image. Flow matching keeps the same overall recipe
+with a simpler training target, and when the learned motion from noise to picture is close to a
+straight line traveled at constant speed, a handful of steps are enough. The number of steps is
+the main cost of generating a sample, so this matters in practice: SD3 and FLUX for images and pi0
+for robot actions are trained with flow matching. Much of these notes is about why the learned
+motion is not exactly straight and what can be done about it.
+
+### The $\pm 1$ example (one pixel of the shape images)
+
+The pictures above live in 256 dimensions, where nothing can be drawn or computed by hand. To see
+the mechanism, shrink the problem to a single pixel. A pixel of the shape pictures is either $-1$
+or $+1$, so take one pixel's value as the entire "picture". The noise is then one standard
+Gaussian number, $\mathcal{N}(0, 1)$, and the data is the two values $-1$ and $+1$. For simplicity
+give each probability $1/2$. (In the training pictures about a quarter of all pixels are shape
+pixels, and the fraction depends on the pixel's position.) A generative model for this data must
+turn every noise number into either $-1$ or $+1$, half each way. The notes call this the $\pm 1$
+example.
+
+The one-pixel problem keeps the parts of the full problem that these notes are about: the made-up
+pairing of noise with data, the averaging of directions where lines toward different data points
+meet, and the number of steps the sampler needs. It drops what makes images hard, which is the
+dependence between pixels (the pixels of a disk must be $+1$ together, in a round region). In 256
+dimensions the network has to learn that structure; the 2D toy data in this assignment and the
+image demo show that part. In exchange, every quantity in the $\pm 1$ example has a closed form
+that can be checked by hand.
+
+The figure shows how the density of the samples changes as they move from noise to data under the
+straight-line construction used later. At $t = 0$ it is the standard Gaussian. As $t$ grows the
+single bump flattens, splits into two, and the two bumps narrow and move outward until, at
+$t = 1$, all the mass sits on the dotted lines at $\pm 1$. In formulas (derived in the linear-path
+section), the density at time $t$ is an equal mixture of two Gaussians centered at $-t$ and $+t$,
+each with standard deviation $1 - t$.
+
+![The plus-minus-1 example: the density of the samples at t = 0, 0.3, 0.5, 0.7, 0.85, one Gaussian bump splitting into two bumps that narrow toward the data points at -1 and +1](assets/pm1_path.png)
+
+### Overview of the rest of the notes
+
+The sections below make the idea above precise. They follow one line of argument, and most of its
+steps are ideas from estimation and dynamics applied to a new problem.
 
 1. What is learned. A velocity field $v_t(x)$ defines an ODE $\dot{x} = v_t(x)$, a time-varying
    dynamical system like the process model of a state-space filter. The goal is to choose the field
@@ -63,31 +157,8 @@ dynamics applied to a new problem.
    converts to the score that a diffusion model learns, which shows how the two frameworks
    relate.
 
-One small example, the $\pm 1$ example introduced next, is used throughout to make each formula
-concrete. Five exercises, placed after the sections they test,
-are meant to be worked by hand (a calculator helps for a few), and each has a worked answer that can
+The $\pm 1$ example is used throughout to make each formula concrete. Five exercises, placed after the sections they test, are meant to be worked by hand (a calculator helps for a few), and each has a worked answer that can
 be expanded.
-
-### The $\pm 1$ example (Gaussian noise moved onto two data points)
-
-The notes use one tiny generative problem in one dimension to make each idea concrete. The noise
-distribution is the standard Gaussian $\mathcal{N}(0, 1)$ on the real line. The data distribution
-is just two points, $-1$ and $+1$, each with probability $1/2$. A generative model for this data
-must move every noise sample to either $-1$ or $+1$ and send half of them each way. The notes call
-this the $\pm 1$ example.
-
-It is the smallest problem in which the central effect of flow matching (straight per-pair paths
-averaging into curved trajectories) is visible, and it is small enough that every quantity has a
-closed form that can be checked by hand.
-
-The figure shows how the density of the samples changes as they move from noise to data under the
-straight-line construction used later. At $t = 0$ it is the standard Gaussian. As $t$ grows the
-single bump flattens, splits into two, and the two bumps narrow and move outward until, at
-$t = 1$, all the mass sits on the dotted lines at $\pm 1$. In formulas (derived in the linear-path
-section), the density at time $t$ is an equal mixture of two Gaussians centered at $-t$ and $+t$,
-each with standard deviation $1 - t$.
-
-![The plus-minus-1 example: the density of the samples at t = 0, 0.3, 0.5, 0.7, 0.85, one Gaussian bump splitting into two bumps that narrow toward the data points at -1 and +1](assets/pm1_path.png)
 
 ### Velocity fields, flows, and probability paths
 
@@ -800,8 +871,9 @@ figures in windows when a display is available. The figures are:
 - `timesteps.png`: histograms of uniform and logit-normal timesteps.
 - `image_cfm.png`: the image-scale demo, which reuses the diffusion U-Net with the CFM loss.
 
-The two figures of the $\pm 1$ example in the notes are generated by `assets/make_pm1_figures.py`
-from the closed-form density and field of Exercise 1, not from the assignment code.
+The figures in the notes are generated by `assets/make_pm1_figures.py`: the blends figure from a
+training picture and random noise, and the two $\pm 1$ example figures from the closed-form density
+and field of Exercise 1. None of them uses the assignment code.
 
 What you should see when you run this. The overfit test reduces the CFM loss by about three orders
 of magnitude from its untrained value (about 900x, from 17.2 to 0.019 in the provided CPU run). It
