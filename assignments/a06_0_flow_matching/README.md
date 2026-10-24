@@ -35,26 +35,44 @@ Required reading before starting:
 
 ### Overview of the notes
 
-The notes answer four questions in order.
+The notes answer four questions in order. Most of the pieces are familiar ideas from estimation
+and dynamics applied to a new problem, and the list says which.
 
 1. What object is being learned? A velocity field that moves a cloud of noise samples onto the
-   data distribution. The first section defines velocity fields, flows, and probability paths, and
-   the equation that links them.
+   data distribution. This is a time-varying dynamical system $\dot{x} = v_t(x)$, the same object
+   as the process model in a state-space filter, except that the goal is to move a whole
+   distribution rather than one state. The first section defines velocity fields, flows, and
+   probability paths, and the equation that links them.
 2. How can it be trained? The ideal loss needs a velocity that nobody knows. The conditional flow
    matching (CFM) section shows that a simpler loss, built from one data point at a time, has the
-   same minimizer. The linear-path section picks the specific straight-line version used here.
+   same minimizer. The argument is the standard result that least squares recovers the conditional
+   mean (the minimum mean-squared-error estimator). The linear-path section picks the specific
+   straight-line version used here.
 3. Why does sampling sometimes need many steps, and how is that fixed? The learned field bends
    where paths from different data points cross. The sections on crossing, optimal transport,
-   minibatch OT coupling, and reflow are all ways to reduce crossings. The timestep section covers
-   a separate training choice: how often each time $t$ is trained on.
-4. How is the result used and measured? Euler sampling, a straightness metric, and the relation
-   between flow matching and diffusion.
+   minibatch OT coupling, and reflow are all ways to reduce crossings. Minibatch OT reduces to the
+   assignment problem, solved with the Hungarian algorithm, as in data association for
+   multi-target tracking. The timestep section covers a separate training choice: how often each
+   time $t$ is trained on.
+4. How is the result used and measured? Sampling is forward Euler integration of the learned ODE.
+   A straightness metric measures how far the trajectories are from straight lines. The last
+   sections relate the learned velocity to the score that a diffusion model learns.
+
+A few exercises are placed after the sections they test. They are meant to be done by hand (a
+calculator helps for two of them), and each has a worked answer that can be expanded.
 
 ### Generation as transport
 
 A generative model turns a sample from a simple distribution (here a standard Gaussian) into a
 sample from the data distribution. Flow matching does this by moving the sample continuously over
-time. Three definitions are needed first.
+time.
+
+A one-dimensional example is used throughout the notes. The noise is $x_0 \sim \mathcal{N}(0, 1)$
+on the real line, and the "data distribution" is two points, $-1$ and $+1$, each with probability
+$1/2$. A sampler for this data must move every noise sample to $-1$ or to $+1$, and must send half
+of them each way. Samples that start at negative values should go to $-1$ and samples that start at
+positive values to $+1$, otherwise their paths would have to pass each other. Every definition below
+can be checked against this picture. Three definitions are needed first.
 
 **Velocity field and flow.** A time-dependent velocity field $v_t(x)$ assigns a vector in
 $\mathbb{R}^d$ to every point $x \in \mathbb{R}^d$ and every time $t$. A particle that starts at
@@ -231,6 +249,32 @@ points pass through the same point at the same time, the learned velocity there 
 their velocities. Averaging velocities that point in different directions gives a field whose
 trajectories curve, even though every individual conditional path is a straight line.
 
+> **Exercise 1 (marginal velocity by hand).** Use the running example: $x_0 \sim \mathcal{N}(0, 1)$,
+> data $x_1 \in \{-1, +1\}$ with equal probability, and the straight-line conditional path of the
+> next section, for which $x_t \mid x_1 \sim \mathcal{N}(t x_1, (1-t)^2)$ and the conditional
+> velocity written in terms of $x_t$ is $u_t(x_t \mid x_1) = (x_1 - x_t)/(1-t)$. Compute the
+> posterior $P(x_1 = +1 \mid x_t = x)$, then the marginal velocity $u_t(x)$ as a closed-form
+> function of $x$ and $t$. Evaluate it at $t = 0.5$, $x = 0.25$.
+
+<details>
+<summary>Answer</summary>
+
+The two Gaussian likelihoods have the same variance, so their ratio is
+$\exp\big(\frac{(x + t)^2 - (x - t)^2}{2(1-t)^2}\big) = \exp\big(\frac{2tx}{(1-t)^2}\big)$, and
+$P(x_1 = +1 \mid x) = \sigma\big(2tx/(1-t)^2\big)$ with $\sigma$ the sigmoid. The posterior mean is
+$\mathbb{E}[x_1 \mid x] = 2\sigma(a) - 1 = \tanh(a/2) = \tanh\big(tx/(1-t)^2\big)$. The conditional
+velocity is linear in $x_1$, so
+
+$$u_t(x) = \frac{\tanh\big(tx/(1-t)^2\big) - x}{1-t}.$$
+
+At $t = 0.5$, $x = 0.25$: $tx/(1-t)^2 = 0.125/0.25 = 0.5$, $\tanh(0.5) \approx 0.462$, and
+$u \approx (0.462 - 0.25)/0.5 \approx 0.424$. The point is slightly right of center, so it is more
+likely headed to $+1$, and the velocity points right but with much less than the speed a
+particle needs to reach $+1$ from there, because the left-going paths through the same point pull
+the average down.
+
+</details>
+
 ### The linear path
 
 Rectified flow (Liu et al. 2022) uses the straight line between the noise sample and the data
@@ -328,6 +372,24 @@ repeatedly adjusting an offset for each row and each column of the cost matrix u
 enough zero-cost entries to form a complete matching. SciPy provides an exact solver for the same
 problem.
 
+> **Exercise 2 (assignment problem by hand).** In one dimension, let the noise samples be
+> $x_0 = (0, 1, 3)$ and the data samples be $x_1 = (2, 0.5, 3.5)$, currently paired in that order.
+> Write the $3 \times 3$ cost matrix $C_{ij} = (x_0^{(i)} - x_1^{(j)})^2$, enumerate all six
+> permutations, and find the optimal one. What do you notice about the optimal pairing in 1D?
+
+<details>
+<summary>Answer</summary>
+
+Costs of the six pairings (the data values assigned to $x_0 = 0, 1, 3$ in order):
+$(2, 0.5, 3.5) \to 4.5$, $(2, 3.5, 0.5) \to 16.5$, $(0.5, 2, 3.5) \to 1.5$,
+$(0.5, 3.5, 2) \to 7.5$, $(3.5, 2, 0.5) \to 19.5$, $(3.5, 0.5, 2) \to 13.5$. The optimum is
+$(0.5, 2, 3.5)$ with cost $1.5$, down from $4.5$ for the original pairing. It pairs the sorted noise
+with the sorted data. In 1D with squared-distance cost the optimal plan is always the monotone
+(sorted) matching, so the straight paths between pairs never cross, which is the property the
+previous section asked for.
+
+</details>
+
 ### Minibatch optimal-transport coupling
 
 Optimal transport between the full Gaussian and the full data distribution cannot be computed. OT
@@ -401,6 +463,20 @@ SD3 (Esser et al. 2024, "Scaling Rectified Flow Transformers for High-Resolution
 [arXiv:2403.03206](https://arxiv.org/abs/2403.03206)) compared several timestep distributions at
 scale and found this one performed best of those tested.
 
+> **Exercise 3 (tail mass of the logit-normal).** With $\mu = 0$ and $s = 1$, compute
+> $\Pr[t < 0.1]$ under the logit-normal distribution, and compare it with uniform sampling. Use
+> $\Phi(-2.2) \approx 0.014$.
+
+<details>
+<summary>Answer</summary>
+
+$\text{logit}(0.1) = \log(0.1/0.9) = -\log 9 \approx -2.197$, so
+$\Pr[t < 0.1] = \Phi(-2.197) \approx 0.014$. Uniform sampling gives $0.1$, about seven times
+more. Training with logit-normal times spends very little effort near the noise end, where the
+target is the easy linear field $-x_0$.
+
+</details>
+
 ### Sampling with forward Euler
 
 Sampling solves $dx/dt = v_\theta(x, t)$ from $t=0$ to $t=1$. The simplest solver is forward Euler
@@ -448,6 +524,24 @@ which is the variance of the velocity along the trajectory. It is zero exactly w
 the same, meaning the trajectory is a straight line traveled at constant speed. It increases with
 any change in either the direction or the speed.
 
+> **Exercise 4 (Euler error and straightness on a field that speeds up).** Take the 1D field
+> $v(x, t) = 2t$, which ignores $x$, and start at $x_0 = 0$. The exact solution is $x(t) = t^2$, so
+> the true endpoint is $x(1) = 1$. Run forward Euler by hand with $N = 2$ and $N = 4$ steps. For each,
+> give the endpoint and the straightness $S$ from the variance formula above.
+
+<details>
+<summary>Answer</summary>
+
+Euler evaluates the field at $t = k/N$, so $v_k = 2k/N$. With $N = 2$: $v = (0, 1)$, endpoint
+$0 + 0 \cdot 0.5 + 1 \cdot 0.5 = 0.5$, mean velocity $\bar v = 0.5$, and
+$S = \tfrac12\big(0.5^2 + 0.5^2\big) = 0.25$. With $N = 4$: $v = (0, 0.5, 1, 1.5)$, endpoint $0.75$,
+$\bar v = 0.75$, and $S = \tfrac14(0.5625 + 0.0625 + 0.0625 + 0.5625) = 0.3125$. In general the
+endpoint is $(N-1)/N$, so the error shrinks like $1/N$. The trajectory is a straight line in 1D, yet
+$S > 0$, because the speed changes. The metric penalizes changes in speed as well as in direction,
+and both make Euler inexact.
+
+</details>
+
 ### Reflow
 
 Reflow (Liu et al. 2022) straightens a flow after it has been trained. Start many trajectories from
@@ -466,18 +560,9 @@ second model's field has less averaging and is straighter.
 Reflow needs no new data, because the endpoints are the first model's own samples. The drawback is
 that the second model learns to reproduce the first model's output distribution, including the
 first model's errors. One reflow step is usually enough (Lee, Lin & Fanti 2024,
-[arXiv:2405.20320](https://arxiv.org/abs/2405.20320)).
-
-As of 2025, newer methods outperform reflow for few-step generation. MeanFlow (Geng et al. 2025,
-[arXiv:2505.13447](https://arxiv.org/abs/2505.13447)) trains the network to predict the average
-velocity over a time interval instead of the velocity at one instant. One network evaluation then
-covers a whole interval, which allows one-step generation from a single training run without a
-reflow stage. Rectified Diffusion (ICLR 2025) argues that reflow helps because it improves the
-pairing of noise and data, not because the trajectories become straight as such. Consistency flow
-matching (Yang et al. 2024, [arXiv:2407.02398](https://arxiv.org/abs/2407.02398)) adds a constraint
-that velocity predictions at different times along the same trajectory agree. Reflow is included
-here because it is the clearest first method to understand, not because it is the current state of
-the art.
+[arXiv:2405.20320](https://arxiv.org/abs/2405.20320)). Reflow is covered here because it is the
+clearest first method for straightening a flow. Newer methods do better; see "Later developments"
+at the end of the notes.
 
 ### The score-velocity relation
 
@@ -527,6 +612,29 @@ The denominator $(1-t)$ is zero at $t=1$. There the conditional path has shrunk 
 $x_1$, the density is not a smooth function, and its gradient does not exist. The relation is
 therefore used only for $t < 1$.
 
+> **Exercise 5 (score from velocity, checked two ways).** In the running example at $t = 0.5$,
+> $x = 0.25$, Exercise 1 gave $u \approx 0.424$ and $\mathbb{E}[x_1 \mid x] \approx 0.462$. Compute
+> the score from the velocity with the formula above. Then compute it directly as the posterior
+> average of the conditional scores $-(x - t x_1)/(1-t)^2$, and check that the two agree. Why is the
+> score negative even though the point is more likely headed to $+1$?
+
+<details>
+<summary>Answer</summary>
+
+From the velocity: $(t u - x)/(1-t) = (0.5 \cdot 0.424 - 0.25)/0.5 \approx -0.076$. Directly: the
+conditional score is linear in $x_1$, so its posterior average is
+$-(x - t\,\mathbb{E}[x_1 \mid x])/(1-t)^2 = -(0.25 - 0.5 \cdot 0.462)/0.25 \approx -0.076$. The two
+agree.
+
+The score describes the density at $t = 0.5$, not the destination. At that time the density is an
+equal mixture of $\mathcal{N}(-0.5, 0.25)$ and $\mathcal{N}(+0.5, 0.25)$. The two means are only two
+standard deviations apart, so the components overlap into a single peak at $0$, and the density
+decreases from $x = 0$ to $x = 0.25$. Its gradient there points back toward $0$. The velocity, in
+contrast, points toward the likely destination $+1$. The two fields answer different questions,
+and the formula converts between them.
+
+</details>
+
 ### What flow matching and diffusion share and where they differ
 
 Both frameworks build a Gaussian path between data and noise of the form
@@ -568,6 +676,17 @@ Three real differences remain.
    express this. The stochastic-interpolants framework (Albergo, Boffi & Vanden-Eijnden 2023,
    [arXiv:2303.08797](https://arxiv.org/abs/2303.08797)) develops this general view and recovers
    both diffusion and flow matching as special cases.
+
+### Later developments
+
+As of 2025, newer methods outperform reflow for few-step generation. MeanFlow (Geng et al. 2025,
+[arXiv:2505.13447](https://arxiv.org/abs/2505.13447)) trains the network to predict the average
+velocity over a time interval instead of the velocity at one instant. One network evaluation then
+covers a whole interval, which allows one-step generation from a single training run without a
+reflow stage. Rectified Diffusion (ICLR 2025) argues that reflow helps because it improves the
+pairing of noise and data, not because the trajectories become straight as such. Consistency flow
+matching (Yang et al. 2024, [arXiv:2407.02398](https://arxiv.org/abs/2407.02398)) adds a constraint
+that velocity predictions at different times along the same trajectory agree.
 
 ## The assignment
 
