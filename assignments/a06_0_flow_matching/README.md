@@ -67,7 +67,7 @@ the inputs do not: nothing says which noise vector should produce which picture.
 adversarial networks (GANs) avoid the need for pairs by training a second network to judge whether
 outputs look real, but that two-network game is unstable to train.
 
-#### The idea: choose the pairs, and learn small steps instead of one jump
+#### The idea, choosing the pairs and learning small steps
 
 Flow matching supplies the missing pairs itself. Pair each training picture with a noise vector
 drawn at random, independently of the picture. A rule for which noise sample goes with which data
@@ -459,7 +459,7 @@ is the observation behind the optimal-transport fix below.
 Independent coupling, the default, pairs noise and data at random and so produces crossings
 everywhere.
 
-### What curvature costs: Euler sampling
+### Euler sampling and the cost of curvature
 
 Sampling solves $dx/dt = v_\theta(x, t)$ from $t=0$ to $t=1$. The simplest solver is forward Euler
 on a uniform grid of $N$ steps: evaluate the velocity at the current point and time, and move in a
@@ -523,7 +523,7 @@ the metric counts both.
 
 </details>
 
-### Choosing the coupling: optimal transport
+### Choosing the coupling with optimal transport
 
 Our crossed-pairs case showed that the coupling with the least total squared distance avoided the
 crossing. Optimal transport makes that idea general.
