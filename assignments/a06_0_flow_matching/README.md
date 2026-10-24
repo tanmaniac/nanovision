@@ -63,18 +63,31 @@ dynamics applied to a new problem.
    converts to the score that a diffusion model learns, which shows how the two frameworks
    relate.
 
-One small example runs through the notes. Five exercises, placed after the sections they test,
+One small example, the $\pm 1$ example introduced next, is used throughout to make each formula
+concrete. Five exercises, placed after the sections they test,
 are meant to be worked by hand (a calculator helps for a few), and each has a worked answer that can
 be expanded.
 
-### The running example
+### The $\pm 1$ example (Gaussian noise moved onto two data points)
 
-The noise distribution is the standard Gaussian $\mathcal{N}(0, 1)$ on the real line. The "data
-distribution" is two points, $-1$ and $+1$, each with probability $1/2$. A generative model for this
-data must move every noise sample to either $-1$ or $+1$ and send half of them each way. This is
-the smallest example in which the central effect of flow matching, straight per-pair paths
-averaging into curved trajectories, is visible. The same example is used to illustrate each new
-formula below.
+The notes use one tiny generative problem in one dimension to make each idea concrete. The noise
+distribution is the standard Gaussian $\mathcal{N}(0, 1)$ on the real line. The data distribution
+is just two points, $-1$ and $+1$, each with probability $1/2$. A generative model for this data
+must move every noise sample to either $-1$ or $+1$ and send half of them each way. The notes call
+this the $\pm 1$ example.
+
+It is the smallest problem in which the central effect of flow matching (straight per-pair paths
+averaging into curved trajectories) is visible, and it is small enough that every quantity has a
+closed form that can be checked by hand.
+
+The figure shows how the density of the samples changes as they move from noise to data under the
+straight-line construction used later. At $t = 0$ it is the standard Gaussian. As $t$ grows the
+single bump flattens, splits into two, and the two bumps narrow and move outward until, at
+$t = 1$, all the mass sits on the dotted lines at $\pm 1$. In formulas (derived in the linear-path
+section), the density at time $t$ is an equal mixture of two Gaussians centered at $-t$ and $+t$,
+each with standard deviation $1 - t$.
+
+![The plus-minus-1 example: the density of the samples at t = 0, 0.3, 0.5, 0.7, 0.85, one Gaussian bump splitting into two bumps that narrow toward the data points at -1 and +1](assets/pm1_path.png)
 
 ### Velocity fields, flows, and probability paths
 
@@ -87,15 +100,13 @@ trajectory has reached at time $t$.
 
 Two trajectories of the same field can never cross, because at a crossing point the field would
 have to give two different velocities at the same place and time. In one dimension this means
-the flow preserves order: in the running example, every sample that starts below some threshold
+the flow preserves order: in the $\pm 1$ example, every sample that starts below some threshold
 ends at $-1$ and every sample above it ends at $+1$. By symmetry the threshold is $0$.
 
 **Probability path.** Instead of one particle, release many, with starting points drawn from a
 density $p_0$, and let every particle follow the same field. At each time $t$ the particles form a
 new density $p_t$. The family $\{p_t\}_{t \in [0,1]}$ is called a probability path from $p_0$ to
-$p_1$. In the running example with the straight-line construction used later, $p_t$ is an equal
-mixture of two Gaussians, centered at $-t$ and $+t$, each with standard deviation $1-t$: one bump at
-$t=0$ that splits into two bumps that move apart and narrow until they are spikes at $\pm 1$.
+$p_1$. The figure in the previous section is the probability path of the $\pm 1$ example.
 
 **Continuity equation.** The field and the path are linked. Particles are not created or destroyed
 as they move, so the density at a point changes only because particles flow in or out. To write
@@ -265,7 +276,7 @@ $$x_t = (1-t)\,x_0 + t\,x_1, \qquad u_t(x_t \mid x_1) = \frac{dx_t}{dt} = x_1 - 
 The conditional velocity is the displacement $x_1 - x_0$, the same at every $t$. The CFM loss
 becomes a regression of the network output onto that displacement.
 
-In the running example, take $x_0 = 0.3$ paired with $x_1 = +1$. At $t = 0.5$ the path point is
+In the $\pm 1$ example, take $x_0 = 0.3$ paired with $x_1 = +1$. At $t = 0.5$ the path point is
 $x_t = 0.5 \cdot 0.3 + 0.5 \cdot 1 = 0.65$ and the target velocity is $1 - 0.3 = 0.7$.
 
 Once $x_1$ is fixed, the only randomness left is $x_0$, a standard Gaussian, and $x_t$ is linear in
@@ -291,7 +302,7 @@ alone would ask for.
 The loss has no explicit weight over $t$. How much training effort each time gets depends only on
 the distribution $t$ is sampled from, which is the subject of a later section.
 
-> **Exercise 1 (the marginal velocity in closed form).** In the running example, compute the
+> **Exercise 1 (the marginal velocity in closed form).** In the $\pm 1$ example, compute the
 > posterior $P(x_1 = +1 \mid x_t = x)$ for general $x$ and $t$, then the marginal velocity $u_t(x)$
 > as a closed-form function of $x$ and $t$. Evaluate it at $t = 0.5$, $x = 0.25$.
 
@@ -323,19 +334,20 @@ average differs from each of them, and a particle following the averaged field c
 or speed as the mix of pairs around it changes. Its trajectory curves, even though each pair's path
 is a straight line.
 
-The figure shows this for the running example. On the left are straight conditional paths for
+The figure shows this for the $\pm 1$ example. On the left are straight conditional paths for
 random noise-data pairs, colored by destination; many cross. On the right are trajectories of the
 exact marginal field from Exercise 1, started from the same noise values. They do not cross, which
 no trajectories of a single field can, and they bend: those that start far from $0$ first drift
 toward the middle, where the posterior is uncertain, and all of them turn toward their destination
 as the posterior becomes sure.
 
-![Running example: straight crossing conditional paths (left) and curved non-crossing trajectories of the marginal field (right)](assets/running_example.png)
+![The plus-minus-1 example: straight crossing conditional paths (left) and curved non-crossing trajectories of the marginal field (right)](assets/pm1_trajectories.png)
 
-An even smaller case shows the effect in the extreme. Take two noise samples $x_0 \in \{-1, +1\}$
-and the two data points, and pair them crosswise: $-1 \mapsto +1$ and $+1 \mapsto -1$. The paths
+A cut-down version of the $\pm 1$ example shows the effect in its most extreme form. Keep the two
+data points, but replace the Gaussian noise with just two noise samples, $x_0 = -1$ and
+$x_0 = +1$, and pair them crosswise: $-1 \mapsto +1$ and $+1 \mapsto -1$. The paths
 are $x_t = 2t - 1$ and $x_t = 1 - 2t$, with velocities $+2$ and $-2$, and they meet at the origin
-at $t = 0.5$. There the learned velocity is the average of $+2$ and $-2$, which is zero. A
+at $t = 0.5$. The notes call this the crossed-pairs case. At the meeting point the learned velocity is the average of $+2$ and $-2$, which is zero. A
 trajectory of the learned field leaves $x = -1$ moving right at speed $2$, but it cannot pass
 through the origin to reach $+1$, because the trajectory starting at $+1$ would have to pass it
 going the other way, and trajectories of one field never cross. Instead it slows as it approaches
@@ -420,7 +432,7 @@ metric counts both.
 
 ### Choosing the pairing: optimal transport
 
-The two-point example showed that the pairing with the least total squared distance avoided the
+The crossed-pairs case showed that the pairing with the least total squared distance avoided the
 crossing. Optimal transport makes that idea general.
 
 Optimal transport (OT) asks how to move one distribution onto another at the least total cost. The
@@ -466,7 +478,7 @@ $(2, 3.5, 0.5) \to 16.5$, $(0.5, 2, 3.5) \to 1.5$, $(0.5, 3.5, 2) \to 7.5$,
 $(3.5, 2, 0.5) \to 19.5$, $(3.5, 0.5, 2) \to 13.5$. The optimum is $(0.5, 2, 3.5)$ with cost
 $1.5$, down from $4.5$. It pairs the sorted noise with the sorted data. In 1D with squared-distance
 cost the optimal pairing is always the sorted one, so the straight paths between pairs never
-cross. In the running example, OT pairing within a batch splits the noise samples at their median:
+cross. In the $\pm 1$ example, OT pairing within a batch splits the noise samples at their median:
 those below it go to $-1$ and those above it to $+1$. For a large batch the median is close to $0$,
 which is the split the curved trajectories in the figure produce.
 
@@ -511,7 +523,7 @@ procedure gives the 3-rectified flow, and so on.
 
 The ODE is deterministic, so each $x_0$ has exactly one endpoint, and the new pairing is the one
 the first model's trajectories produced. Liu et al. prove that this pairing has a transport cost no
-higher than the pairing it came from, for every convex cost function at once. By the two-point
+higher than the pairing it came from, for every convex cost function at once. By the crossed-pairs
 argument, lower-cost pairings have fewer crossing paths, so the second model has less to average
 and its field is straighter.
 In one dimension the step is exact: trajectories of one field preserve order, so in the running
@@ -532,7 +544,7 @@ training decides how much effort each time receives. Uniform sampling on $[0, 1]
 equally. SD3 samples times near the middle more often.
 
 The reason is that the regression target is simple at both ends of the path. Assume independent
-coupling and data with zero mean, as in the running example.
+coupling and data with zero mean, as in the $\pm 1$ example.
 - At $t=0$, the path point is $x_t = x_0$. Since $x_1$ was drawn independently of $x_0$, the target
   is $\mathbb{E}[x_1 - x_0 \mid x_0] = \mathbb{E}[x_1] - x_0 = -x_0$.
 - At $t=1$, the path point is $x_t = x_1$, and the target is
@@ -540,7 +552,7 @@ coupling and data with zero mean, as in the running example.
 
 Both endpoint targets are linear in $x_t$, which any network learns almost immediately. The
 decision of which part of the data a noise sample heads toward is made at intermediate times; in
-the running example, that is where the trajectories in the figure bend. (Under OT coupling the
+the $\pm 1$ example, that is where the trajectories in the figure bend. (Under OT coupling the
 endpoint targets are no longer linear, because $x_1$ then depends on $x_0$, but the middle times
 still carry most of the difficulty.)
 
@@ -628,7 +640,7 @@ $$\text{score}(x_t, t) = \frac{t\,v - x_t}{1-t}.$$
 The denominator is zero at $t=1$, where each conditional path has shrunk to the single point $x_1$
 and the density has no gradient. The relation is used only for $t < 1$.
 
-> **Exercise 5 (score and velocity at the same point).** In the running example at $t = 0.5$,
+> **Exercise 5 (score and velocity at the same point).** In the $\pm 1$ example at $t = 0.5$,
 > $x = 0.25$, Exercise 1 gave $u \approx 0.424$ and posterior mean $\mathbb{E}[x_1 \mid x] \approx
 > 0.462$. Compute the score from the velocity with the formula above. Then compute it directly as
 > the posterior average of the conditional scores $-(x - t x_1)/(1-t)^2$, and check that they
@@ -645,8 +657,8 @@ agree.
 The score is negative: it points toward $0$, away from the destination $+1$. The score describes
 the density at $t = 0.5$, not where particles are going. At that time the density is an equal
 mixture of Gaussians with means $\pm 0.5$ and standard deviation $0.5$. The means are only two
-standard deviations apart, so the bumps merge into a single peak at $0$, and the density falls
-from $x = 0$ to $x = 0.25$. The velocity answers a different question, where the particle is
+standard deviations apart, so the bumps merge into a single flat-topped peak at $0$ (the
+$t = 0.5$ curve in the first figure), and the density falls from $x = 0$ to $x = 0.25$. The velocity answers a different question, where the particle is
 headed, and the formula converts one into the other.
 
 </details>
@@ -762,7 +774,7 @@ The tests check:
   for constant velocity" result from the notes.
 - `test_score_velocity.py`: the score computed from the velocity matches the conditional score.
   Times are drawn from $[0.05, 0.90]$ to stay away from the singularity at $t=1$.
-- `test_ot_coupling.py`: `test_swap_case` is a 2D version of the crossed two-point example: the
+- `test_ot_coupling.py`: `test_swap_case` is a 2D version of the crossed-pairs case: the
   input pairing crosses, and OT must swap it. The second test checks that the output is a valid
   permutation whose cost is no higher than the original pairing's.
 - `test_straightness.py`: a constant field gives $S < 10^{-10}$; a rotation field, whose velocity
@@ -788,8 +800,8 @@ figures in windows when a display is available. The figures are:
 - `timesteps.png`: histograms of uniform and logit-normal timesteps.
 - `image_cfm.png`: the image-scale demo, which reuses the diffusion U-Net with the CFM loss.
 
-The running-example figure in the notes is generated by `assets/make_running_example.py` from the
-closed-form field of Exercise 1, not from the assignment code.
+The two figures of the $\pm 1$ example in the notes are generated by `assets/make_pm1_figures.py`
+from the closed-form density and field of Exercise 1, not from the assignment code.
 
 What you should see when you run this. The overfit test reduces the CFM loss by about three orders
 of magnitude from its untrained value (about 900x, from 17.2 to 0.019 in the provided CPU run). It
