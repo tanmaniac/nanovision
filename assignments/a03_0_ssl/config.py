@@ -3,7 +3,7 @@
 One small config object so the magic numbers live in one place. The defaults are
 the CIFAR-10-scale tiny setup from the research scope: 32x32 images, patch 4 (so
 N = 64 patch tokens). MAE uses an asymmetric encoder (dim 64, depth 4) and a
-lighter decoder (dim 32, depth 2) with 75% masking. DINO uses the same tiny ViT
+lighter decoder (dim 48, depth 2) with 75% masking. DINO uses the same tiny ViT
 backbone with a projection head to K prototypes, an EMA teacher, and centering +
 sharpening temperatures.
 """
