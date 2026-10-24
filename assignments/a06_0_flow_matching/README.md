@@ -13,12 +13,13 @@ reverse a noising process one small step at a time. Flow matching trains the vel
 with a plain mean-squared-error loss against a target velocity that has a closed-form expression,
 and nothing has to be simulated during training. When the paths the model follows from noise to
 data are close to straight lines traveled at constant speed, a few large ODE steps are enough to
-generate a sample, where a diffusion sampler typically needs hundreds. Stable Diffusion 3 (SD3)
-and FLUX, the text-to-image systems released since mid-2024, are trained with this objective.
+generate a sample, where a diffusion sampler typically needs tens to hundreds. Stable Diffusion 3
+(SD3) and FLUX, two text-to-image systems released in 2024, are trained with this objective.
 
 Build conditional flow matching from scratch on 2D toy data, where the velocity field and the
 paths can be plotted in full. The pieces are the straight-line path between noise and data, the
-conditional flow matching loss, minibatch optimal-transport coupling (choosing which noise sample
+conditional flow matching loss, minibatch (the examples in one training step) optimal-transport
+coupling (choosing which noise sample
 goes with which data sample so that paths cross less), logit-normal sampling of training times (a
 distribution that favors the middle of the path), an Euler ODE sampler, a metric for how straight
 the generated paths are, and the conversion from a flow-matching velocity to the score (the
@@ -99,14 +100,13 @@ pictures are plausible, and the average points toward a vague mixture of them. A
 emerges, fewer pictures remain plausible, the average sharpens, and the steps head toward one
 specific picture.
 
-#### Why it matters
+#### Fewer sampling steps than diffusion
 
 Diffusion models also generate by turning noise into data in many small steps, and they produce
 excellent images, but sampling takes tens to hundreds of network evaluations per image. Flow
 matching keeps the same overall recipe with a simpler training target, and when the motion from
 noise to picture is close to a straight line traveled at constant speed, a handful of steps are
-enough. The number of steps is the main cost of generating a sample, so this matters in practice:
-SD3 and FLUX for images and pi0 (a robot control policy from Physical Intelligence) for robot
+enough. The number of steps is the main cost of generating a sample, which is why SD3 and FLUX for images and pi0 (a robot control policy from Physical Intelligence) for robot
 actions are trained with flow matching. Much of these notes is about why the motion is not exactly
 straight and what can be done about it.
 
@@ -132,7 +132,8 @@ Two words used throughout the notes can be seen here first. A quantity is **cond
 refers to one fixed data point $x_1$, and **marginal** when it is averaged over all data points. In
 our $\pm 1$ example, take all the noise samples paired with $x_1 = +1$ and move each along its
 straight line. At time $t$ they form a single Gaussian bump centered at $t$ with standard deviation
-$1 - t$: that is the conditional distribution of the interpolant given $x_1 = +1$. Do the same for
+$1 - t$: that is the conditional distribution of the interpolant given $x_1 = +1$, called the
+conditional probability path. Do the same for
 $x_1 = -1$ and pool both groups. The pooled distribution is an equal mixture of two bumps,
 centered at $-t$ and $+t$: that is the marginal distribution of the interpolant.
 
@@ -174,11 +175,13 @@ worked answer that can be expanded.
 
 ### Velocity fields, flows, and probability paths
 
-The word "path" is used in three senses in this literature, so the notes keep three terms apart. A
-**conditional path** is the straight line from one noise sample to its paired data point. A
+The word "path" is used in several senses in this literature, so the notes keep the terms apart.
+A **conditional path** is the straight line from one noise sample to its paired data point. A
 **trajectory** is the curve a point traces when it follows a velocity field, as the sampler does.
-A **probability path** is a sequence of distributions over time, not a curve at all; it is defined
-below.
+A **probability path** is a sequence of distributions over time, defined below. The **conditional
+probability path** is the distribution of the interpolant over all noise samples paired with one
+data point $x_1$ (the single bump in our $\pm 1$ example), and the marginal probability path is
+the same over all data points (the two-bump mixture).
 
 A time-dependent **velocity field** $v_t(x)$ assigns a vector in $\mathbb{R}^d$ to every point
 $x \in \mathbb{R}^d$ and every time $t$. A point that starts at $x$ moves according to the ODE
@@ -224,7 +227,7 @@ field that generates a probability path from the Gaussian to the data is enough 
 ### Why not train the field by maximum likelihood
 
 The standard way to fit a probabilistic model is to maximize the likelihood it assigns to the
-training data. Continuous normalizing flows, the predecessor of flow matching, were trained that
+training data. Continuous normalizing flows (defined below), the predecessor of flow matching, were trained that
 way, and they were slow to train. Flow matching was designed to remove the step that made them
 slow.
 
@@ -258,9 +261,9 @@ onto a target velocity that has a closed-form expression, with a mean-squared-er
 training step is: sample a time, sample a data point, sample an interpolant, evaluate the network
 once, and take a gradient step. No ODE solver is involved.
 
-### Notation
+### Notation summary
 
-In these notes $t=0$ is noise and $t=1$ is data. Diffusion papers, and the diffusion assignment,
+This section collects the symbols already introduced and used from here on. In these notes $t=0$ is noise and $t=1$ is data. Diffusion papers, and the diffusion assignment,
 use the opposite convention: $x_0$ is the clean image and time runs forward into noise. Both
 conventions are standard in their own literature, so the clash cannot be avoided. It matters in the
 score-velocity section near the end.
@@ -297,7 +300,7 @@ regresses the network onto the conditional velocity:
 $$\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E}_{t,\,x_1,\,x_t}\Big[\,\big\|v_\theta(x_t, t) - u_t(x_t \mid x_1)\big\|^2\,\Big].$$
 
 Every quantity in it can be sampled: draw $t$, draw a data point $x_1$, draw $x_t$ from the
-conditional path, and compute the target. The claim is that minimizing $\mathcal{L}_{\text{CFM}}$
+conditional probability path, and compute the target. The claim is that minimizing $\mathcal{L}_{\text{CFM}}$
 gives the same network as minimizing $\mathcal{L}_{\text{FM}}$. The proof has two steps.
 
 #### Step 1, least-squares regression returns the conditional mean
@@ -325,15 +328,17 @@ $\mathcal{L}_{\text{CFM}}$ is the average of their velocities:
 
 $$v_\theta(x, t) = \mathbb{E}\big[\,u_t(x_t \mid x_1) \;\big|\; x_t = x\,\big].$$
 
-If this average is the marginal velocity $u_t(x)$, then the two losses have targets with the same
-conditional mean, so by the fact above they differ by a constant that does not depend on $\theta$
-and have identical gradients. Step 2 shows that it is.
+Flow matching defines the marginal velocity $u_t(x)$ to be exactly this average. With that
+definition the two losses have targets with the same conditional mean, so by the fact above they
+differ by a constant that does not depend on $\theta$ and have identical gradients. The definition
+is only useful if this average actually moves the noise onto the data, and Step 2 shows that it
+does.
 
 #### Step 2, the average of the conditional velocities generates the marginal path
 
 The marginal density is a mixture of the conditional densities, one per data point:
 $p_t(x) = \int p_t(x \mid x_1)\,p(x_1)\,dx_1$. Differentiate in $t$ under the integral and use the
-continuity equation for each conditional path:
+continuity equation for each conditional probability path:
 
 $$\frac{\partial p_t(x)}{\partial t}
 = -\int \nabla \cdot \big(p_t(x \mid x_1)\,u_t(x \mid x_1)\big)\,p(x_1)\,dx_1
@@ -343,15 +348,15 @@ The divergence moves outside the integral because it differentiates in $x$ and t
 over $x_1$. The second form multiplies and divides by $p_t(x)$. By Bayes' rule, the weight
 $p_t(x \mid x_1)p(x_1)/p_t(x)$ is the posterior probability of data point $x_1$ given that the
 interpolant is at $x$ at time $t$, so the integral is the posterior average of the conditional
-velocities. Define the marginal velocity as that average:
+velocities, which is the marginal velocity as defined in Step 1:
 
 $$u_t(x) = \mathbb{E}\big[\,u_t(x_t \mid x_1) \;\big|\; x_t = x\,\big].$$
 
 The equation now reads $\partial p_t / \partial t = -\nabla \cdot (p_t u_t)$, the continuity
 equation for the marginal probability path. So the posterior average of the conditional velocities
-generates the marginal path. Of the many fields that generate that path, flow matching takes this
-one as the marginal velocity in $\mathcal{L}_{\text{FM}}$, and it is exactly what the regression in
-Step 1 converges to. Together the two steps show that $\mathcal{L}_{\text{CFM}}$ and
+generates the marginal path. Of the many fields that generate that path, this is the one flow
+matching uses in $\mathcal{L}_{\text{FM}}$, and it is exactly what the regression in Step 1
+converges to. Together the two steps show that $\mathcal{L}_{\text{CFM}}$ and
 $\mathcal{L}_{\text{FM}}$ have identical gradients. This is Theorem 1 of Lipman et al. (2022).
 
 ### The linear path
@@ -369,7 +374,7 @@ In our $\pm 1$ example, take $x_0 = 0.3$ paired with $x_1 = +1$. At $t = 0.5$ th
 $x_t = 0.5 \cdot 0.3 + 0.5 \cdot 1 = 0.65$ and the target velocity is $1 - 0.3 = 0.7$.
 
 Once $x_1$ is fixed, the only randomness left is $x_0$, a standard Gaussian, and $x_t$ is linear in
-it, so the conditional path is Gaussian at every time:
+it, so the conditional probability path is Gaussian at every time:
 
 $$x_t \mid x_1 \sim \mathcal{N}\big(t\,x_1,\ (1-t)^2 I\big).$$
 
@@ -389,9 +394,6 @@ $P(x_1 = +1 \mid x_t = 0.65) = 13.5/14.5 \approx 0.931$. The marginal velocity t
 average, $0.931 \cdot 0.7 + 0.069 \cdot (-3.3) \approx 0.42$, well below the $0.7$ that the pair
 toward $+1$ alone would ask for.
 
-The loss has no explicit weight over $t$. How much training effort each time gets depends only on
-the distribution $t$ is sampled from, the subject of a later section.
-
 > **Exercise 1 (the marginal velocity in closed form).** In our $\pm 1$ example, compute the
 > posterior $P(x_1 = +1 \mid x_t = x)$ for general $x$ and $t$, then the marginal velocity $u_t(x)$
 > as a closed-form function of $x$ and $t$. Evaluate it at $t = 0.5$, $x = 0.25$.
@@ -402,8 +404,8 @@ the distribution $t$ is sampled from, the subject of a later section.
 The two conditional densities are Gaussians with the same standard deviation $1-t$ and means
 $\pm t$. Their ratio is
 $\exp\big(\frac{(x + t)^2 - (x - t)^2}{2(1-t)^2}\big) = \exp\big(\frac{2tx}{(1-t)^2}\big)$, so
-$P(x_1 = +1 \mid x) = \sigma\big(2tx/(1-t)^2\big)$, where $\sigma$ is the sigmoid. The posterior
-mean of $x_1$ is $2\sigma(a) - 1 = \tanh(a/2) = \tanh\big(tx/(1-t)^2\big)$. The conditional velocity
+$P(x_1 = +1 \mid x) = \sigma(\alpha)$ with $\alpha = 2tx/(1-t)^2$, where $\sigma$ is the sigmoid.
+The posterior mean of $x_1$ is $2\sigma(\alpha) - 1 = \tanh(\alpha/2) = \tanh\big(tx/(1-t)^2\big)$. The conditional velocity
 $(x_1 - x)/(1-t)$ is linear in $x_1$, so its posterior average is
 
 $$u_t(x) = \frac{\tanh\big(tx/(1-t)^2\big) - x}{1-t}.$$
@@ -469,15 +471,14 @@ Euler's error comes from the velocity changing during a step. Expanding the true
 Taylor series about the current time, Euler keeps $\dot{x}\,\Delta t$ and drops the rest, of which
 the largest term is $\tfrac12 \ddot{x}\,\Delta t^2$, set by the acceleration along the trajectory.
 If the velocity along a trajectory is constant, the acceleration and every higher derivative are
-zero, and Euler lands exactly on the endpoint with any number of steps, including one. This is an
-exact statement, not a limit as $\Delta t \to 0$.
+zero, and Euler lands exactly on the endpoint with any number of steps, including one. This holds
+exactly for any step size.
 
 So the number of sampling steps needed depends on how much the velocity changes along the
 trajectories. A trajectory that is a straight line traveled at constant speed needs a single step.
 The curved trajectories in the figure above need enough steps to follow the bend. Making the
-trajectories straighter therefore reduces the number of network evaluations at sampling time. A
-diffusion sampler may need hundreds of network evaluations for a given quality, where a flow with
-nearly straight trajectories needs a few.
+trajectories straighter therefore reduces the number of network evaluations at sampling time,
+which is the advantage over diffusion described at the start of the notes.
 
 ### Measuring straightness
 
@@ -551,7 +552,8 @@ weights, optimal transport between two point sets is a matching problem.
 
 Trying every permutation would take $B!$ evaluations. This matching problem is the **assignment
 problem**, and it has exact polynomial-time algorithms. The Hungarian algorithm (Kuhn 1955, Naval
-Research Logistics Quarterly) solves it in $O(B^3)$ time and returns the exact optimum. It works by
+Research Logistics Quarterly) returns the exact optimum; later refinements of it run in $O(B^3)$
+time. It works by
 repeatedly adjusting an offset for each row and each column of the cost matrix until there are
 enough zero-cost entries to form a complete matching. SciPy has an exact solver for it.
 
@@ -570,9 +572,9 @@ $(2, 3.5, 0.5) \to 16.5$, $(0.5, 2, 3.5) \to 1.5$, $(0.5, 3.5, 2) \to 7.5$,
 $(3.5, 2, 0.5) \to 19.5$, $(3.5, 0.5, 2) \to 13.5$. The optimum is $(0.5, 2, 3.5)$ with cost
 $1.5$, down from $4.5$. It pairs the sorted noise with the sorted data. In 1D with squared-distance
 cost the optimal coupling is always the sorted one, so the conditional paths never cross. In our
-$\pm 1$ example, OT coupling within a batch splits the noise samples at their median: those below
-it go to $-1$ and those above it to $+1$. For a large batch the median is close to $0$, which is
-the split the curved trajectories in the figure produce.
+$\pm 1$ example, if a batch contains $n$ copies of $-1$, OT coupling sends the $n$ smallest noise
+samples to $-1$ and the rest to $+1$. For a large batch with about equal numbers of each, the split
+falls close to $0$, which is the split the curved trajectories in the figure produce.
 
 </details>
 
@@ -596,6 +598,8 @@ bias and show it shrinks as the minibatch grows. And building the cost matrix co
 solving the assignment costs $O(B^3)$, which is negligible at $B = 256$ in two dimensions and
 significant for images.
 
+### Two meanings of "optimal transport"
+
 Two different things in this literature are called "optimal transport". Lipman et al. call the
 linear path the "optimal transport" conditional path, because for a fixed $x_1$ the straight-line
 map is the optimal transport map between the two endpoint conditional distributions: the standard
@@ -616,9 +620,10 @@ procedure gives the 3-rectified flow, and so on.
 
 The ODE is deterministic, so each $x_0$ has exactly one endpoint, and the new coupling is the one
 the first model's trajectories produced. Liu et al. prove that this coupling has a transport cost no
-higher than the coupling it came from, for every convex cost function at once. By the argument of
-our crossed-pairs case, a lower-cost coupling has fewer crossing conditional paths, so the second
-model has less to average and its trajectories are straighter.
+higher than the coupling it came from, for every convex cost function at once, and that repeated
+reflow drives the straightness $S$ toward zero. The second model's conditional paths are lines
+between points the first model's non-crossing trajectories connected, so they cross less than
+independent pairs, and the second model has less to average.
 
 In one dimension the improvement is complete. Trajectories of one field preserve order, so in our
 $\pm 1$ example reflow pairs each negative noise sample with $-1$ and each positive one with $+1$.
@@ -694,17 +699,18 @@ into a diffusion score.
 The **score** of a density is the gradient of its logarithm, $\nabla_x \log p_t(x)$. It points in
 the direction in which the density increases fastest, and like the velocity it is a vector field
 over points and times. It is what a diffusion model learns. A noise-prediction network learns it in
-rescaled form: for a noised sample $x_t = a\,x_{\text{data}} + \sigma\,\varepsilon$ with
-$\varepsilon \sim \mathcal{N}(0, I)$, the conditional score is $-\varepsilon/\sigma$, so predicting
-the noise is predicting the score up to a factor of $-\sigma$.
+rescaled form: in the diffusion assignment's notation a noised sample is
+$x_t = a_t\,x_{\text{data}} + b_t\,\varepsilon$ with $\varepsilon \sim \mathcal{N}(0, I)$, its
+conditional score is $-\varepsilon/b_t$, and so predicting the noise is predicting the score up to
+a factor of $-b_t$.
 
 The result of this section: on the linear path, the score at a point is an affine function of the
 velocity at that point, with coefficients that depend only on $x_t$ and $t$.
 
-Start with one conditional path, where everything is Gaussian. From the linear-path section,
-$x_t \mid x_1 \sim \mathcal{N}(t x_1, (1-t)^2 I)$. The log-density of a Gaussian with mean $\mu$
-and variance $\sigma^2$ is $-\lVert x - \mu \rVert^2 / (2\sigma^2)$ plus a constant, so its gradient
-is $-(x - \mu)/\sigma^2$:
+Start with one conditional probability path, where everything is Gaussian. From the linear-path section,
+$x_t \mid x_1 \sim \mathcal{N}(t x_1, (1-t)^2 I)$. The log-density of a Gaussian is minus the
+squared distance to the mean divided by twice the variance, plus a constant, so its gradient is
+$-(x - \text{mean})/\text{variance}$:
 
 $$\nabla_{x_t}\log p_t(x_t \mid x_1) = -\frac{x_t - t\,x_1}{(1-t)^2}.$$
 
@@ -732,7 +738,7 @@ can be computed from its output:
 
 $$\text{score}(x_t, t) = \frac{t\,v - x_t}{1-t}.$$
 
-The denominator is zero at $t=1$, where each conditional path has shrunk to the single point $x_1$
+The denominator is zero at $t=1$, where each conditional probability path has shrunk to the single point $x_1$
 and the density has no gradient. The relation is used only for $t < 1$.
 
 > **Exercise 5 (score and velocity at the same point).** In our $\pm 1$ example at $t = 0.5$,
@@ -765,16 +771,18 @@ into the other.
 Both frameworks build a Gaussian path between data and noise of the form
 $x_t = a_t\,x_{\text{data}} + b_t\,x_{\text{noise}}$, with scalar schedules $a_t$ and $b_t$.
 
-Diffusion with the standard **variance-preserving** schedule uses $a_t^2 + b_t^2 = 1$. For data with
+Diffusion with the standard **variance-preserving** schedule, as in the diffusion assignment, uses
+$a_t^2 + b_t^2 = 1$. For data with
 unit variance this keeps the variance of $x_t$ at 1 for every $t$, hence the name, so the network
-sees inputs of the same scale at every noise level. The cosine schedule is one such choice. The
+sees inputs of the same scale at every noise level (the amount of noise in $x_t$, set by $t$). The cosine schedule is one such choice. The
 linear path uses $a_t = t$ and $b_t = 1-t$, and $t^2 + (1-t)^2$ is not 1: it drops to $0.5$ at
 $t = 0.5$. So the linear path is not variance-preserving.
 
 The difference is a rescaling. Dividing a point on the linear path by $\sqrt{t^2 + (1-t)^2}$ puts
-it on a variance-preserving path. The two paths pass through the same signal-to-noise ratios
-$a^2/b^2$ at different times, and matched by signal-to-noise ratio they describe the same family of
-distributions up to a scalar at each time.
+it on a variance-preserving path with the same signal-to-noise ratio $a_t^2/b_t^2$ at every $t$.
+Any two such paths, for example the rescaled linear path and the cosine schedule, then differ only
+in which $t$ reaches a given signal-to-noise ratio. Matching times by signal-to-noise ratio, they
+describe the same family of distributions up to a scalar at each time.
 
 The prediction targets correspond in the same way. Diffusion models can be trained to predict the
 noise, the clean sample, or a combination of the two called $v$-prediction (Salimans & Ho 2022,
@@ -793,8 +801,11 @@ Three differences remain.
 1. The effective weighting across noise levels differs, because of that time-dependent factor.
    Flow matching with logit-normal timesteps and diffusion with a cosine schedule optimize the same
    family of objectives but are not the same training run.
-2. OT coupling has no diffusion counterpart. Diffusion's forward process adds independent Gaussian
-   noise to each data point, so the coupling is always independent.
+2. Coupling is built into flow matching but not into standard diffusion. Diffusion's forward
+   process adds independent Gaussian noise to each data point, so its coupling is independent by
+   construction. Immiscible Diffusion (Li et al. 2024,
+   [arXiv:2406.12303](https://arxiv.org/abs/2406.12303)) later added minibatch noise assignment to
+   diffusion training, borrowing the same idea.
 3. Flow matching does not need one endpoint to be noise. Any two distributions that can be sampled
    will do, because the conditional path interpolates between a sample from each rather than
    running a noising process. This lets rectified flow map one data distribution directly onto
@@ -805,7 +816,7 @@ Three differences remain.
 
 ### Later developments
 
-As of 2025, newer methods outperform reflow for few-step generation. MeanFlow (Geng et al. 2025,
+Methods published in 2024 and 2025 outperform reflow for few-step generation. MeanFlow (Geng et al. 2025,
 [arXiv:2505.13447](https://arxiv.org/abs/2505.13447)) trains the network to predict the average
 velocity over a time interval instead of the velocity at one instant, so one network evaluation
 covers a whole interval; this allows one-step generation from a single training run without a
@@ -905,7 +916,7 @@ What you should see when you run this. The overfit test reduces the CFM loss by 
 of magnitude from its untrained value (about 900x, from 17.2 to 0.019 in the provided CPU run). It
 stops improving there because some distinct pairs land at nearly the same $(x_t, t)$ with different
 target velocities, and a finite MLP cannot match both. For that reason the test checks a relative
-drop and a loose absolute bound rather than an exact number. The constant-velocity oracle
+drop and a loose absolute bound rather than an exact number. The constant-velocity Euler test
 reconstructs $x_1$ to within $10^{-6}$ even with one Euler step. In the figures, OT coupling and one
 reflow step give visibly straighter trajectories and a lower straightness number than independent
 coupling, and the OT model produces recognizable samples with 2 to 4 Euler steps. These are 2D toy
@@ -937,6 +948,7 @@ in the feature space of a pretrained network.
 - Albergo, Boffi & Vanden-Eijnden 2023, Stochastic Interpolants,
   [arXiv:2303.08797](https://arxiv.org/abs/2303.08797).
 - Geng et al. 2025, MeanFlow, [arXiv:2505.13447](https://arxiv.org/abs/2505.13447).
+- Li et al. 2024, Immiscible Diffusion, [arXiv:2406.12303](https://arxiv.org/abs/2406.12303).
 - Wang et al. 2024, Rectified Diffusion, [arXiv:2410.07303](https://arxiv.org/abs/2410.07303).
 - Yang et al. 2024, Consistency Flow Matching,
   [arXiv:2407.02398](https://arxiv.org/abs/2407.02398).

@@ -50,7 +50,7 @@ for k in range(steps):
 ts = np.linspace(0.0, t_end, steps + 1)
 for i in range(n):
     ax_m.plot(ts, traj[:, i], color="tab:blue" if traj[-1, i] > 0 else "tab:orange", lw=1)
-ax_m.set_title("Marginal-field trajectories: curved, no crossings")
+ax_m.set_title("Marginal-velocity trajectories: curved, no crossings")
 ax_m.set_xlabel("t")
 
 for ax in (ax_c, ax_m):
@@ -73,7 +73,7 @@ for x1 in (-1, 1):
     ax.axvline(x1, color="gray", lw=0.8, ls=":")
 ax.set_xlabel("x")
 ax.set_ylabel("density $p_t(x)$")
-ax.set_title("The ±1 example: noise N(0, 1) at t = 0, two data points at ±1 at t = 1")
+ax.set_title("Our ±1 example: noise N(0, 1) at t = 0, data points ±1 at t = 1")
 ax.legend(fontsize=8)
 fig2.tight_layout()
 fig2.savefig("pm1_path.png", dpi=120)
