@@ -26,8 +26,10 @@ def test_prior_overfit():
             first = loss.item()
     final = loss.item()
     # Starts near ln(K) (uniform over K codes) and drops ~25x. It floors near ln(B)/L
-    # (here ln(8)/16 ~= 0.13), not 0, because position 0 has the identical [BOS] context for
-    # every grid, so its cross-entropy cannot beat the entropy of the B distinct first tokens.
+    # (here ln(8)/16 ~= 0.13), not 0: a model that memorizes B distinct grids can at best give
+    # each probability 1/B, so the summed cross-entropy over the L positions is at least ln(B).
+    # The cost is paid where grids first differ (position 0 for most; two of these 8 grids share
+    # their first token, so part of it lands at position 1), but the total is ln(B) either way.
     assert first > 0.5 * math.log(cfg.num_codes), f"start {first} not near ln(K)={math.log(cfg.num_codes):.2f}"
     assert final < 0.2, f"final {final}"
     assert final < 0.1 * first
