@@ -2,8 +2,9 @@
 
 This proves the matcher + loss + model overfit a tiny fixed set. It proves nothing about
 convergence speed or accuracy at real scale (see the README's toy-scope disclaimer). The
-total loss falls from ~4.8 to a floor near 0.1-0.25, dominated by the GIoU residual that the
-4-pixel patch stride leaves on box localization; the matched predicted box centers land on
+total loss falls from ~4.8 to near 0.1-0.25 after 500 steps, dominated by the GIoU term
+(GIoU is relative to box size, so a sub-pixel edge error on a 6-8 pixel box still costs a few
+percent); the value keeps falling with more steps. The matched predicted box centers land on
 the ground-truth centers to well under 0.06 of the image size.
 
 Measured at seed 0, 500 Adam steps (lr 1e-3), CPU, ~15s: first ~4.8, final ~0.11, matched

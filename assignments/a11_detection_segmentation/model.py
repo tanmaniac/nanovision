@@ -11,8 +11,9 @@ This build deliberately omits two real DETR pieces:
     added once at the patch-embedding layer.
   - Per-layer auxiliary losses (a copy of the matching loss at every decoder layer). Here the
     loss is computed only from the final layer's output.
-Box localization is bounded by the 4-pixel patch stride: the backbone sees the image at an
-8x8 grid, so a center cannot be pinned finer than that grid allows.
+The backbone sees the image as an 8x8 grid of 4-pixel patches, but the regressed boxes are
+not limited to that grid: after overfitting, the residual box-edge errors are a fraction of a
+pixel, and they keep shrinking with more training steps.
 """
 
 import torch
