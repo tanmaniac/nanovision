@@ -8,7 +8,7 @@ penalty for doing so.
 
 Two correctness points the build must respect:
 
-1. ONE shared scale over the UNION of both pointmaps' valid points (Eq. 5), not a separate
+1. ONE shared scale over the UNION of both pointmaps' valid points (Eq. 3), not a separate
    scale per map. A per-map scale would independently rescale view 1 and view 2 and destroy
    the relative scale between them, which is exactly the information the shared cam1-frame
    representation carries. normalize_scale therefore returns one scalar per batch element.
@@ -24,7 +24,7 @@ from torch import Tensor
 
 
 def normalize_scale(pts: Tensor, valid: Tensor, eps: float = 1e-8) -> Tensor:
-    """One shared scale over the union of both pointmaps' valid points (DUSt3R Eq. 5).
+    """One shared scale over the union of both pointmaps' valid points (DUSt3R Eq. 3).
 
     Both pointmaps stack into pts so they share one scalar per batch element; do not compute
     a scale per map. See the "The confidence-weighted, scale-normalized loss" section of the
@@ -59,8 +59,9 @@ def pointmap_loss(
     Scale-normalize the two predicted maps by a single joint z and the two GT maps by a
     single joint zbar, both from normalize_scale (one shared scale per side, not per map).
     The loss weights each valid pixel's residual by its confidence and averages over the
-    valid pixels of BOTH views; alpha = 0.2 (paper). See the "The confidence-weighted,
-    scale-normalized loss" section of the README for the residual and the loss.
+    valid pixels of BOTH views; alpha = 0.2 (DUSt3R code release). See the "The
+    confidence-weighted, scale-normalized loss" section of the README for the residual and
+    the loss.
 
     Args:
         pred_pts1, pred_pts2: (B, h, w, 3) predicted pointmaps, both in cam1 frame.

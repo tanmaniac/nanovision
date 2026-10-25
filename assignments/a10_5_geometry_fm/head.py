@@ -6,7 +6,7 @@ the (h, w) patch grid. The toy predicts one point per patch (patch resolution); 
 predicts one point per pixel through a DPT head. The lesson is the same: regress 3D + a
 learned confidence.
 
-Confidence uses the DUSt3R parameterization C = 1 + exp(logit) (paper text after Eq. 6), so
+Confidence uses the DUSt3R parameterization C = 1 + exp(logit) (paper text after Eq. 4), so
 C >= 1 always. The loss reads C; a softplus would change the trade-off, so do not substitute.
 """
 
