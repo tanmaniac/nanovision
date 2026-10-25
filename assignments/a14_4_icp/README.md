@@ -756,8 +756,7 @@ solve responds only to real misalignment.
 The orthogonal Procrustes solution. Be ready to derive or state the SVD solution for the
 point-to-point rotation, and specifically the $\det(V U^\top)$ correction and why it is there:
 maximizing the trace alone constrains $R$ to be orthogonal, not to be a rotation, and on
-rank-deficient data the best orthogonal fit can be a reflection. Interviewers often ask about this detail
-specifically.
+rank-deficient data the best orthogonal fit can be a reflection.
 
 The point-to-plane linearization. The standard on-the-spot ask is to derive it: first-order
 motion of a point under a twist, dot with the normal, read off the Jacobian row
