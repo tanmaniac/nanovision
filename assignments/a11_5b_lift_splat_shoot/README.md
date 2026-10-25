@@ -13,9 +13,9 @@ Build that view transform: the per-pixel depth-and-context lift (context is a le
 vector per pixel), the frustum (the 3-D position of every pixel at every candidate depth) that
 places each lifted feature in the ego frame, the sort-and-cumsum pooling that splats the frustum
 into BEV pillars (BEV cells, each the vertical column of space above one patch of ground), the
-assembled model, and the BEVDepth depth-supervision loss. The depth lift and the sort-and-cumsum
-pooling built here are shared infrastructure, reused unchanged by the occupancy-prediction
-assignment. All graded tests run on CPU.
+assembled model, and the BEVDepth depth-supervision loss. The occupancy-prediction assignment
+starts from a BEV feature map of the kind this view transform produces. All graded tests run on
+CPU.
 
 Required reading before starting:
 - Philion and Fidler 2020, "Lift, Splat, Shoot: Encoding Images from Arbitrary Camera Rigs by
@@ -518,9 +518,10 @@ differentiable image sampler because the network chooses the sampling location.
 
 ### Where this goes next
 
-Occupancy prediction reuses the exact depth-lift and frustum code with one change: drop the BEV
-collapse and keep the full 3-D voxel grid, passing a 3-D voxel index to the pooling instead of a
-2-D pillar index. GaussianLSS (Lu et al. 2025,
+Camera-based occupancy prediction can reuse the same depth lift and frustum with one change:
+drop the BEV collapse and keep the full 3-D voxel grid, passing a 3-D voxel index to the pooling
+instead of a 2-D pillar index. (This course's occupancy assignment instead lifts a given BEV map to
+3-D with a channel-to-height reshape.) GaussianLSS (Lu et al. 2025,
 [arXiv:2504.01957](https://arxiv.org/abs/2504.01957)) changes the depth representation: instead of
 $D$ bin probabilities per pixel it predicts a continuous Gaussian, a mean depth and a spread, so the
 pixel carries an explicit depth uncertainty rather than the shape of a histogram, and the cost
