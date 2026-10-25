@@ -37,6 +37,13 @@ def train_head(
       - "annealed": temperature decays linearly tau0 -> 0 over the first anneal_frac of steps,
                     then hard (None) for the rest. This is the headline working recipe.
     K=1 with recipe "hard" is the single-mode baseline (the winner is the only mode).
+
+    In every recipe the Adam learning rate is held at lr for the first anneal_frac of the steps,
+    then decays linearly to 0 over the rest. Without the decay, hard-phase training on the shared
+    scene keeps oscillating: the winner for one intention flips between two nearby modes, and a
+    run's final minADE depends on where in an oscillation the last step lands (annealed seed 0
+    ended at 0.46 m with 2 CPU threads and at 0.005 m with 11). The decay lets the final iterate
+    settle, so the result no longer depends on the thread count.
     """
     torch.manual_seed(seed)
     bev = scene["bev_feat"].to(device)
@@ -53,6 +60,9 @@ def train_head(
 
     hard_start = int(anneal_frac * steps)
     for step in range(steps):
+        if step >= hard_start:
+            for group in opt.param_groups:
+                group["lr"] = lr * (1.0 - (step - hard_start) / max(1, steps - hard_start))
         if recipe == "hard":
             temp = None
         elif recipe == "soft":

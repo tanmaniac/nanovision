@@ -168,7 +168,8 @@ def wta_loss(
     The regression term is selected by temperature:
     - temperature is None (hard WTA, the canonical min-of-N): regress only the winner's full
       trajectory, so only the winning mode carries regression gradient. Spare modes that never win
-      get no gradient and stay dead (the dead-mode risk the soft path fixes).
+      have no loss term pulling them toward any future and only drift with the shared weights (the
+      dead-mode risk the soft path fixes).
     - temperature is a float (soft / annealed min-of-N): every mode gets gradient, weighted toward
       the closer ones; annealing temperature -> 0 recovers the hard loss.
 
