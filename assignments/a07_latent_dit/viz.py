@@ -1,6 +1,6 @@
 """Render the two-stage latent-diffusion pipeline: train the VAE on a batch and show
-originals vs reconstructions, then train the DiT on the encoded latents and sample one
-image per class through the frozen VAE decoder. Provided, not graded.
+originals vs reconstructions, then train the DiT on the encoded latents and sample four
+images per class through the frozen VAE decoder. Provided, not graded.
 
 Run from the repo root: `python -m assignments.a07_latent_dit.viz` (or
 `make viz A=a07_latent_dit`). Writes a figure to out/. Runs in solution mode (the
@@ -41,7 +41,7 @@ def _train_vae(cfg, x, steps=1500):
     return vae, recon.item(), kl.item()
 
 
-def _train_dit(cfg, latents, labels, steps=3000):
+def _train_dit(cfg, latents, labels, steps=12000):
     dev = latents.device
     g = torch.Generator(device=dev).manual_seed(0)
     model = DiT(cfg).to(dev)
@@ -73,23 +73,28 @@ def main():
 
     model = _train_dit(cfg, latents, labels)
     model.eval()
-    cls = torch.arange(cfg.num_classes, device=dev)
+    per_class = 4
+    cls = torch.arange(cfg.num_classes, device=dev).repeat_interleave(per_class)
     C, hw = cfg.latent_dim, cfg.image_size // cfg.f
     with torch.no_grad():
-        x0 = torch.randn(cfg.num_classes, C, hw, hw,
+        x0 = torch.randn(cls.shape[0], C, hw, hw,
                          generator=torch.Generator(device=dev).manual_seed(1), device=dev)
         z_samp = euler_sample(model, x0, cls, cfg.n_steps)
         samples = vae.decode(z_samp)
 
-    # Top row: originals vs reconstructions (first num_classes images). Bottom: DiT samples.
-    fig, axes = plt.subplots(3, cfg.num_classes, figsize=(2 * cfg.num_classes, 6.2))
-    for j in range(cfg.num_classes):
+    # Rows 0-1: originals vs reconstructions (first per_class images). Then one row of DiT
+    # samples per class.
+    rows = 2 + cfg.num_classes
+    fig, axes = plt.subplots(rows, per_class, figsize=(2 * per_class, 2.1 * rows))
+    for j in range(per_class):
         axes[0, j].imshow(x[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
         axes[0, j].set_title(f"orig (class {int(labels[j])})"); axes[0, j].axis("off")
         axes[1, j].imshow(x_hat[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
         axes[1, j].set_title("VAE recon"); axes[1, j].axis("off")
-        axes[2, j].imshow(samples[j, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
-        axes[2, j].set_title(f"DiT sample (class {j})"); axes[2, j].axis("off")
+        for c in range(cfg.num_classes):
+            k = c * per_class + j
+            axes[2 + c, j].imshow(samples[k, 0].cpu().numpy(), cmap="gray", vmin=-1, vmax=1)
+            axes[2 + c, j].set_title(f"DiT sample (class {c})"); axes[2 + c, j].axis("off")
     plt.tight_layout(); finish(_OUT / "latent_dit.png")
     print(f"wrote figure to {_OUT}; VAE recon {recon:.3f}, KL {kl:.3f}")
 
