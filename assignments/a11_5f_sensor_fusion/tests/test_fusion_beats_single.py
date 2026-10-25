@@ -6,8 +6,8 @@ separate a vehicle blob from a clutter blob (matched geometry and density). A he
 modality therefore hits a ceiling that generalization to held-out scenes exposes, while a fused
 head that keeps LiDAR geometry and camera semantics clears it.
 
-The margins are floored well below the measured gap. Measured on this config across six parameter
-inits, the held-out mean IoU gap was at least +0.30 over camera-only and +0.18 over LiDAR-only;
+The margins are floored well below the measured gap. Measured on this config across eight parameter
+inits, the held-out mean IoU gap was at least +0.31 over camera-only and +0.15 over LiDAR-only;
 the asserts below require only +0.10 and +0.05. See compare.py for the training protocol and the
 README for the full per-init distribution.
 """

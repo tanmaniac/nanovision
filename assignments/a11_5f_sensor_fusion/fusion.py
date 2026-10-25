@@ -42,7 +42,8 @@ def paint_points(
     is behind the camera (camera-frame z <= 0); project it to a pixel with ``project_points``;
     drop it if the pixel falls outside ``[0, W) x [0, H)``; otherwise gather the C-dim per-pixel
     score vector at the nearest pixel and concatenate it onto the point. Dropped points get the
-    zero (background) score vector. The output order is ``[x, y, z, s_1..s_C]``.
+    all-zero score vector, which is not the background score (a softmax output sums to 1), so it
+    marks "not seen by the camera". The output order is ``[x, y, z, s_1..s_C]``.
 
     Args:
         points_ego: (N, 3) ego-frame LiDAR points.
