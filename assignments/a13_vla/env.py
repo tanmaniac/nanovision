@@ -9,7 +9,7 @@ without the robot library installed. Set MUJOCO_GL=egl for headless rendering.
 The expert is analytic inverse kinematics plus a PD controller in joint space - it has privileged
 access to the target world position and the joint state, which the learned policy does not. Demos
 are filtered: only episodes that actually reach the target (reward > 0.5) are kept, truncated at the
-reach step, so behavior cloning sees clean successful trajectories. The expert reaches on ~83% of
+reach step, so behavior cloning sees clean successful trajectories. The expert reaches on ~75% of
 random seeds in ~20 steps.
 
 The retained point-mass functions at the bottom (GOALS, expert_action, make_condition, sample_start,
