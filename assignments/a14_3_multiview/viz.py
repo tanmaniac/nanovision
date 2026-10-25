@@ -1,11 +1,11 @@
 """Two-view geometry, visualized in Rerun.
 
-A synthetic point cloud is seen by two cameras a short baseline apart, with a third of the
+A synthetic point cloud is seen by two cameras a short baseline apart, with 35% of the
 correspondences corrupted into wrong matches. The RANSAC front-end estimates the relative
 pose and triangulates the inliers. The 3D view shows the triangulated points and the two
 recovered camera frusta. The two 2D views show the correspondences colored by inlier vs
-outlier, with a few epipolar lines (l' = F x) drawn in the second image - every inlier sits
-on its epipolar line, every outlier does not. A scalar panel tracks the consensus-set size.
+outlier, with the epipolar lines (l' = F x) of eight inliers drawn in the second image, each
+passing through its matched point.
 
 Run headless (writes out/multiview.rrd):   make viz A=a14_3_multiview
 Open the interactive viewer:                make viz A=a14_3_multiview SHOW=1
