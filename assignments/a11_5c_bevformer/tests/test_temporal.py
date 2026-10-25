@@ -6,10 +6,10 @@ identity.
 
 The necessity test makes temporal information NECESSARY: the moving vehicle is occluded in the
 current frame's images (dropped from all frame-t renders) but present in frame t-1 with the correct
-ego warp. BCE is scored only on that vehicle's current-frame BEV cells. The temporal model recovers
-it from the warped history; the no-temporal model (history zeroed) cannot. A single-seed strict
-inequality is a coin flip near the floor, so the test averages over a seed set and requires the
-mean gap to clear a margin.
+ego warp. Its current-frame cell is also removed from the training loss, so no model can memorize
+that label through its per-cell BEV query; the only route to it is the warped history. After
+training, the occupancy probability at that cell is read out. The temporal model must call it
+occupied and the no-temporal model (no history) must call it free, on every seed.
 """
 
 import torch
@@ -59,7 +59,7 @@ def _backbone(cfg):
 
 
 def _train_and_score(cfg, seed, temporal):
-    """Train BEVFormerSeg on the two-frame occlusion scene; return BCE on the occluded cells."""
+    """Train on the two-frame occlusion scene; return the occupancy prob at the occluded cell."""
     torch.manual_seed(seed)
     scene = toy.bev_multicam_scene(
         n_cams=cfg.n_cams, n_vehicles=4, img=cfg.img, stride=cfg.stride, focal=cfg.f,
@@ -71,8 +71,11 @@ def _train_and_score(cfg, seed, temporal):
     ego_delta = scene["ego_deltas"][1]                  # frame-1 ego motion
     occ = scene["occluded_cells"]                        # (k, 2) current-frame cells
     if occ.numel() == 0:
-        # No occluded cell placed for this seed; skip by returning equal scores.
+        # No occluded cell placed for this seed; the caller skips it.
         return None
+
+    keep = torch.ones_like(gt[1])                        # loss mask: drop the occluded cell
+    keep[occ[:, 0], occ[:, 1]] = 0.0
 
     model = BEVFormerSeg(cfg)
     bb = _backbone(cfg)
@@ -88,8 +91,11 @@ def _train_and_score(cfg, seed, temporal):
             logit = model(feats1, rig, prev_bev=prev.detach(), ego_delta=ego_delta)
         else:
             logit = model(feats1, rig)                   # no history
-        # Train on the full current-frame occupancy (both frames' supervision).
-        loss = lf(logit[0], gt[1]) + lf(model(feats0, rig)[0], gt[0])
+        # Supervise both frames, but hide the occluded cell's current-frame label so it cannot be
+        # memorized; the temporal model can only recover it from the warped history.
+        per_cell = torch.nn.functional.binary_cross_entropy_with_logits(
+            logit[0], gt[1], reduction="none")
+        loss = (per_cell * keep).sum() / keep.sum() + lf(model(feats0, rig)[0], gt[0])
         opt.zero_grad(); loss.backward(); opt.step()
 
     with torch.no_grad():
@@ -99,27 +105,24 @@ def _train_and_score(cfg, seed, temporal):
             logit = model(feats1, rig, prev_bev=prev, ego_delta=ego_delta)[0]
         else:
             logit = model(feats1, rig)[0]
-        ii, jj = occ[:, 0], occ[:, 1]
-        target = gt[1][ii, jj]
-        bce = torch.nn.functional.binary_cross_entropy_with_logits(logit[ii, jj], target)
-    return bce.item()
+        prob = torch.sigmoid(logit[occ[:, 0], occ[:, 1]])  # occupancy prob at the hidden cell
+    return prob.min().item() if temporal else prob.max().item()
 
 
 def test_temporal_recovers_occluded_vehicle():
     cfg = BEVFormerConfig()
-    seeds = [0, 1, 2]
-    gaps, temporals, no_temporals = [], [], []
-    for s in seeds:
-        bt = _train_and_score(cfg, s, temporal=True)
-        bn = _train_and_score(cfg, s, temporal=False)
-        if bt is None or bn is None:
+    results = []
+    for s in [0, 1, 2]:
+        pt = _train_and_score(cfg, s, temporal=True)
+        pn = _train_and_score(cfg, s, temporal=False)
+        if pt is None or pn is None:
             continue
-        temporals.append(bt); no_temporals.append(bn); gaps.append(bn - bt)
+        results.append((s, pt, pn))
 
-    assert len(gaps) >= 2, "too few seeds placed an occluded cell"
-    mean_gap = sum(gaps) / len(gaps)
-    # The temporal model recovers the occluded vehicle; the no-temporal one cannot. Require the
-    # mean BCE gap on the occluded cells to clear a margin across the seed set.
-    assert mean_gap > 0.1, (
-        f"mean gap {mean_gap:.3f}; temporal {temporals}, no_temporal {no_temporals}"
-    )
+    assert len(results) >= 2, "too few seeds placed an occluded cell"
+    # The label of the hidden cell was never trained on, so only the warped history can reveal the
+    # vehicle: with history the cell must be confidently occupied, without it confidently free.
+    for s, pt, pn in results:
+        assert pt > 0.9 and pn < 0.1, (
+            f"seed {s}: temporal prob {pt:.3f} (want > 0.9), no-temporal prob {pn:.3f} (want < 0.1)"
+        )

@@ -631,18 +631,16 @@ def bev_multicam_scene(
     vehicle's ego cell. BEV cells reaching back into image space (the query-pull view transform)
     can recover the occupancy because the projection geometry is exact.
 
-    A 4-camera cardinal ring does not produce cells seen by two cameras at once (the FOV
-    boundaries meet along the diagonals), so every BEV cell is single-view or unseen regardless of
-    focal; the multi-view averaging in spatial cross-attention is exercised by its unit test, not
-    by this toy's geometry. The default focal (img / 2, ~90 degree FOV) covers almost the whole
-    grid (only the far corners are unseen) while keeping many single-view cells for the hit-mask
-    test.
+    At the default focal (img / 2, about a 90-degree horizontal FOV) the four fields of view meet
+    along the diagonals, so every BEV cell of the default grid is seen by exactly one camera or by
+    none: 252 cells are single-view and only the 4 cells around the ego origin are unseen. No cell
+    is seen by two cameras, so the cross-camera average in spatial cross-attention is never
+    exercised by this toy, and no test covers it.
 
     Conventions match nanovision.geometry: ego x forward, y left, z up; camera OpenCV x right,
     y down, z forward; extrinsic E = T_cam_ego. A camera at ego yaw a has axes z_cam=(cos a,
     sin a, 0), x_cam=(sin a, -cos a, 0), y_cam=(0, 0, -1); at a=0 this is the forward camera of
-    bev_toy_scene. The default focal (img) gives a ~53 degree FOV so adjacent cameras leave gaps
-    and some BEV cells are single-view (the spatial-cross-attention hit-mask test needs that).
+    bev_toy_scene.
 
     Temporal use (n_frames=2): the ego moves forward ego_step meters per frame; vehicles are fixed
     in the world, so their ego coordinates shift backward by ego_step each frame. ego_deltas
