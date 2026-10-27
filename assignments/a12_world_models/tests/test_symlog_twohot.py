@@ -1,69 +1,76 @@
-"""Exact, training-free checks of symlog/symexp and the value-space two-hot encoding."""
+"""symlog / symexp are inverses; two-hot encode splits a target between its two neighboring bins
+with linear weights, and decode returns the expected bin value."""
+
+import math
 
 import torch
 
-from config import WorldModelConfig
-from nets import (
-    symexp,
-    symlog,
-    twohot_decode,
-    twohot_encode,
-    twohot_loss,
-    value_bins,
-)
+from nets import symexp, symexp_bins, symlog, twohot_decode, twohot_encode
 
 
-def test_symexp_inverts_symlog():
-    # Includes large magnitudes where the compression is strong.
-    x = torch.tensor([0.0, 1e-4, 0.5, -1.3, 7.0, -50.0, 1234.5, -9876.0], dtype=torch.float64)
-    back = symexp(symlog(x))
-    assert torch.allclose(back, x, atol=1e-6, rtol=1e-6), (back - x).abs().max()
+def test_symlog_symexp_inverse():
+    x = torch.cat([torch.linspace(-1e6, 1e6, 101, dtype=torch.float64),
+                   torch.linspace(-3, 3, 61, dtype=torch.float64)])
+    torch.testing.assert_close(symexp(symlog(x)), x, rtol=1e-12, atol=1e-12)
+    torch.testing.assert_close(symlog(symexp(x[-61:])), x[-61:], rtol=1e-12, atol=1e-12)
 
 
-def test_twohot_is_exact_inverse_in_range():
-    cfg = WorldModelConfig()
-    bins = value_bins(cfg).double()
-    # Raw targets well inside the bin range (the toy's returns are O(1)).
-    y = torch.tensor([0.0, 0.37, -0.9, 2.5, -4.2, 10.0, -15.0], dtype=torch.float64)
-    enc = twohot_encode(y, bins)
-    dec = twohot_decode(enc, bins)
-    assert torch.allclose(dec, y, atol=1e-5), (dec - y).abs().max()
+def test_symlog_values():
+    x = torch.tensor([0.0, 1e-8, -1e-8, torch.e - 1, -(torch.e - 1), 1e4], dtype=torch.float64)
+    expect = torch.tensor([0.0, 1e-8, -1e-8, 1.0, -1.0, math.log1p(1e4)], dtype=torch.float64)
+    torch.testing.assert_close(symlog(x), expect, rtol=1e-12, atol=1e-15)  # slope 1 at 0, odd
 
 
-def test_twohot_label_has_two_nonzero_entries_summing_to_one():
-    cfg = WorldModelConfig()
-    bins = value_bins(cfg).double()
-    y = torch.tensor([0.3, -2.1, 5.0], dtype=torch.float64)
-    enc = twohot_encode(y, bins)
-    assert torch.allclose(enc.sum(-1), torch.ones(3, dtype=torch.float64))
-    # At most two nonzero per row (exactly two unless y lands on a bin).
-    nnz = (enc > 0).sum(-1)
-    assert (nnz <= 2).all() and (nnz >= 1).all(), nnz
+def test_symexp_bins_antisymmetric():
+    for n in (255, 31, 30):
+        b = symexp_bins(n)
+        assert b.shape == (n,)
+        assert torch.all(b[1:] >= b[:-1])       # an even n repeats the bin at 0
+        assert torch.equal(b, -b.flip(0))
+    assert torch.all(symexp_bins(255)[1:] > symexp_bins(255)[:-1])
+    assert torch.isclose(symexp_bins(255)[-1], symexp(torch.tensor(20.0)))
 
 
-def test_twohot_loss_minimized_at_matching_logits():
-    cfg = WorldModelConfig()
-    bins = value_bins(cfg).double()
-    y = torch.tensor([1.7], dtype=torch.float64)
-    label = twohot_encode(y, bins)
-    # Logits that reproduce the two-hot label as a softmax give a lower loss than mismatched logits.
-    # Build matching logits by taking log of the (clamped) label.
-    matched = torch.log(label.clamp_min(1e-12))
-    mismatched = torch.zeros_like(label)  # uniform softmax, far from the sharp two-hot target
-    loss_match = twohot_loss(matched, y, bins)
-    loss_mismatch = twohot_loss(mismatched, y, bins)
-    assert loss_match < loss_mismatch
+def test_twohot_hand_example():
+    bins = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])
+    lab = twohot_encode(torch.tensor([0.25, -1.5, 1.0, 7.0, -9.0]), bins)
+    expect = torch.tensor([
+        [0, 0, 0.75, 0.25, 0],      # between bins 0 and 1, linear weights
+        [0.5, 0.5, 0, 0, 0],
+        [0, 0, 0, 1.0, 0],          # exactly on a bin
+        [0, 0, 0, 0, 1.0],          # above the range: all on the last bin
+        [1.0, 0, 0, 0, 0],          # below the range: all on the first bin
+    ])
+    torch.testing.assert_close(lab, expect)
 
 
-def test_bins_in_symlog_space():
-    # The bins are linspace(-20, 20, n) in symlog space: evenly spaced and symmetric about 0.
-    cfg = WorldModelConfig()
-    bins = value_bins(cfg)
-    assert bins.shape == (cfg.n_bins,)
-    assert torch.all(bins[1:] > bins[:-1]), "bins must be strictly increasing"
-    assert torch.allclose(bins[0], -bins[-1], rtol=1e-5), "bins must be symmetric about 0"
-    assert torch.allclose(bins[0], torch.tensor(cfg.bin_lo)) and \
-        torch.allclose(bins[-1], torch.tensor(cfg.bin_hi))
-    # Evenly spaced (symlog space), so the gaps are constant.
-    gaps = bins[1:] - bins[:-1]
-    assert torch.allclose(gaps, gaps[0].expand_as(gaps), atol=1e-5)
+def test_twohot_two_neighbors_and_weights():
+    bins = symexp_bins(255)
+    y = torch.cat([torch.randn(200) * 3, torch.randn(200) * 300])
+    lab = twohot_encode(y, bins)
+    assert lab.shape == (400, 255)
+    torch.testing.assert_close(lab.sum(-1), torch.ones(400))
+    for i in range(len(y)):
+        nz = torch.nonzero(lab[i]).flatten()
+        k = int(torch.searchsorted(bins, y[i], right=True)) - 1     # bins[k] <= y < bins[k + 1]
+        assert set(nz.tolist()) <= {k, k + 1}
+        w_hi = (y[i] - bins[k]) / (bins[k + 1] - bins[k])
+        torch.testing.assert_close(lab[i, k + 1], w_hi, atol=1e-5, rtol=1e-5)
+
+
+def test_twohot_round_trip():
+    bins = symexp_bins(255)
+    y = torch.cat([torch.linspace(-2000, 2000, 401), torch.tensor([0.0, 1e-3, -1e-3, 1.0])])
+    lab = twohot_encode(y, bins)
+    back = twohot_decode(torch.log(lab), bins)       # softmax(log(label)) = label
+    assert back.shape == (len(y), 1)
+    torch.testing.assert_close(back.squeeze(-1), y, rtol=1e-5, atol=1e-5)
+
+
+def test_twohot_decode_is_expected_value():
+    for bins in (torch.tensor([-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0]), torch.tensor([-3.0, -1.0, 1.0, 3.0])):
+        logits = torch.randn(5, 3, len(bins))
+        expect = (torch.softmax(logits.double(), -1) * bins.double()).sum(-1, keepdim=True)
+        out = twohot_decode(logits, bins)
+        assert out.shape == (5, 3, 1)
+        torch.testing.assert_close(out.double(), expect, rtol=1e-5, atol=1e-6)

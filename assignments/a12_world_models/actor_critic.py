@@ -1,282 +1,229 @@
-"""Behavior learning in imagination: lambda-returns, a two-hot critic, and a continuous actor.
+"""Actor and critic trained on imagined rollouts, plus the critic loss on replayed states.
 
-The actor pi(a | h, z) and critic V(h, z) train entirely on trajectories imagined inside the world
-model, with no environment steps. The critic regresses lambda-returns computed along the imagined
-rollout. For continuous control (cartpole-balance, a 1-D force) the actor is a reparameterized
-Tanh-Normal policy trained by DYNAMICS BACKPROP: the imagined lambda-return is differentiable with
-respect to the action through the learned world model, so the policy gradient is the analytic
-gradient of the return, not a REINFORCE score-function estimate.
+Ported from the actor-critic half of r2dreamer's `Dreamer._cal_grad` (`_imagine`,
+`_lambda_return`, `networks.ReturnEMA`), which follows DreamerV3 v2 (arXiv 2301.04104v2):
 
-Why dynamics backprop and not REINFORCE here: cartpole-balance reward is near-flat in the action
-(a balanced pole earns ~1 regardless of a small force difference over a short horizon). REINFORCE
-estimates the gradient from the correlation between a sampled action and its return, so a near-flat
-reward leaves it chasing critic noise and the policy collapses (measured ~135 real return, below the
-~214 random baseline). A differentiable world model gives the analytic gradient
-nabla_theta E[sum_t gamma^t r_t] directly by backpropagating the return through the dynamics into a
-reparameterized action; it is dense and low-variance, so it transfers (measured greedy ~300+).
+- Imagination starts from every posterior state of the replayed batch (B*T = 1024 starts), detached,
+  and rolls the prior forward 15 steps under the current actor without gradients.
+- Returns are lambda-returns bootstrapped with the critic. Rewards are read off the state after the
+  action, matching the world model's reward alignment.
+- The actor is trained by REINFORCE: loss = -(log pi(a|s) * sg(A) + eta * H[pi]), with advantage
+  A = (R^lambda - v(s)) / max(1, S) and S an EMA of the 5th-95th percentile range of returns.
+- The critic is a two-hot classifier over symexp bins, regressed toward the lambda-return and
+  toward its own slow EMA copy (a regularizer, weight 1).
+- The critic is also trained on replayed posterior states with a replay lambda-return that
+  bootstraps from the imagined returns (`repval`, scale 0.3). Its feature input is NOT detached,
+  so this loss also sends gradient into the world model. The reference does this on purpose
+  ("keep gradients through world model").
 
-The discrete Categorical Actor + REINFORCE path (actor_loss) is kept below as the contrast used by
-the README and viz; the continuous ContActor + actor_loss_dynbackprop + imagine_dynamics path is the
-build target.
-
-ent_coef, ret_range, and the EMA ReturnNormalizer match DreamerV3.
+Holes in this file (each raises NotImplementedError until written): lambda_return, imagine,
+actor_loss, critic_loss and imagination_losses. Actor, Critic, ReturnEMA and replay_value_loss
+are provided.
 """
 
-import math
-
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
-from torch.distributions import Categorical, Normal
 
-from nets import twohot_decode, twohot_loss, value_bins
-
-# Tanh-Normal log-std clamp: floor at log(0.1) so the policy cannot collapse to a delta, ceiling at
-# log(2.0). The floor is what keeps a small exploration noise even as the mean sharpens.
-LOGSTD_MIN, LOGSTD_MAX = math.log(0.1), math.log(2.0)
-
-
-def compute_lambda_returns(rewards: Tensor, values: Tensor, continues: Tensor,
-                           gamma: float, lam: float) -> Tensor:
-    """DreamerV3 lambda-returns (arXiv:2301.04104 eq. 5), bootstrapping on the NEXT value.
-
-    A backward recursion over the horizon that mixes n-step returns; c_t (= 0 at an episode end)
-    zeros both the bootstrap and the recursion tail at termination.
-
-    Shapes: rewards, continues are (B, H); values are (B, H + 1) where values[:, H] is the
-    bootstrap value V_H at the state after the last reward. Returns (B, H).
-
-    Args:
-        rewards: (B, H) imagined rewards r_t.
-        values: (B, H + 1) critic values V_0..V_H.
-        continues: (B, H) continuation flags c_t in [0, 1].
-        gamma: discount.
-        lam: lambda mixing weight.
-    Returns:
-        (B, H) lambda-returns R_0..R_{H-1}.
-
-    See the actor-critic in imagination section of the README.
-    """
-    raise NotImplementedError(
-        "implement compute_lambda_returns (DreamerV3 eq. 5): backward over t = H-1..0 with "
-        "R_H = values[:, H]; R_t = rewards[:, t] + gamma*continues[:, t]*((1-lam)*values[:, t+1] "
-        "+ lam*R_{t+1}); return the stacked (B, H) returns. continues=0 zeros bootstrap and tail."
-    )
-
-
-class ContActor(nn.Module):
-    """Tanh-Normal policy over the 1-D continuous force. Provided body; the lesson is the loss.
-
-    The net maps the model state (h, z) to (mean, log_std). An action is the reparameterized sample
-    a = tanh(mean + std * eps), eps ~ N(0, 1), so a is in (-1, 1) and the gradient flows from a back
-    into (mean, log_std) and on into the dynamics that produced (h, z). log_std is clamped to
-    [log(0.1), log(2.0)] so the policy keeps exploration noise and cannot become a point mass. The
-    entropy bonus uses the pre-tanh Normal entropy.
-    """
-
-    def __init__(self, cfg):
-        super().__init__()
-        in_dim = cfg.h_dim + cfg.n_cat * cfg.n_cls
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, 2),                       # (mean, log_std) for the 1-D force
-        )
-
-    def dist(self, h: Tensor, z: Tensor):
-        """Return (mean, log_std) of the pre-tanh Normal, with log_std clamped to the floor/ceiling."""
-        mean, log_std = self.net(torch.cat([h, z], dim=-1)).chunk(2, dim=-1)
-        return mean, torch.clamp(log_std, LOGSTD_MIN, LOGSTD_MAX)
-
-    def sample(self, h: Tensor, z: Tensor, greedy: bool = False):
-        """Reparameterized Tanh-Normal sample. Returns (action (B, 1) in (-1, 1), entropy (B,)).
-
-        greedy=True takes a = tanh(mean) (the deterministic action used for evaluation). The
-        gradient of the sampled action w.r.t. the network parameters is nonzero (reparameterization),
-        which is what makes dynamics backprop possible.
-        """
-        mean, log_std = self.dist(h, z)
-        std = torch.exp(log_std)
-        pre = mean if greedy else mean + std * torch.randn_like(mean)
-        a = torch.tanh(pre)                                # (B, 1) in (-1, 1), reparameterized
-        ent = Normal(mean, std).entropy().sum(dim=-1)      # pre-tanh Normal entropy, (B,)
-        return a, ent
-
-
-def imagine_dynamics(model, actor, critic, h, z, cfg):
-    """The DIFFERENTIABLE imagined rollout under the prior. This is a hole.
-
-    Starting from a (detached) batch of posterior states (h, z), roll the dynamics forward for
-    cfg.horizon steps with the actor in the loop, keeping the whole graph attached so the imagined
-    lambda-return is differentiable w.r.t. the actor. Collect both the pre-action and the post-action
-    state at each step, then decode rewards, continuation flags, and values off those states and pass
-    them to compute_lambda_returns.
-
-    Two constraints carry the lesson. The reward of action a_t is read from the POST-action state
-    s_{t+1}, not the pre-action state, so the states sliced for the reward/cont heads are
-    states[:, 1:], not states[:, :-1]. And nothing here may be wrapped in torch.no_grad: dynamics
-    backprop needs the reward / value / cont decode to stay in the graph.
-
-    Args:
-        model: the WorldModel (rssm, reward_head, cont_head, bins).
-        actor: a ContActor (its sample returns (action, entropy), reparameterized).
-        critic: the Critic (value(h, z) decodes the two-hot value head).
-        h, z: (B, h_dim), (B, n_cat*n_cls) detached posterior start states.
-        cfg: config (horizon, gamma, lam).
-    Returns:
-        returns: (B, horizon) differentiable lambda-returns.
-        entropies: (B, horizon) per-step policy entropies.
-        H_h, H_z: (B, horizon+1, .) the stacked deterministic and latent states (for the critic
-                  regression target in _train.py).
-
-    See the imagination section of the README.
-    """
-    raise NotImplementedError(
-        "implement imagine_dynamics: for _ in range(cfg.horizon): a, ent = actor.sample(h, z); "
-        "h = model.rssm.forward_h(h, z, a); _, z, _ = model.rssm.prior(h); collect pre- and "
-        "post-action (h, z) and ent. Stack to H_h, H_z (B, horizon+1, .); states = cat([H_h, H_z]); "
-        "rewards = twohot_decode(softmax(model.reward_head(states[:, 1:]), -1), model.bins); "
-        "conts = sigmoid(model.cont_head(states[:, 1:]).squeeze(-1)); "
-        "values = critic.value(H_h, H_z) (B, horizon+1); "
-        "returns = compute_lambda_returns(rewards, values, conts, cfg.gamma, cfg.lam). "
-        "Do NOT use no_grad - the return must stay differentiable through the dynamics. "
-        "Return returns, stacked entropies, H_h, H_z."
-    )
-
-
-def actor_loss_dynbackprop(returns: Tensor, entropies: Tensor, ent_coef: float,
-                           ret_range: Tensor) -> Tensor:
-    """Dynamics-backprop actor loss: negative normalized return minus an entropy bonus. This is a hole.
-
-    The returns here are DIFFERENTIABLE w.r.t. the actor (imagine_dynamics kept the graph attached
-    through the world model), so the policy gradient is just the gradient of the return: there is no
-    log-prob and no detached advantage. The loss maximizes the return, normalized by ret_range so the
-    gradient scale does not depend on the reward magnitude, minus an entropy bonus.
-
-    This is the contrast with the discrete REINFORCE form (actor_loss below), where the return is a
-    detached weight on the log-prob; here the return itself carries the gradient.
-
-    Args:
-        returns: (B, horizon) differentiable lambda-returns from imagine_dynamics.
-        entropies: (B, horizon) per-step policy entropies.
-        ent_coef: entropy bonus weight.
-        ret_range: scalar (or broadcastable) normalizer max(1, S).
-    Returns:
-        scalar actor loss.
-
-    See the two ways to get a policy gradient section of the README.
-    """
-    raise NotImplementedError(
-        "implement actor_loss_dynbackprop: -(returns / ret_range).mean() "
-        "- ent_coef * entropies.mean(). The returns are differentiable through the dynamics, so "
-        "there is no log-prob and no detach - the gradient of the return IS the policy gradient."
-    )
+from nets import MLPHead, actor_dist, bernoulli_dist, symexp_bins, twohot_decode, twohot_log_prob
 
 
 class Actor(nn.Module):
-    """MLP policy (h, z) -> action_dim logits, returning a Categorical. The discrete REINFORCE
-    contrast used by the README/viz; the build target is ContActor above. Body provided."""
+    """pi(a | feat): Gaussian with mean tanh(mu) and std in [0.1, 1] (nets.actor_dist)."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, feat_dim: int):
         super().__init__()
-        in_dim = cfg.h_dim + cfg.n_cat * cfg.n_cls
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, cfg.action_dim),
-        )
+        self.net = MLPHead(feat_dim, 2 * cfg.action_dim, cfg.actor_layers, cfg.units, cfg.actor_outscale)
+        self.min_std, self.max_std = cfg.actor_min_std, cfg.actor_max_std
 
-    def forward(self, h: Tensor, z: Tensor) -> Categorical:
-        logits = self.net(torch.cat([h, z], dim=-1))
-        return Categorical(logits=logits)
+    def forward(self, feat: Tensor):
+        return actor_dist(self.net(feat), self.min_std, self.max_std)
 
 
 class Critic(nn.Module):
-    """MLP value head (h, z) -> n_bins two-hot logits. Body provided; loss is a hole."""
+    """v(feat) as a two-hot distribution over symexp bins. forward returns logits."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, feat_dim: int):
         super().__init__()
-        in_dim = cfg.h_dim + cfg.n_cat * cfg.n_cls
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, cfg.h_dim), nn.SiLU(),
-            nn.Linear(cfg.h_dim, cfg.n_bins),
-        )
-        self.register_buffer("bins", value_bins(cfg))
+        self.net = MLPHead(feat_dim, cfg.bins, cfg.critic_layers, cfg.units, cfg.critic_outscale)
+        self.register_buffer("bins", symexp_bins(cfg.bins), persistent=False)
 
-    def logits(self, h: Tensor, z: Tensor) -> Tensor:
-        return self.net(torch.cat([h, z], dim=-1))
+    def forward(self, feat: Tensor) -> Tensor:
+        return self.net(feat)
 
-    def value(self, h: Tensor, z: Tensor) -> Tensor:
-        """Decoded scalar value: symexp of the symlog-space bin expectation (via twohot_decode)."""
-        probs = F.softmax(self.logits(h, z), dim=-1)
-        return twohot_decode(probs, self.bins)
+    def value(self, feat: Tensor) -> Tensor:
+        """Expected value, (..., 1)."""
+        return twohot_decode(self(feat), self.bins)
 
 
-def actor_loss(logprobs: Tensor, returns: Tensor, values: Tensor, entropies: Tensor,
-               ent_coef: float, ret_range: Tensor) -> Tensor:
-    """REINFORCE actor loss on the normalized advantage.
+@torch.no_grad()
+def lambda_return(last: Tensor, term: Tensor, reward: Tensor, boot: Tensor, disc: float, lamb: float) -> Tensor:
+    """Lambda-returns over a sequence, computed backward from the last step (DreamerV3 v2 eq. 5).
 
-    The score-function estimator: the advantage (return minus value) is DETACHED so only the log-prob
-    carries the policy gradient, and it is normalized by ret_range = max(1, S), the EMA of the 5-95
-    percentile return spread tracked in _train.py. An entropy bonus is subtracted.
+        R_{T-1} = boot_{T-1}
+        R_t     = r_{t+1} + gamma_{t+1} * ((1 - lam_{t+1}) * boot_{t+1} + lam_{t+1} * R_{t+1})
 
-    Args:
-        logprobs: (B, H) log-prob of each imagined action.
-        returns: (B, H) lambda-returns.
-        values: (B, H) critic values at the same states.
-        entropies: (B, H) per-step policy entropies.
-        ent_coef: entropy bonus weight.
-        ret_range: scalar (or broadcastable) normalizer max(1, S).
-    Returns:
-        scalar actor loss.
+    for t = T-2 down to 0, with gamma_{t+1} = disc * (1 - term_{t+1}) and
+    lam_{t+1} = lamb * (1 - last_{t+1}). A terminal step (term = 1) stops all future value; a step
+    marked last (end of the stored episode, not a terminal) cuts the recursion and bootstraps fully
+    from boot. Index t + 1 because reward[:, t] is the reward for ARRIVING at step t, so the return
+    of state t starts with reward[:, t + 1].
 
-    See the two ways to get a policy gradient section of the README.
-    """
-    raise NotImplementedError(
-        "implement actor_loss (REINFORCE): adv = (returns - values).detach() / ret_range; "
-        "loss = -(logprobs * adv).mean() - ent_coef * entropies.mean()"
-    )
+    The reference groups the arithmetic as follows; use the same grouping for bit-identical
+    results (it is the same math as the formula above):
 
-
-def critic_loss(logits: Tensor, returns: Tensor, bins: Tensor) -> Tensor:
-    """Two-hot regression of the critic logits onto the (detached) lambda-returns.
+        live   = (1 - term)[:, 1:] * disc                    (N, T-1, 1)
+        cont   = (1 - last)[:, 1:] * lamb
+        interm = reward[:, 1:] + (1 - cont) * live * boot[:, 1:]
+        R      = interm[:, t] + live[:, t] * cont[:, t] * R_next,  starting from R_next = boot[:, -1]
 
     Args:
-        logits: (B, H, n_bins) critic two-hot logits.
-        returns: (B, H) lambda-return targets.
-        bins: (n_bins,) value-space bin positions.
+        last, term, reward, boot: (N, T, 1), float (cast the flags with .float()). boot is the
+            value used to bootstrap: the critic for imagined rollouts, the imagined return for
+            replayed sequences.
+        disc: gamma (1 - 1/333). lamb: lambda (0.95).
     Returns:
-        scalar critic loss.
-
-    See the actor-critic in imagination section of the README.
+        (N, T-1, 1) returns for steps 0..T-2 (the last step only supplies the bootstrap).
     """
-    raise NotImplementedError(
-        "implement critic_loss: twohot_loss(logits, returns.detach(), bins).mean()"
-    )
+    raise NotImplementedError("implement the lambda-return")
 
 
-class ReturnNormalizer:
-    """EMA of the 5-95 percentile return spread; ret_range = max(1, S). DreamerV3 eq. 6-7. Provided.
+class ReturnEMA(nn.Module):
+    """EMA of the 5th and 95th percentiles of the returns; scale = max(1, p95 - p5)."""
 
-    Tracked in _train.py and updated each batch; the actor divides the advantage by ret_range so
-    the policy-gradient scale is invariant to return magnitude.
+    def __init__(self, alpha: float = 1e-2, quantiles=(0.05, 0.95)):
+        super().__init__()
+        self.alpha = alpha
+        self.register_buffer("range", torch.tensor(quantiles, dtype=torch.float32))
+        self.register_buffer("ema_vals", torch.zeros(2, dtype=torch.float32))
+
+    def forward(self, x: Tensor):
+        """Update the EMA with x's percentiles; return (offset, scale) as detached scalars."""
+        # Sort once and interpolate the two order statistics (torch.quantile's 'linear' rule).
+        # The reference avoids torch.quantile because torch.compile cannot trace it.
+        srt, _ = torch.sort(torch.flatten(x.detach()))
+        n = srt.shape[0]
+        pos = self.range.to(srt.dtype) * (n - 1)
+        lo = pos.floor().long().clamp_(0, n - 1)
+        hi = pos.ceil().long().clamp_(0, n - 1)
+        frac = pos - pos.floor()
+        q = srt[lo] + (srt[hi] - srt[lo]) * frac
+        self.ema_vals.copy_(self.alpha * q.detach() + (1 - self.alpha) * self.ema_vals)
+        scale = torch.clip(self.ema_vals[1] - self.ema_vals[0], min=1.0)
+        return self.ema_vals[0].detach(), scale.detach()
+
+
+@torch.no_grad()
+def imagine(rssm, actor: Actor, h: Tensor, z: Tensor, steps: int):
+    """Roll the prior forward under the actor, without gradients.
+
+    Loop `steps` times: feat = rssm.get_feat(h, z); action = actor(feat).rsample(); record both;
+    then advance h, z = rssm.img_step(h, z, action). The step after the last action is computed and
+    thrown away, as in the reference (it draws random numbers, so skipping it would shift the
+    random stream). Nothing here needs gradients: the actor is trained by REINFORCE, which only
+    needs log pi(a | s) of the recorded actions, recomputed later from the detached feats.
+
+    Args:
+        rssm: the world model's RSSM. actor: maps feat to a distribution with rsample().
+        h, z: (N, D), (N, S, K) start states.
+        steps: number of states returned, including the start (imag_horizon + 1 = 16).
+    Returns:
+        feats (N, steps, F) and actions (N, steps, A); actions[:, t] was sampled at feats[:, t].
     """
+    raise NotImplementedError("implement the imagination rollout")
 
-    def __init__(self, decay: float = 0.99):
-        self.decay = decay
-        self.S = None
 
-    def update(self, returns: Tensor) -> Tensor:
-        lo = torch.quantile(returns.detach(), 0.05)
-        hi = torch.quantile(returns.detach(), 0.95)
-        spread = (hi - lo).clamp(min=0.0)
-        if self.S is None:
-            self.S = spread
-        else:
-            self.S = self.decay * self.S + (1.0 - self.decay) * spread
-        return self.range()
+def actor_loss(policy, actions: Tensor, adv: Tensor, weight: Tensor, entropy_coef: float) -> Tensor:
+    """REINFORCE with an entropy bonus (DreamerV3 v2 eq. 6):
 
-    def range(self) -> Tensor:
-        s = self.S if self.S is not None else torch.tensor(1.0)
-        return torch.maximum(s, torch.ones_like(s))
+        loss = mean( weight * -( log pi(a_t | s_t) * sg(A_t) + eta * H[pi(. | s_t)] ) )
+
+    The advantage A is detached, so the gradient is the score-function estimator: it raises the
+    log-probability of actions with A > 0 and lowers it for A < 0. The entropy term pushes the
+    policy to stay spread out. The weight (cumulative discount) is detached too.
+
+    The policy covers all T imagined states but the advantages only T-1 (the last state has no
+    return), so drop the last step of log_prob and entropy: policy.log_prob(actions)[:, :-1] and
+    policy.entropy()[:, :-1], each unsqueezed to (N, T-1, 1).
+
+    Args:
+        policy: torch distribution over the imagined feats, batch shape (N, T), event (A,).
+        actions: (N, T, A). adv: (N, T-1, 1) normalized advantages.
+        weight: (N, T-1, 1) cumulative discount. entropy_coef: eta (3e-4).
+    Returns:
+        scalar loss.
+    """
+    raise NotImplementedError("implement the REINFORCE actor loss")
+
+
+def critic_loss(logits: Tensor, target: Tensor, slow_target: Tensor, weight: Tensor, bins: Tensor) -> Tensor:
+    """Two-hot cross-entropy toward the return target plus toward the slow critic's value.
+
+        loss = mean( weight * ( -log p(target) - log p(slow_target) ) )
+
+    where log p(y) = nets.twohot_log_prob(logits, y, bins). The second term regularizes the critic
+    toward its own slow EMA copy (weight 1, as in the reference). Both targets are detached.
+
+    Cast logits to float32 once, before both terms, so their gradients add in float32 before
+    flowing back into a bfloat16 network. Compute the per-step loss over all T steps, then drop the
+    last one (nll[:, :-1].unsqueeze(-1)): the target's last step is padding.
+
+    Args:
+        logits: (N, T, bins); target, slow_target: (N, T, 1).
+        weight: (N, T-1, 1), detached inside.
+    Returns:
+        scalar loss.
+    """
+    raise NotImplementedError("implement the critic loss")
+
+
+def imagination_losses(wm, actor: Actor, critic: Critic, slow_critic: Critic, return_ema: ReturnEMA,
+                       h: Tensor, z: Tensor, cfg):
+    """Actor and critic losses on rollouts imagined from detached start states h (N, D), z (N, S, K).
+
+    Steps, in the reference's order (the order of random draws and EMA updates matters for
+    bit-identical results):
+
+    1. feats, actions = imagine(wm.rssm, actor, h.detach(), z.detach(), cfg.imag_horizon + 1).
+    2. Under torch.no_grad, read off every imagined state (N, H+1, 1 each):
+       reward = nets.twohot_decode(wm.reward(feats), wm.bins);
+       cont = nets.bernoulli_dist(wm.cont(feats)).mean (the probability of continuing);
+       value = critic.value(feats); slow_value = slow_critic.value(feats).
+    3. disc = 1 - 1 / cfg.horizon. weight = cumprod(cont * disc, dim=1). The reference starts the
+       product with step 0's own factor cont_0 * disc rather than with 1; keep that.
+    4. ret = lambda_return(zeros_like(cont), 1 - cont, reward, value, disc, cfg.lamb), (N, H, 1).
+       No step is marked last; the soft termination 1 - cont is the only cut.
+    5. _, scale = return_ema(ret): updates the percentile EMA and returns S' = max(1, p95 - p5).
+       adv = (ret - value[:, :-1]) / scale. Dividing by max(1, S) rather than by S keeps small
+       returns from being blown up into noise.
+    6. policy = actor(feats); losses["policy"] = actor_loss(policy, actions, adv, weight[:, :-1],
+       cfg.act_entropy).
+    7. Pad the target with a zero step, tar = cat([ret, 0 * ret[:, -1:]], 1), and
+       losses["value"] = critic_loss(critic(feats), tar, slow_value, weight[:, :-1], critic.bins).
+    8. metrics: imag_reward = reward.mean(), imag_value = value.mean(), imag_return = ret.mean(),
+       ret_p05 = return_ema.ema_vals[0], ret_p95 = return_ema.ema_vals[1], adv_std = adv.std(),
+       action_entropy = policy.entropy().mean(), action_std = actions.std().
+
+    Returns:
+        losses {"policy", "value"} (insert in that order), ret (N, H, 1), metrics dict.
+    """
+    raise NotImplementedError("implement the actor and critic losses on an imagined rollout")
+
+
+def replay_value_loss(critic: Critic, slow_critic: Critic, feat: Tensor, data: dict, imag_ret: Tensor, cfg):
+    """Critic loss on the replayed posterior states (the reference's `repval`).
+
+    The replay lambda-return uses real rewards and bootstraps from the imagined return of each
+    state (imag_ret[:, 0]). feat stays attached, so this term also trains the world model.
+    Args:
+        feat: (B, T, F) posterior features. imag_ret: (B*T, H, 1) from imagination_losses.
+    """
+    B, T = feat.shape[:2]
+    last, term, reward = data["is_last"], data["is_terminal"], data["reward"]
+    boot = imag_ret[:, 0].reshape(B, T, 1)
+    with torch.no_grad():
+        slow_value = slow_critic.value(feat)
+    disc = 1 - 1 / cfg.horizon
+    ret = lambda_return(last, term, reward, boot, disc, cfg.lamb)            # (B, T-1, 1)
+    ret_padded = torch.cat([ret, 0 * ret[:, -1:]], 1)
+    weight = 1.0 - last
+    return critic_loss(critic(feat), ret_padded, slow_value, weight[:, :-1], critic.bins)

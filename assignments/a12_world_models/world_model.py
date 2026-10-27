@@ -1,121 +1,73 @@
-"""The world-model ELBO: reconstruction + reward + continuation, minus a balanced KL.
+"""The world model: encoder, RSSM, decoder, reward head and continuation head, and its loss.
 
-The world model is a sequence VAE. The posterior q(z_t | h_t, o_t) sees each frame; the decoder
-reconstructs the frame from (h_t, z_t); the reward and continuation heads predict r_t and c_t.
-The KL trains the prior p(z_t | h_t) toward the posterior so imagination (prior only) stays
-grounded.
+Ported from the world-model half of r2dreamer's `Dreamer._cal_grad` (DreamerV3 mode,
+`rep_loss=dreamer`). For a replayed batch of B sequences of length T:
 
-DreamerV3 splits the KL into two separately-weighted terms, each with a stop-gradient
-(sg = detach) on the opposite side (arXiv:2301.04104 eq. 2-3), NOT DreamerV2's single 0.8/0.2
-balance. The dynamics term trains the prior toward the posterior; the representation term trains the
-posterior toward the prior. The per-head KLs are summed over the n_cat heads first (the factorized
-posterior makes the joint KL the sum of per-head KLs), and the free-bits floor is applied to that
-single summed scalar per term, not per head. The weighting moves the prior faster than the posterior.
+    e_t            = encoder(o_t)
+    h_t, z_t       = RSSM posterior rollout from the stored initial state
+    L_dyn, L_rep   = free-bits KL terms between posterior and prior (rssm.kl_loss)
+    L_image        = sum over pixels of (decoder(h_t, z_t) - o_t)^2
+    L_rew          = two-hot cross-entropy of r_t from feat_t
+    L_con          = Bernoulli negative log-likelihood of (1 - terminal_t) from feat_t
 
-The math is in the two KL terms, free bits, and weighting section of the README.
+Reward alignment: in a replayed sequence, step t holds the frame o_t, the action a_{t-1} that led
+to it, and the reward r_t earned by that action. So the reward of an action is read off the state
+AFTER the action, both here and in imagination.
+
+Hole in this file: WorldModel.loss. The networks are provided.
 """
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
 
-from nets import Decoder, Encoder, symlog, twohot_loss, value_bins
-from rssm import RSSMCell
-
-
-def _categorical_kl(logits_q: Tensor, logits_p: Tensor) -> Tensor:
-    """KL[q || p] for n_cat independent categoricals, summed over heads. Returns (B,).
-
-    logits are (B, n_cat, n_cls). Per head, KL = sum_c q_c (log q_c - log p_c); the joint KL of
-    the factorized distribution is the sum over heads.
-    """
-    logq = F.log_softmax(logits_q, dim=-1)
-    logp = F.log_softmax(logits_p, dim=-1)
-    q = logq.exp()
-    per_head = (q * (logq - logp)).sum(dim=-1)   # (B, n_cat)
-    return per_head.sum(dim=-1)                   # (B,)
-
-
-def kl_loss(post_logits: Tensor, prior_logits: Tensor, free_bits: float,
-            beta_dyn: float, beta_rep: float, n_cat: int, n_cls: int):
-    """DreamerV3 two-term KL with free bits and per-term weighting.
-
-    Args:
-        post_logits, prior_logits: (..., n_cat*n_cls) posterior q and prior p logits.
-        free_bits: nats floor on the SUMMED-over-heads KL per term (clip on the total, not per-head).
-        beta_dyn, beta_rep: weights on the dynamics and representation terms (0.5, 0.1).
-        n_cat, n_cls: categorical layout.
-    Returns:
-        scalar weighted KL, and a dict {"dyn": L_dyn, "rep": L_rep} of the clipped per-term means.
-
-    See the two KL terms, free bits, and weighting section of the README.
-    """
-    raise NotImplementedError(
-        "implement kl_loss (DreamerV3 eq. 2-3): reshape to (-1, n_cat, n_cls); use the provided "
-        "_categorical_kl (it sums per-head KL over heads). Dynamics term clips "
-        "max(free_bits, KL[sg(q) || p]); representation term clips max(free_bits, KL[q || sg(p)]) "
-        "- the free-bits max is on the SUMMED scalar per term, NOT per head. Average over batch, "
-        "return beta_dyn*L_dyn + beta_rep*L_rep and a dict {'dyn': L_dyn, 'rep': L_rep}"
-    )
+from nets import ConvDecoder, ConvEncoder, MLPHead, bernoulli_dist, symexp_bins, twohot_log_prob
+from rssm import RSSM, kl_loss
 
 
 class WorldModel(nn.Module):
-    """Encoder, RSSM cell, decoder, and two-hot reward / Bernoulli-logit continuation heads."""
-
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.encoder = Encoder(cfg)
-        self.decoder = Decoder(cfg)
-        self.rssm = RSSMCell(cfg)
-        state_dim = cfg.h_dim + cfg.n_cat * cfg.n_cls
-        self.reward_head = nn.Sequential(
-            nn.Linear(state_dim, cfg.h_dim), nn.SiLU(), nn.Linear(cfg.h_dim, cfg.n_bins)
-        )
-        self.cont_head = nn.Sequential(
-            nn.Linear(state_dim, cfg.h_dim), nn.SiLU(), nn.Linear(cfg.h_dim, 1)
-        )
-        self.register_buffer("bins", value_bins(cfg))
+        self.encoder = ConvEncoder(cfg)
+        self.rssm = RSSM(cfg, self.encoder.out_dim)
+        feat = self.rssm.feat_dim
+        self.reward = MLPHead(feat, cfg.bins, cfg.reward_layers, cfg.units, cfg.reward_outscale)
+        self.cont = MLPHead(feat, 1, cfg.cont_layers, cfg.units, cfg.cont_outscale)
+        self.decoder = ConvDecoder(cfg)
+        self.register_buffer("bins", symexp_bins(cfg.bins), persistent=False)
 
-    def encode_seq(self, obs: Tensor) -> Tensor:
-        """(B, T, 3, S, S) -> (B, T, embed_dim) by folding time into the batch for the CNN."""
-        B, T = obs.shape[:2]
-        e = self.encoder(obs.reshape(B * T, *obs.shape[2:]))
-        return e.reshape(B, T, -1)
+    def loss(self, data: dict, h0: Tensor, z0: Tensor):
+        """World-model losses for one batch.
 
-    def loss(self, batch, greedy: bool = False):
-        """The full world-model ELBO on a batch of sequences.
+        Args:
+            data: image (B, T, 3, H, W) float in [0, 1]; action (B, T, A), the action before each
+                frame; reward (B, T, 1); is_first (B, T) bool; is_terminal (B, T, 1) float.
+            h0, z0: (B, D), (B, S, K) state before the first step of each sequence.
+        Returns:
+            losses: dict of scalar means (dyn, rep, image, rew, con), in the reference's order.
+            h, z: (B, T, D), (B, T, S, K) posterior states, attached to the graph.
+            feat: (B, T, F) concat(flatten(z), h), attached to the graph.
 
-        batch holds obs (B, T, 3, S, S), actions (B, T), rewards (B, T), conts (B, T) as tensors.
+        Steps (each line is one call to a provided network or to a function from nets/rssm):
 
-        The loss sums four terms: reconstruction is MSE against symlog(obs) (the symexp is applied at
-        viz time), reward is the two-hot cross-entropy over the value-space bins, continuation is a
-        Bernoulli-logit BCE, and the balanced KL ties the prior to the posterior.
+        1. embed = self.encoder(image), (B, T, E).
+        2. h, z, post_logits = self.rssm.observe(embed, action, h0, z0, is_first): the posterior
+           rollout, (B, T, D), (B, T, S, K), (B, T, S, K).
+        3. _, prior_logits = self.rssm.prior(h): the prior evaluated at the posterior's h. Call
+           prior (not prior_net directly) even though its sample is unused: it draws a sample like
+           the reference does, which keeps the random-number stream aligned with it.
+        4. dyn, rep = rssm.kl_loss(post_logits, prior_logits, cfg.kl_free, cfg.unimix); store
+           their means as losses["dyn"] and losses["rep"].
+        5. feat = self.rssm.get_feat(h, z).
+        6. image: recon = self.decoder(h, z).float(); the squared error summed over (C, H, W),
+           then averaged over (B, T). Plain pixels in [0, 1], no symlog.
+        7. rew: -nets.twohot_log_prob(self.reward(feat), reward, self.bins), averaged. Feature t
+           predicts reward t, the reward earned by the action that produced frame t.
+        8. con: the Bernoulli negative log-likelihood of cont = 1 - is_terminal under
+           nets.bernoulli_dist(self.cont(feat)), averaged.
 
-        Returns (total_loss, parts_dict).
-
-        See the world-model ELBO section of the README.
+        Insert the keys in the order dyn, rep, image, rew, con. The trainer sums the scaled
+        losses in dict order (dyn x 1.0, rep x 0.1, image, rew, con x 1.0), and a different order
+        changes the float rounding of the total.
         """
-        raise NotImplementedError(
-            "implement the ELBO assembly: encode_seq(obs) -> embeds; rssm.observe(...) -> "
-            "hs, zs, prior_logits, post_logits; states = cat([hs, zs]). Reconstruction = "
-            "mse(decoder(states), symlog(obs)); reward = twohot_loss(reward_head(states), rewards, "
-            "bins).mean(); continuation = BCE-with-logits(cont_head(states), conts); add "
-            "kl_loss(post_logits, prior_logits, free_bits, kl_dyn_scale, kl_rep_scale, n_cat, "
-            "n_cls). total = recon + reward + cont + kl; return (total, parts) with the parts "
-            "dict carrying recon/reward/cont/kl/kl_dyn/kl_rep for logging"
-        )
-
-    def encode_start(self, obs0: Tensor):
-        """Encode one real frame to a posterior start state (h, z) for imagination. Provided.
-
-        obs0 is (B, 3, S, S). Runs one posterior step from the zero initial state with a zero
-        previous action, returning (h, z) to seed imagine().
-        """
-        B = obs0.shape[0]
-        embed = self.encoder(obs0)
-        h0, z0 = self.rssm.initial_state(B, device=obs0.device, dtype=obs0.dtype)
-        a0 = torch.zeros(B, dtype=torch.long, device=obs0.device)
-        h = self.rssm.forward_h(h0, z0, a0)
-        _, z, _ = self.rssm.posterior(h, embed)
-        return h, z
+        raise NotImplementedError("implement the world-model loss")
