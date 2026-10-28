@@ -7,10 +7,10 @@ the student can reduce the cross-view cross-entropy toward it. The moving-teache
 collapse dynamics (centering and sharpening) are exercised separately in
 test_dino_collapse.
 
-The loss does not reach zero: the head's unit-norm features and bounded cosine
-logits at student_temp can only approach, not match, the sharp teacher_temp target,
-and the student's own prototypes move as it trains. So the criterion is a clear
-relative drop, not convergence to ~0. Two smooth (low-frequency) views are used so
+The loss does not reach zero: a cross-entropy against a soft target is bounded
+below by the target's entropy, H(p_t, p_s) = H(p_t) + KL(p_t || p_s) >= H(p_t). The
+student gets close to that floor (the frozen teacher's entropy here is about 1.90),
+so the criterion is a clear relative drop, not convergence to ~0. Two smooth (low-frequency) views are used so
 they share signal; on pure noise the cross-view target is unlearnable.
 """
 

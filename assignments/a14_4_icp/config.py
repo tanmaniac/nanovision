@@ -11,7 +11,7 @@ N_POINTS = 800
 # The known transform that separates the source cloud from the target. ICP (and the matched
 # closed-form solve) must recover its inverse, mapping source back onto target. Kept modest so
 # nearest-neighbor correspondences from the identity initialization are mostly correct.
-PERTURB_ROTVEC = np.array([0.06, -0.10, 0.08])   # ~9 deg
+PERTURB_ROTVEC = np.array([0.06, -0.10, 0.08])   # ~8.1 deg (norm 0.1414 rad)
 PERTURB_TRANS = np.array([0.15, -0.10, 0.08])
 
 # ICP outer-loop settings.

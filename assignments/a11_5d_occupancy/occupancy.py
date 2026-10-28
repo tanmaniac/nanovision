@@ -32,9 +32,10 @@ from nanovision.volume import deltas_from_z, sample_along_rays, volume_render
 def bev_to_voxel(bev_feats: Tensor, n_z: int, conv: nn.Conv2d) -> Tensor:
     """Lift a flat BEV feature map to a voxel feature volume by pillar extrusion.
 
-    A bird's-eye-view feature map has collapsed the height axis. Pillar extrusion restores it:
-    a 1x1 convolution predicts a per-height feature distribution for every BEV cell (a learnable
-    spread over Z), not a bare repeat of the same vector at every height.
+    A bird's-eye-view feature map has collapsed the height axis. Pillar extrusion (FlashOcc's
+    channel-to-height) restores it: a 1x1 convolution maps each BEV cell's C channels to C * n_z,
+    which are read as one C-vector per height layer. It is a learned per-cell linear map, not a
+    normalized distribution over Z, and not a bare repeat of the same vector at every height.
 
     Args:
         bev_feats: [B, C, Y, X] BEV features.

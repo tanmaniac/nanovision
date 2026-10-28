@@ -4,6 +4,9 @@ This is the supervision the GeometryFM model overfits. There is no network here:
 two camera poses, the intrinsic K, and a chosen sphere (center + radius), it computes the
 exact 3D surface point each patch-center ray hits, for both views, expressed in CAMERA 1's
 frame. A patch whose center ray misses the sphere is invalid (masked out of the loss).
+The images are rendered from the same off-center sphere (nerf_synthetic_scene with
+center=cfg.sphere_center), so a patch is valid exactly where the image shows the sphere at
+the patch center.
 
 Why off-center the sphere and widen the baseline. A single sphere centered at the world
 origin viewed from a symmetric ring gives two near-identical views, so placing view 2's
@@ -74,8 +77,8 @@ def stereo_pointmap_gt(cfg) -> dict:
     """
     images, poses, K, _, _ = toy.nerf_synthetic_scene(
         n_views=cfg.n_ring, H=cfg.img_size, W=cfg.img_size,
-        radius=cfg.radius, cam_dist=cfg.cam_dist,
-    )
+        radius=cfg.radius, cam_dist=cfg.cam_dist, center=cfg.sphere_center,
+    )  # render the same off-center sphere the ground truth below describes
     dtype = K.dtype
     device = K.device
     center = torch.tensor(cfg.sphere_center, dtype=dtype, device=device)

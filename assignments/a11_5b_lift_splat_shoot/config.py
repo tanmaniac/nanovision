@@ -1,11 +1,12 @@
 """Hyperparameters for the Lift-Splat-Shoot toy. Provided, not a hole.
 
 The toy is one forward camera at 32x32 imaging a few "vehicles" as colored blobs, with an
-8x16 BEV grid (x in [0, 8] m forward, y in [-8, 8] m lateral, 1.0 m cells). The depth-range /
-BEV-extent match is load-bearing: a forward camera's frustum reaches only as far forward as the
-deepest depth bin, so the BEV forward extent must lie within the depth range. With d_min=1,
-d_max=9, d_step=1 the bins are arange(1, 9, 1) = [1..8] (EXCLUSIVE of d_max), D=8, deepest
-reachable point 8 m forward - exactly the BEV x_max. Using arange(1, 10, 1) would give D=9 and
+8x16 BEV grid (half-open: x in [0, 8) m forward, y in [-8, 8) m lateral, 1.0 m cells). The
+depth-range / BEV-extent match is load-bearing: a forward camera's frustum reaches only as far
+forward as the deepest depth bin, so the BEV forward extent must lie within the depth range. With
+d_min=1, d_max=9, d_step=1 the bins are arange(1, 9, 1) = [1..8] (EXCLUSIVE of d_max), D=8. Bin d
+lands at ego x = d, i.e. in BEV row ix = d, so bins 1..7 fill rows 1..7 and the 8 m bin falls on
+x = 8, outside the half-open grid, and is dropped. Using arange(1, 10, 1) would give D=9 and
 break every shape; pin the exclusive convention here.
 
 These defaults keep every test on CPU in seconds. A real LSS config is D=41 bins from 4 to 45 m

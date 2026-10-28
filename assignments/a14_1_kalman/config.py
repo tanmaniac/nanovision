@@ -16,7 +16,9 @@ SEED = 0
 # beta = 2 is Gaussian-optimal, kappa = 0. The textbook alpha = 1e-3 makes the sigma
 # spread ~1e-3 and the center weights ~1e6, which is exact in theory but loses digits
 # to cancellation; we use 0.5 so the deterministic agreement test has clean margin.
-# (kappa = 3 - n is another common choice but can drive n + lambda <= 0.)
+# (kappa = 3 - n is another common choice; it keeps n + lambda = 3 alpha^2 > 0, but for n > 3
+# kappa is negative, the center weight can go negative, and the predicted covariance can lose
+# positive-definiteness.)
 UKF_ALPHA = 0.5
 UKF_BETA = 2.0
 UKF_KAPPA = 0.0

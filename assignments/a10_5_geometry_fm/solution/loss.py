@@ -8,7 +8,7 @@ penalty for doing so.
 
 Two correctness points the build must respect:
 
-1. ONE shared scale over the UNION of both pointmaps' valid points (Eq. 5), not a separate
+1. ONE shared scale over the UNION of both pointmaps' valid points (Eq. 3), not a separate
    scale per map. A per-map scale would independently rescale view 1 and view 2 and destroy
    the relative scale between them, which is exactly the information the shared cam1-frame
    representation carries. normalize_scale therefore returns one scalar per batch element.
@@ -24,7 +24,7 @@ from torch import Tensor
 
 
 def normalize_scale(pts: Tensor, valid: Tensor, eps: float = 1e-8) -> Tensor:
-    """One shared scale over the union of both pointmaps' valid points (DUSt3R Eq. 5).
+    """One shared scale over the union of both pointmaps' valid points (DUSt3R Eq. 3).
 
     The scale for batch element b is the mean L2 norm of every valid 3D point across BOTH
     pointmaps:
@@ -73,7 +73,8 @@ def pointmap_loss(
 
         L = mean over valid pixels of ( C_i^v * ell_i^v - alpha * log(C_i^v) ),
 
-    with the mean taken over the count of valid pixels across BOTH views. alpha = 0.2 (paper).
+    with the mean taken over the count of valid pixels across BOTH views. alpha = 0.2 (DUSt3R
+    code release; the paper gives no value).
 
     Args:
         pred_pts1, pred_pts2: (B, h, w, 3) predicted pointmaps, both in cam1 frame.

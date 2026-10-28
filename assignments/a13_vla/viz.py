@@ -6,14 +6,17 @@ Run from the repo root with headless rendering:
 
 Writes panels to out/:
 
-1. reacher_rollouts.png - frames from a reacher episode under the flow policy and the BC policy,
-   both reading only the 64x64 camera image. Shows the finger reaching the target from pixels.
+1. reacher_rollouts.png - frames from one reacher episode (seed 2001) under the flow policy and the
+   BC policy, both reading only the 64x64 camera image. Frames are taken at chunk queries (one query
+   per H env steps), and each row title says whether that episode reached the target. One episode
+   per policy is an illustration; the success rates come from the rollouts behind the ablation.
 2. chunk_ablation.png - reach success vs chunk size H for behavior cloning from pixels, with the
    random-torque floor. The MEASURED ablation lives here, not in a unit test.
 3. multimodal.png - the retained point-mass side-demo: with the goal hidden, the BC regressor's
    single predicted action collapses toward the origin (averaging the four goal directions) while
-   the flow head's samples spread to the four directions. This is the generative-vs-regression
-   lesson; the reacher cannot show it because the image fixes the target.
+   the flow head's samples land on the four directions. Actions are standardized before training.
+   This is the generative-vs-regression lesson; the reacher cannot show it because the image fixes
+   the target.
 4. flow_path.png - the flow-matching ODE path: z_t integrated from t=0 (noise) to t=1 (action) for
    one conditioning.
 
@@ -89,12 +92,13 @@ def panel_reacher_rollouts(cfg, dev, demos):
     for r, (kind, enc, head, label) in enumerate(rows):
         frames, hit = run_and_grab(enc, head, kind, seed=2001)
         picks = np.linspace(0, len(frames) - 1, 6).astype(int)
+        outcome = "reached" if hit else "missed"
         for col, fi in enumerate(picks):
             axes[r, col].imshow(frames[fi])
             axes[r, col].axis("off")
-            axes[r, col].set_title(f"{label} t={fi}", fontsize=8)
-        axes[r, 0].set_ylabel(label)
-    fig.suptitle("Reacher controlled from 64x64 pixels: flow vs BC action head reaching the target")
+            axes[r, col].set_title(f"{label} ({outcome}), query {fi}", fontsize=8)
+        print(f"rollout panel: {label} episode seed 2001 {outcome} after {len(frames) - 1} queries")
+    fig.suptitle("One reacher episode per policy, from 64x64 pixels (frames at chunk queries)")
     fig.tight_layout()
     finish(_OUT / "reacher_rollouts.png", dpi=110)
 
@@ -132,19 +136,29 @@ def panel_multimodal(cfg, dev):
     """Retained point-mass side-demo: regressor averages multimodal actions, flow samples a mode."""
     demos = ENV.collect_demos_pointmass(400, seed=0, repr=cfg.repr, goal_conditioned=False)
     a, c = build_batch_pointmass(demos, cfg.chunk, device=dev)
-    bcH = train_bc(a, c, cfg, steps=3000, device=dev)
-    flowH = train_flow(a, c, cfg, steps=4000, device=dev)
+    # Standardize the actions before training. The point-mass actions have components of about
+    # +-0.035, while the flow head starts from N(0, I) noise; at that mismatch the learned field
+    # does not separate the four modes and the samples form one blob. The reacher torques already
+    # lie in [-1, 1], so the pixel path needs no rescaling. Both heads train on a / a_scale, and
+    # their outputs are multiplied back by a_scale.
+    a_scale = a.std().item()
+    bcH = train_bc(a / a_scale, c, cfg, steps=3000, device=dev)
+    flowH = train_flow(a / a_scale, c, cfg, steps=4000, device=dev)
 
     p = np.array([0.5, 0.5], dtype=np.float32)
     cq = ENV.make_condition(p, 0, goal_conditioned=False, repr=cfg.repr)
     cq = torch.from_numpy(cq[None]).float().to(dev)
     with torch.no_grad():
-        bc_a = bcH(cq)[0, 0].cpu().numpy()
-        samples = np.stack(
+        bc_a = a_scale * bcH(cq)[0, 0].cpu().numpy()
+        samples = a_scale * np.stack(
             [flow_sample(flowH, cq, cfg.chunk, cfg.n_flow_steps)[0, 0].cpu().numpy() for _ in range(200)]
         )
+    modes = np.stack([ENV.expert_action(p, ENV.GOALS[gi], v_max=cfg.v_max) for gi in range(cfg.n_goals)])
+    dist = np.linalg.norm(samples[:, None] - modes[None], axis=-1)       # (200, n_goals)
+    near = dist.min(1) < 0.01
+    counts = [int(((dist.argmin(1) == gi) & near).sum()) for gi in range(cfg.n_goals)]
 
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(5, 5.6))
     for gi in range(cfg.n_goals):
         ea = ENV.expert_action(p, ENV.GOALS[gi], v_max=cfg.v_max)
         ax.arrow(0, 0, ea[0], ea[1], color="tab:green", alpha=0.5, width=0.001,
@@ -157,13 +171,14 @@ def panel_multimodal(cfg, dev):
     ax.axvline(0, color="k", lw=0.3)
     ax.set_xlabel("vx")
     ax.set_ylabel("vy")
-    ax.set_title("Point-mass side-demo: goal hidden, regressor averages, flow samples")
-    ax.legend(fontsize=8)
+    ax.set_title("Point-mass, goal hidden: BC averages, flow samples modes", fontsize=10)
+    ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
     ax.set_aspect("equal")
     fig.tight_layout()
     finish(_OUT / "multimodal.png")
     print(f"point-mass multimodal: BC averaged |action|={np.linalg.norm(bc_a):.4f}  "
-          f"flow sample spread std={samples.std(0).mean():.4f}")
+          f"flow sample spread std={samples.std(0).mean():.4f}  "
+          f"flow samples within 0.01 of a mode={near.mean():.3f}  per-mode counts={counts}")
 
 
 def panel_flow_path(cfg, dev, demos):

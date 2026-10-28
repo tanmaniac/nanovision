@@ -19,7 +19,7 @@ from dataclasses import dataclass
 @dataclass
 class VLAConfig:
     act_dim: int = 2            # reacher action is a 2D joint torque (shoulder, wrist) in [-1, 1]
-    chunk: int = 4             # default chunk length H; the ablation sweeps {1, 4, 16}
+    chunk: int = 4             # default chunk length H; the viz ablation sweeps (1, 4, 8)
     cond_dim: int = 64          # width the heads project the conditioning to inside the MLP
     hidden: int = 256           # MLP hidden width
     time_dim: int = 64          # sinusoidal time-embedding width for the flow/ddpm heads

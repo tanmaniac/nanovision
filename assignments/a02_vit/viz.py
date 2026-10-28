@@ -1,11 +1,13 @@
-"""A2 viz: ViT overfit loss curve and a CLS-token attention map, headless.
+"""A2 viz: ViT overfit loss curve, a CLS-token attention map, and DINOv2 token norms.
 
-Always produces PNGs in out/ with no download. Path (a) overfits a synthetic batch
-and plots the loss curve. Path (b) renders the [CLS]-token attention over the patch
-grid on a synthetic image via an attention rollout. Path (c), only if timm is
-installed and DINOv2 weights are reachable, loads vit_small_patch14_dinov2 and its
-register variant and saves their attention-map difference; it falls back cleanly to
-the synthetic path and prints a message if timm/internet are missing.
+Writes PNGs to out/. Path (a) overfits a synthetic batch and plots the loss curve.
+Path (b) renders the [CLS]-token attention over the patch grid on a synthetic image
+via an attention rollout. Both need no download. Path (c), only if timm is installed
+and the DINOv2 weights are reachable (vit_base_patch14_dinov2 and its reg4 variant,
+about 331 MB each, cached after the first run), plots the patch-token norms at an
+intermediate encoder block on matplotlib's bundled grace_hopper.jpg, with and without
+register tokens; it prints a message and skips the figure if timm or the weights are
+unavailable.
 
 Run with: make viz A=a02_vit  (uses the reference solution).
 """
@@ -123,10 +125,31 @@ def attention_map(out_path):
     finish(out_path)
 
 
-def dinov2_register_comparison(out_path):
-    """Optional: DINOv2 vs DINOv2-reg attention, if timm and weights are reachable.
+DINO_BLOCK = 9  # 1-based encoder block whose output norms are plotted
 
-    Returns True if it produced the figure, False if it fell back. Never raises.
+
+def _grace_hopper(res: int = 518) -> torch.Tensor:
+    """matplotlib's bundled sample photo, resized and ImageNet-normalized: (1, 3, res, res)."""
+    import matplotlib
+    from PIL import Image
+
+    path = Path(matplotlib.get_data_path()) / "sample_data" / "grace_hopper.jpg"
+    img = Image.open(path).convert("RGB").resize((res, res), Image.BICUBIC)
+    x = torch.from_numpy(np.asarray(img, dtype=np.float32) / 255.0).permute(2, 0, 1)
+    mean = torch.tensor([0.485, 0.456, 0.406])[:, None, None]
+    std = torch.tensor([0.229, 0.224, 0.225])[:, None, None]
+    return ((x - mean) / std)[None]
+
+
+def dinov2_register_comparison(out_path):
+    """Optional: patch-token norms of DINOv2 ViT-B with and without registers.
+
+    Runs vit_base_patch14_dinov2 and vit_base_patch14_reg4_dinov2 (timm, about 331 MB
+    of weights each) on matplotlib's bundled grace_hopper.jpg at 518x518, captures the
+    output of encoder block DINO_BLOCK with a forward hook (before the final norm),
+    drops the class and register tokens, and plots each patch token's norm on the
+    37x37 grid. Returns True if it produced the figure, False if timm or the weights
+    are unavailable. Never raises on a missing dependency.
     """
     try:
         import timm
@@ -134,33 +157,46 @@ def dinov2_register_comparison(out_path):
         print(f"timm not available ({e}); skipping the DINOv2 register comparison.")
         return False
     try:
-        plain = timm.create_model("vit_small_patch14_dinov2.lvd142m", pretrained=True,
+        plain = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True,
                                    num_classes=0).eval()
-        reg = timm.create_model("vit_small_patch14_reg4_dinov2.lvd142m", pretrained=True,
+        reg = timm.create_model("vit_base_patch14_reg4_dinov2.lvd142m", pretrained=True,
                                 num_classes=0).eval()
     except Exception as e:  # noqa: BLE001
         print(f"DINOv2 weights unreachable ({e}); skipping the register comparison.")
         return False
 
-    set_seed(0)
-    dev = default_device()  # the pretrained ViT-Small forward at 518x518 is the heavy part
-    plain, reg = plain.to(dev), reg.to(dev)
-    img = torch.randn(1, 3, 518, 518, device=dev)
-    fig, axs = plt.subplots(1, 2, figsize=(8, 4))
-    for ax, (name, model) in zip(axs, [("DINOv2", plain), ("DINOv2-reg", reg)]):
+    dev = default_device()  # the pretrained ViT-B forward at 518x518 is the heavy part
+    img = _grace_hopper().to(dev)
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    axs[0].imshow(((img[0].cpu() * torch.tensor([0.229, 0.224, 0.225])[:, None, None]
+                    + torch.tensor([0.485, 0.456, 0.406])[:, None, None])
+                   .clamp(0, 1).permute(1, 2, 0).numpy()))
+    axs[0].set_title("input (518x518)")
+    axs[0].axis("off")
+    for ax, (name, model) in zip(axs[1:], [("DINOv2 ViT-B", plain), ("DINOv2 ViT-B reg4", reg)]):
+        model = model.to(dev)
+        captured = {}
+        handle = model.blocks[DINO_BLOCK - 1].register_forward_hook(
+            lambda mod, inp, out: captured.__setitem__("x", out.detach()))
         with torch.no_grad():
-            feats = model.forward_features(img)
-        # Per-token feature norm; the high-norm artifacts are what registers remove.
-        if isinstance(feats, dict):
-            feats = feats.get("x_norm_patchtokens", next(iter(feats.values())))
-        tokens = feats[0]
+            model.forward_features(img)
+        handle.remove()
+        # timm puts the class token and any register tokens first; drop them so only
+        # the patch tokens are laid out on the grid.
+        tokens = captured["x"][0, model.num_prefix_tokens:]
         n = tokens.shape[0]
-        side = int(round((n) ** 0.5))
-        norms = tokens.norm(dim=-1)[: side * side].reshape(side, side).cpu().numpy()
-        im = ax.imshow(norms, cmap="viridis")
-        ax.set_title(f"{name} patch-token norm")
+        side = int(round(n ** 0.5))
+        assert side * side == n, f"{name}: {n} patch tokens do not form a square grid"
+        norms = tokens.norm(dim=-1).float()
+        med = norms.median().item()
+        n_out = int((norms > 10 * med).sum().item())
+        print(f"{name} block {DINO_BLOCK}: median norm {med:.1f}, max {norms.max().item():.1f} "
+              f"({norms.max().item() / med:.1f}x median), {n_out} tokens above 10x median")
+        im = ax.imshow(norms.reshape(side, side).cpu().numpy(), cmap="viridis")
+        ax.set_title(f"{name}, block {DINO_BLOCK} patch-token norm")
         ax.axis("off")
         fig.colorbar(im, ax=ax, fraction=0.046)
+        model.cpu()
     fig.tight_layout()
     finish(out_path)
     print(f"wrote DINOv2 register comparison to {out_path}")

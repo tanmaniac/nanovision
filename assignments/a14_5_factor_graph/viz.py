@@ -4,8 +4,8 @@ A robot drives a loop; its odometry drifts, so the raw trajectory does not close
 loop-closure edge ties the last pose back to the first. Scrubbing the timeline replays the
 Gauss-Newton iterations: the drifted trajectory snaps onto the ground-truth loop as the
 loop-closure residual is distributed back along the path. A scalar panel plots the total cost
-falling, and a static image shows the block-sparsity of the system matrix H (the arrowhead the
-loop-closure edge creates).
+falling, and a static image shows the block-sparsity of the system matrix H (a band from the
+odometry edges plus the corner blocks the loop-closure edge creates).
 
 Run headless (writes out/pose_graph.rrd):   make viz A=a14_5_factor_graph
 Open the interactive viewer:                 make viz A=a14_5_factor_graph SHOW=1

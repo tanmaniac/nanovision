@@ -251,15 +251,17 @@ def nerf_synthetic_scene(
     focal_mult: float = 1.0,
     seed: int = 0,
     device: str = "cpu",
+    center: tuple[float, float, float] | None = None,
 ) -> tuple[Tensor, Tensor, Tensor, float, float]:
     """A tiny posed-image scene of one solid sphere, for NeRF (A9).
 
-    The object is a solid sphere of the given radius centered at the world origin and
-    constant interior density `sphere_sigma`. Its surface albedo is either a smooth
-    position-dependent color (the default) or, when `texture_freq > 0`, a high-frequency
-    grayscale stripe pattern - the signal the Fourier positional encoding must resolve and a
-    raw-coordinate MLP blurs (the spectral-bias ablation in A9; a smooth sphere has no
-    high-frequency content for encoding to help with, so the ablation needs the texture).
+    The object is a solid sphere of the given radius, centered at the world origin (or at
+    `center`, when given), with constant interior density `sphere_sigma`. Its surface albedo
+    is either a smooth position-dependent color (the default) or, when `texture_freq > 0`, a
+    high-frequency grayscale stripe pattern - the signal the Fourier positional encoding must
+    resolve and a raw-coordinate MLP blurs (the spectral-bias ablation in A9; a smooth sphere
+    has no high-frequency content for encoding to help with, so the ablation needs the
+    texture).
     `focal_mult` scales the focal length to zoom the sphere into the frame so the textured
     surface, not the background, dominates the image.
 
@@ -292,6 +294,11 @@ def nerf_synthetic_scene(
         bg: background gray level in [0, 1], applied to all three channels.
         seed: unused placeholder for API symmetry (the scene is deterministic).
         device: target device for the returned tensors.
+        center: world position of the sphere's center. None (the default) puts it at the
+            origin, the scene A9 and A10 use. A10.5 passes its off-center sphere so the
+            images show the same sphere its ground-truth pointmaps describe. The cameras
+            always look at the origin; the surface color is a function of the position
+            relative to the center.
 
     Returns:
         images: (n_views, H, W, 3) ground-truth pixels in [0, 1].
@@ -308,10 +315,18 @@ def nerf_synthetic_scene(
     # near/far bracket the sphere along every ray: cam_dist +- radius with margin.
     near = cam_dist - radius - 0.5
     far = cam_dist + radius + 0.5
+    if center is not None:
+        # An off-center sphere can sit up to |center| closer to or farther from a camera.
+        shift = float(torch.tensor(center).norm())
+        near = near - shift
+        far = far + shift
+    c_t = None if center is None else torch.tensor(center, dtype=torch.float32)
 
     # Surface albedo as a function of the entry point (so it is view-consistent: the same 3D
     # surface point has the same color from every camera).
     def _sphere_color(p: Tensor) -> Tensor:
+        if c_t is not None:
+            p = p - c_t  # color by position relative to the sphere's center
         if texture_freq > 0.0:
             # High-frequency grayscale stripes: a smooth but high-frequency function of the
             # surface position. The Fourier encoding resolves it; a raw-coordinate MLP, biased
@@ -354,10 +369,11 @@ def nerf_synthetic_scene(
         dirs_world = dirs_cam @ R.T
         dirs_world = dirs_world / dirs_world.norm(dim=-1, keepdim=True)
         o = cam_pos  # (3,)
+        oc = o if c_t is None else o - c_t  # ray origin relative to the sphere center
 
-        # Closed-form ray-sphere chord: |o + t d|^2 = radius^2, d unit so a = 1.
-        b_coef = 2.0 * (dirs_world * o).sum(-1)
-        c_coef = (o * o).sum() - radius * radius
+        # Closed-form ray-sphere chord: |oc + t d|^2 = radius^2, d unit so a = 1.
+        b_coef = 2.0 * (dirs_world * oc).sum(-1)
+        c_coef = (oc * oc).sum() - radius * radius
         disc = b_coef * b_coef - 4.0 * c_coef
         hit = disc > 0.0
         sqrt_disc = torch.sqrt(disc.clamp(min=0.0))
@@ -615,18 +631,16 @@ def bev_multicam_scene(
     vehicle's ego cell. BEV cells reaching back into image space (the query-pull view transform)
     can recover the occupancy because the projection geometry is exact.
 
-    A 4-camera cardinal ring does not produce cells seen by two cameras at once (the FOV
-    boundaries meet along the diagonals), so every BEV cell is single-view or unseen regardless of
-    focal; the multi-view averaging in spatial cross-attention is exercised by its unit test, not
-    by this toy's geometry. The default focal (img / 2, ~90 degree FOV) covers almost the whole
-    grid (only the far corners are unseen) while keeping many single-view cells for the hit-mask
-    test.
+    At the default focal (img / 2, about a 90-degree horizontal FOV) the four fields of view meet
+    along the diagonals, so every BEV cell of the default grid is seen by exactly one camera or by
+    none: 252 cells are single-view and only the 4 cells around the ego origin are unseen. No cell
+    is seen by two cameras, so the cross-camera average in spatial cross-attention is never
+    exercised by this toy, and no test covers it.
 
     Conventions match nanovision.geometry: ego x forward, y left, z up; camera OpenCV x right,
     y down, z forward; extrinsic E = T_cam_ego. A camera at ego yaw a has axes z_cam=(cos a,
     sin a, 0), x_cam=(sin a, -cos a, 0), y_cam=(0, 0, -1); at a=0 this is the forward camera of
-    bev_toy_scene. The default focal (img) gives a ~53 degree FOV so adjacent cameras leave gaps
-    and some BEV cells are single-view (the spatial-cross-attention hit-mask test needs that).
+    bev_toy_scene.
 
     Temporal use (n_frames=2): the ego moves forward ego_step meters per frame; vehicles are fixed
     in the world, so their ego coordinates shift backward by ego_step each frame. ego_deltas

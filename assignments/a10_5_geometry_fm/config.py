@@ -23,7 +23,7 @@ class GeometryFMConfig:
     dec_heads: int = 4
     head_hidden: int = 128      # pointmap-head MLP width
 
-    alpha: float = 0.2          # confidence regularizer weight (DUSt3R)
+    alpha: float = 0.2          # confidence regularizer weight (DUSt3R code release)
 
     # Toy scene geometry: off-center sphere + wide baseline (avoids the centered-sphere
     # degeneracy where the two views are near-identical and cross-attention is idle).

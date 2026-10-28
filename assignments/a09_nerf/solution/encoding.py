@@ -8,8 +8,9 @@ high-frequency detail (sharp object boundaries) early in training.
 Input-range contract: the frequency schedule 2^k is only well-behaved when inputs are
 normalized to roughly [-1, 1] first. The caller (NeRFMLP) divides sample positions by a
 scene-bound constant before encoding and feeds unit-length directions. An unnormalized
-position of magnitude ~4 with the top 2^(L-1) * pi band aliases badly, so this module
-assumes the caller has normalized.
+position of magnitude ~4 scales every band frequency up by 4 (a narrower kernel than L was
+chosen for) and makes the lowest band repeat inside the scene, so this module assumes the
+caller has normalized.
 """
 
 import torch

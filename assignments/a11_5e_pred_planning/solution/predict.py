@@ -200,8 +200,8 @@ def wta_loss(
       trajectory with mean squared error. The winner index is computed once, detached (argmin has
       no gradient), so only the winning mode carries regression gradient. Selection uses Euclidean
       FDE; regression uses squared error - the mismatch is intentional (squared error is smooth at
-      0 for gradcheck). The dead-mode risk: spare modes that never win get no gradient and stay
-      dead.
+      0 for gradcheck). The dead-mode risk: a spare mode that never wins has no loss term pulling it
+      toward any future; it only drifts with the weights it shares with the winners.
     - temperature is a float (soft / annealed min-of-N): per-mode weight
       w_k = softmax(-FDE_k / temperature); regression = sum_k w_k * MSE_k. Every mode gets
       gradient, weighted toward the closer ones. Annealing temperature -> 0 recovers the hard loss
