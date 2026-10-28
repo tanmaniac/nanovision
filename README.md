@@ -100,6 +100,11 @@ make verify-all          # every solution/ in its own process (the green bar)
 Both `viz` targets write PNGs to `out/` (headless by default). Add `SHOW=1` to either
 (`make viz-mine A=a02_vit SHOW=1`) to also open the figures in interactive windows.
 
+`make pdf` exports every assignment README to a phone-sized PDF in `pdf/` (`make pdf A=a02_vit`
+for one), with the math and diagrams rendered and the exercise answers expanded. It needs pandoc,
+Playwright's Chromium (`pip install playwright && python -m playwright install
+chromium-headless-shell`), and network access for KaTeX and Mermaid.
+
 The student-versus-solution switch is the `NANOVISION_IMPL` environment variable,
 which the `make` targets set for you. Unset (the default, `make test`) imports your
 top-level files; `NANOVISION_IMPL=solution` (`make verify`, `make viz`) imports the

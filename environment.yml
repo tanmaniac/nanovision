@@ -38,6 +38,9 @@ dependencies:
       # Heavy and optional; the graded CPU mechanism tests skip it via importorskip.
       # Uncomment to run those assignments' real-training and viz paths:
       # - dm_control>=1.0
+      # README export to PDF (make pdf). Also needs pandoc on PATH and, once:
+      #   python -m playwright install chromium-headless-shell
+      # - playwright>=1.40
       # classical SLAM module (a14_*): C++ build + bindings, and the Rerun viewer.
       - cmake>=3.22
       - pybind11>=2.11
