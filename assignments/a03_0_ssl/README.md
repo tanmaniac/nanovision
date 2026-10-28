@@ -609,8 +609,8 @@ flowchart TB
     TP --> L["cross-view CE<br/>over crop pairs"]
     SP --> L
     L -->|backprop| STU
-    STU -.->|EMA: theta_t <- m·theta_t + (1-m)·theta_s| TEA
-    TP -.->|center <- m_c·center + (1-m_c)·mean| CEN["center buffer (1, K)"]
+    STU -.->|"EMA: theta_t <- m·theta_t + (1-m)·theta_s"| TEA
+    TP -.->|"center <- m_c·center + (1-m_c)·mean"| CEN["center buffer (1, K)"]
 ```
 
 ### Collapse, centering, and sharpening

@@ -8,6 +8,7 @@
 #   make verify  A=a00_harness   # run the reference in solution/ (must be green)
 #   make viz     A=a00_harness   # render the result to assignments/<A>/out/
 #   make test-all / make verify-all
+#   make pdf     [A=a00_harness] # export the READMEs to phone-sized PDFs in pdf/ (all if no A)
 #
 # Iterating on one function (test / verify accept these):
 #   make test A=a01_transformer K="sdpa"            # -k filter: only tests whose name matches
@@ -33,7 +34,7 @@ PYTHON ?= python
 PYTEST := $(PYTHON) -m pytest
 A ?=
 
-.PHONY: test verify viz test-all verify-all
+.PHONY: test verify viz test-all verify-all pdf
 
 test:
 	@test -n "$(A)" || (echo "set A=<assignment id>, e.g. make test A=a00_harness" && exit 1)
@@ -69,3 +70,8 @@ verify-all:
 		echo "== $$(basename $$d) =="; \
 		NANOVISION_IMPL=solution $(PYTEST) "$$d/tests" -q --no-header; \
 	done
+
+# Export assignment READMEs to phone-sized PDFs in pdf/, with math and diagrams rendered
+# (all assignments, or only A). Needs pandoc and Playwright's Chromium; see tools/export_pdfs.py.
+pdf:
+	$(PYTHON) tools/export_pdfs.py $(A)
