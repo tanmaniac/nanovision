@@ -51,7 +51,7 @@ def _train_dit(cfg, latents, labels, steps=12000):
         idx = torch.randint(0, n, (min(32, n),), generator=g, device=dev)
         x1, y = latents[idx], labels[idx]
         x0 = torch.randn_like(x1)
-        t = 0.05 + 0.9 * torch.rand(x1.shape[0], generator=g, device=dev)
+        t = torch.rand(x1.shape[0], generator=g, device=dev)   # t ~ U[0, 1], the sampler's range
         opt.zero_grad(); cfm_loss(model, x0, x1, y, t).backward(); opt.step()
     return model
 

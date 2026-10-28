@@ -706,8 +706,9 @@ and averaged over the batch:
 
 $$\mathcal{L}_{\text{CFM}} = \big\Vert v_\theta(x_t, t, y) - (x_1 - x_0)\big\Vert^2.$$
 
-The training loop draws $t$ uniformly from $[0.05, 0.95]$ rather than the full $[0, 1]$, keeping
-the endpoints out of the training distribution.
+The training loop draws $t$ uniformly from $[0, 1]$, the same range the Euler sampler steps
+through, so every time at which the sampler queries the network is one it was trained on. With the
+linear interpolant the target $x_1 - x_0$ is defined at every $t$, endpoints included.
 
 Flow matching rather than DDPM is a deliberate choice. DDPM (Ho, Jain, Abbeel 2020) defines a
 fixed Markov chain that adds Gaussian noise on a variance schedule, derives the exact Gaussian
@@ -865,13 +866,13 @@ rather than convergence.
 In `latent_dit.png` most decoded DiT samples are clean shapes of the requested class, but not
 all. Counting a sample as clear when its thresholded mask overlaps some exactly drawn shape of
 the requested class with intersection-over-union of at least 0.85, and matches that class
-better than the other two, two GPU runs with 16 samples per class gave 13/16 and 15/16 clear
-disks, 16/16 and 16/16 clear squares, and 16/16 and 10/16 clear plus signs. The failures are
-small round blobs (a plus at the smallest size is only a few pixels wider than a disk) and
-merged or ragged shapes; the result varies from run to run because CUDA training is not
-bit-exact. The DiT is trained on only 64 images, and most samples are close copies of a
-training image (in the second run, 88% of samples had intersection-over-union above 0.95 with
-some training image), so this demo shows conditional generation working through the latent,
+better than the other two, three GPU runs (training seeds 0, 1, 2) with 16 samples per class gave
+14, 13 and 15 of 16 clear disks, 16 of 16 clear squares in all three, and 15, 13 and 13 of 16 clear
+plus signs. The failures are
+misshapen samples such as the ragged square in the class-1 row of the figure; the result varies with the training seed, and between repeated runs
+because CUDA training is not bit-exact. The DiT is trained on only 64 images, and most samples are close copies of a
+training image (in those three runs, 88%, 83% and 62% of samples had intersection-over-union above
+0.95 with some training image), so this demo shows conditional generation working through the latent,
 not generalization to new positions and sizes.
 These are toy artifacts on 16x16 images that confirm the two-stage pipeline runs end to end; they
 say nothing about sample quality at scale, where the VAE uses $f = 8$, the DiT is far larger, and
